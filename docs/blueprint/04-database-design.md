@@ -87,10 +87,13 @@ erDiagram
 | `sold_count` | int | Vé đã thanh toán/phát hành. |
 | `version` | int | Optimistic locking nếu cần. |
 
-Invariant:
+Invariant bắt buộc:
 
 ```text
-sold_count + reserved_count <= total_capacity
+sold_count + active_reserved_count <= total_capacity
+paid_user_ticket_count <= configured_user_limit
+one successful payment confirmation issues ticket exactly once
+one ticket can have at most one accepted check-in
 ```
 
 ### `reservations`
@@ -118,6 +121,31 @@ Unique đề xuất: `(user_id, idempotency_key)`.
 | `paid_count` | int | Vé đã mua thành công. |
 
 Primary key: `(user_id, ticket_type_id)`.
+
+### Transaction giữ vé
+
+Inventory là phần cần consistency cao nhất. Checkout không được dựa vào Redis/cache để quyết định bán vé.
+
+Trong transaction tạo reservation:
+
+1. Lock row `ticket_inventory` bằng `SELECT ... FOR UPDATE`, hoặc dùng optimistic update `WHERE available >= quantity`.
+2. Lock/upsert row `user_ticket_quota`.
+3. Kiểm tra sale window hợp lệ.
+4. Kiểm tra `available >= quantity`.
+5. Kiểm tra quota sau khi cộng reservation không vượt `per_user_limit`.
+6. Insert reservation có TTL.
+7. Update `reserved_count` và quota reserved.
+
+Khi payment thành công, transaction confirm sẽ chuyển reservation sang sold và chuyển quota reserved sang paid. Sweeper chạy định kỳ để release reservation hết hạn.
+
+### Mở rộng khi PostgreSQL thành bottleneck
+
+| Vấn đề | Cách xử lý |
+|---|---|
+| Row lock nóng trên ticket type SVIP | Dùng waiting room để giới hạn write concurrency vào ticket type hot. |
+| Retry transaction quá nhiều | Serialize command cực hot bằng RabbitMQ theo `ticket_type_id`. |
+| Dashboard/reporting ảnh hưởng primary | Dùng read replica hoặc read model riêng. |
+| Số concert/ticket type lớn | Partition/shard theo `concert_id` và `ticket_type_id` nếu cần. |
 
 ### `orders`, `payments`, `tickets`
 
@@ -147,4 +175,3 @@ Primary key: `(user_id, ticket_type_id)`.
 | `guest_list_batches` | Lưu batch import CSV, status, file object key, summary lỗi. |
 | `guest_entries` | Guest list đã validate theo concert/zone/version. |
 | `artist_bio_jobs` | Trạng thái xử lý PDF, extracted text, AI output, review status. |
-

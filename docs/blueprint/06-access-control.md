@@ -31,6 +31,14 @@ TicketBox dùng RBAC làm nền tảng, kết hợp ownership check theo organiz
 
 ## Kiểm tra quyền tại từng điểm truy cập
 
+Nguyên tắc chung:
+
+1. Không tin quyền từ UI; backend kiểm tra lại ở mọi endpoint.
+2. Token chỉ chứng minh danh tính và role, không thay thế resource ownership check.
+3. Admin action nhạy cảm phải có audit log.
+4. Scanner token nên ngắn hạn và bind theo device/event/gate.
+5. Service account chỉ có scope tối thiểu cho job nội bộ.
+
 ### API endpoint
 
 Mọi endpoint private yêu cầu access token hợp lệ. Backend kiểm tra:
@@ -69,4 +77,3 @@ Các hành động cần audit:
 - Import/publish guest list version.
 - Payment webhook/reconciliation/refund.
 - Ticket issuing và check-in conflict.
-

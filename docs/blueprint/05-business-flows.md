@@ -1,5 +1,7 @@
 # 5. Mô tả các luồng nghiệp vụ quan trọng
 
+Các luồng trong file này bao phủ các nghiệp vụ rủi ro nhất của TicketBox: mua vé, soát vé offline, nhập guest list CSV, cập nhật cache và AI Artist Bio.
+
 ## Luồng mua vé
 
 ```mermaid
@@ -120,3 +122,67 @@ sequenceDiagram
 | Batch lỗi nặng | Quarantine file, không ghi đè dữ liệu production. |
 | Import service restart | Job có idempotency theo file checksum/batch id. |
 
+## Luồng cập nhật cache concert
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Admin
+    participant Concert as Concert Service
+    participant DB as DB
+    participant EventBus as Event Bus
+    participant CacheWorker as Cache Worker
+    participant Cache as Nginx/Varnish/Redis
+    participant PublicAPI as Public API
+
+    Admin->>Concert: Update concert
+    Concert->>DB: Save
+    Concert->>EventBus: Publish ConcertUpdated
+    EventBus-->>CacheWorker: Deliver ConcertUpdated
+    CacheWorker->>Cache: Invalidate concert detail/listing keys
+    PublicAPI->>Cache: Serve updated content
+```
+
+### Xử lý lỗi giữa chừng
+
+| Lỗi | Hành vi |
+|---|---|
+| Cache worker lỗi | TTL ngắn giúp cache tự hết hạn; worker retry event. |
+| Event bus retry | Invalidation idempotent, xóa key nhiều lần vẫn an toàn. |
+| Cache stampede | Dùng request coalescing, stale-while-revalidate và prewarm trước giờ mở bán. |
+
+## Luồng AI Artist Bio
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Admin
+    participant Storage as Object Storage
+    participant Event as Object Storage/Event
+    participant AI as AI Artist Bio Service
+    participant PDF as PDF Extractor
+    participant Model as AI Model
+    participant DB as DB
+    participant AdminWeb as Admin Web
+    participant Concert as Concert Service
+    participant PublicPage as Public Page
+
+    Admin->>Storage: Upload PDF
+    Event->>AI: Start job
+    AI->>PDF: Extract text
+    AI->>AI: Clean, truncate, remove irrelevant content
+    AI->>Model: Generate short artist bio
+    AI->>DB: Save draft bio
+    Admin->>AdminWeb: Review/publish
+    AdminWeb->>Concert: Publish approved bio
+    Concert-->>PublicPage: Display published bio
+```
+
+### Xử lý lỗi giữa chừng
+
+| Lỗi | Hành vi |
+|---|---|
+| PDF lỗi hoặc quá lớn | Reject upload hoặc đưa job vào failed, không ảnh hưởng trang concert. |
+| Extract text lỗi | Lưu lỗi job để admin upload lại hoặc nhập bio thủ công. |
+| AI model timeout | Retry/backoff; nếu vẫn lỗi, giữ draft trống hoặc bio thủ công. |
+| AI sinh nội dung không phù hợp | Không auto-publish; admin phải review/edit/publish. |

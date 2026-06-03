@@ -1,5 +1,7 @@
 # 2. C4 Diagram
 
+Các sơ đồ C4 dưới đây mô tả actor, container ứng dụng, container hạ tầng và cách TicketBox giao tiếp với hệ thống ngoài.
+
 ## Level 1 - System Context
 
 ```mermaid
@@ -83,7 +85,7 @@ flowchart TD
     Workers --> CSVSource
 ```
 
-### Công nghệ đề xuất
+### Công nghệ đề xuất theo container
 
 | Container | Công nghệ | Giao tiếp chính |
 |---|---|---|
@@ -97,3 +99,63 @@ flowchart TD
 | MinIO | Object storage | Lưu file lớn và asset versioned. |
 | Keycloak | OIDC provider | Login, JWT/session, role, MFA. |
 
+## Container topology triển khai
+
+```mermaid
+flowchart TD
+    Internet["Internet"]
+    Edge["Reverse Proxy / Edge Cache / WAF"]
+    Gateway["Kubernetes Ingress / API Gateway"]
+
+    Internet --> Edge --> Gateway
+
+    subgraph Apps["Application workloads"]
+        AudienceWeb["audience-web"]
+        AdminWeb["admin-web"]
+        BackendAPI["backend-api"]
+        Concert["concert-service"]
+        Inventory["inventory-service"]
+        Order["order-service"]
+        Payment["payment-service"]
+        Checkin["checkin-service"]
+    end
+
+    subgraph Workers["Async workers"]
+        NotificationWorker["notification-worker"]
+        ReservationSweeper["reservation-sweeper"]
+        PaymentReconciliation["payment-reconciliation-worker"]
+        CSVImport["csv-import-worker"]
+        AIBioWorker["ai-artist-bio-worker"]
+    end
+
+    subgraph Platform["Platform services"]
+        Postgres["PostgreSQL primary + replica"]
+        Redis["Redis Cluster"]
+        RabbitMQ["RabbitMQ cluster"]
+        MinIO["MinIO cluster"]
+        Keycloak["Keycloak"]
+        Observability["Prometheus / Grafana / Loki / Tempo"]
+    end
+
+    Gateway --> AudienceWeb
+    Gateway --> AdminWeb
+    Gateway --> BackendAPI
+    Gateway --> Concert
+    Gateway --> Inventory
+    Gateway --> Order
+    Gateway --> Payment
+    Gateway --> Checkin
+
+    BackendAPI --> Keycloak
+    BackendAPI --> Postgres
+    BackendAPI --> Redis
+    BackendAPI --> RabbitMQ
+    BackendAPI --> MinIO
+    BackendAPI --> Observability
+
+    RabbitMQ --> NotificationWorker
+    RabbitMQ --> ReservationSweeper
+    RabbitMQ --> PaymentReconciliation
+    RabbitMQ --> CSVImport
+    RabbitMQ --> AIBioWorker
+```

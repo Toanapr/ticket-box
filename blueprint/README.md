@@ -6,8 +6,8 @@ Blueprint này là nguồn tài liệu thiết kế chính cho đồ án TicketB
 
 | Nguồn | Vai trò |
 |---|---|
-| `docs/blueprint/` | Source of truth cho thiết kế hệ thống TicketBox. |
-| [`../project-brief-ticketbox.md`](../project-brief-ticketbox.md) | Bối cảnh đề bài và phạm vi đồ án. |
+| `blueprint/` | Thư mục Blueprint dùng để review và nộp bài; source of truth cho thiết kế hệ thống TicketBox. |
+| [`../docs/project-brief-ticketbox.md`](../docs/project-brief-ticketbox.md) | Bối cảnh đề bài và phạm vi đồ án. |
 
 ## Mục lục Blueprint
 
@@ -29,11 +29,13 @@ Blueprint này là nguồn tài liệu thiết kế chính cho đồ án TicketB
 | Nhóm tài liệu | Nội dung |
 |---|---|
 | [Core design decisions](core-design-decisions/README.md) | Giải thích từng quyết định thiết kế cốt lõi, lý do chọn, trade-off, phương án không chọn và cách kiểm chứng. |
+| [Feature specifications](specs/README.md) | Đặc tả hành vi, kịch bản lỗi, ràng buộc và tiêu chí chấp nhận theo tính năng khi implement. |
 
 ## Cách đọc
 
 - Đọc nhanh toàn cảnh: `01-system-design.md`, `02-c4-diagrams.md`, `03-high-level-architecture.md`.
 - Hiểu lý do và trade-off của thiết kế: `core-design-decisions/`.
+- Implement và kiểm thử theo tính năng: `specs/`.
 - Triển khai backend: `04-database-design.md`, `05-business-flows.md`, `06-access-control.md`.
 - Xử lý rủi ro hệ thống: `07-protection-mechanisms.md`, `08-requirements.md`.
 - Chọn công nghệ và lên kế hoạch triển khai: `09-implementation-roadmap.md`, `10-technology-stack.md`.

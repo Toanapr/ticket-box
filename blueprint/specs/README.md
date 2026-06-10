@@ -2,6 +2,8 @@
 
 Thư mục này lưu đặc tả hành vi theo từng tính năng khi bắt đầu implementation. Mỗi spec cần mô tả luồng chính, kịch bản lỗi, ràng buộc và tiêu chí chấp nhận; không lặp lại kiến trúc hoặc quyết định đã có trong các tài liệu Blueprint khác.
 
+Quy trình đầy đủ để tạo spec, implementation plan, GitHub Issue, ADR và API contract: [documentation-and-implementation-workflow.md](../../docs/documentation-and-implementation-workflow.md).
+
 ## Specs dự kiến
 
 | Spec | Phạm vi |

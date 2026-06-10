@@ -10,7 +10,7 @@ TicketBox dùng RBAC làm nền tảng, kết hợp ownership check theo organiz
 |---|---|---|
 | `audience` | Khán giả | Xem concert public, tạo reservation/order của chính mình, xem ticket của chính mình. |
 | `organizer` | Ban tổ chức | Tạo/sửa/hủy concert thuộc organization, cấu hình vé, upload PDF/CSV, xem doanh thu concert mình quản lý. |
-| `scanner` | Nhân sự soát vé | Đăng nhập mobile app, tải manifest được phân công, quét/sync check-in. |
+| `scanner` | Nhân sự soát vé | Đăng nhập scanner PWA, tải manifest được phân công, quét/sync check-in. |
 | `system_admin` | Quản trị hệ thống | Quản lý organization, user, global config, audit. |
 | `service_account` | Worker/internal service | Gọi API nội bộ hoặc consume event theo scope hẹp. |
 
@@ -63,7 +63,7 @@ Ví dụ:
 
 Admin Web chỉ hiển thị route sau khi user có role `organizer` hoặc `system_admin`. UI không phải lớp bảo mật duy nhất; backend vẫn kiểm tra quyền trên từng API. Các action nhạy cảm như hủy concert, refund, đổi quota sau khi mở bán cần audit log và có thể yêu cầu MFA/re-auth.
 
-### Mobile app soát vé
+### Scanner Web/PWA App
 
 Scanner app dùng token ngắn hạn, có thể bind với `device_id`, `concert_id`, `gate_id` và `zone_code`. Manifest tải về cần chữ ký và version. Khi sync offline, backend không tin dữ liệu client hoàn toàn mà kiểm tra lại ticket status, assignment và idempotency key.
 

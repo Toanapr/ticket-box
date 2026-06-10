@@ -44,9 +44,9 @@ flowchart TD
     subgraph TicketBox["TicketBox System"]
         AudienceWeb["Audience Web App<br/>Next.js"]
         AdminWeb["Admin Web App<br/>Next.js"]
-        ScannerApp["Scanner Mobile App<br/>Flutter/React Native"]
-        Gateway["API Gateway / Backend API<br/>NestJS/Spring Boot"]
-        Workers["Background Workers<br/>Node/Java workers"]
+        ScannerApp["Scanner Web/PWA App<br/>Next.js"]
+        Gateway["API Gateway / Backend API<br/>NestJS"]
+        Workers["Background Workers<br/>NestJS / TypeScript"]
         Postgres["PostgreSQL<br/>transactional database"]
         Redis["Redis<br/>cache/rate limit/waiting room"]
         RabbitMQ["RabbitMQ<br/>event bus/job queue"]
@@ -90,9 +90,9 @@ flowchart TD
 | Container | Công nghệ | Giao tiếp chính |
 |---|---|---|
 | Audience/Admin Web | Next.js | HTTPS tới API Gateway, cache public page ở edge. |
-| Scanner Mobile App | Flutter hoặc React Native | HTTPS khi online, local encrypted DB khi offline. |
-| Backend API | NestJS hoặc Spring Boot | REST, transaction PostgreSQL, Redis, RabbitMQ. |
-| Workers | Cùng stack backend | RabbitMQ consumer, gọi AI/email/CSV/object storage. |
+| Scanner Web/PWA App | Next.js PWA | HTTPS khi online, IndexedDB mã hóa khi offline. |
+| Backend API | NestJS | REST, transaction PostgreSQL, Redis, RabbitMQ. |
+| Workers | NestJS/TypeScript | RabbitMQ consumer, gọi AI/email/CSV/object storage. |
 | PostgreSQL | SQL database | Transaction, constraint, index, lock cho consistency. |
 | Redis | In-memory data store | Cache-aside, token bucket, waiting room token. |
 | RabbitMQ | Message broker | Retry, DLQ, asynchronous workflow. |

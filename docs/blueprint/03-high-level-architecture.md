@@ -12,7 +12,7 @@ flowchart TD
 
     AudienceWeb["Audience Web App"]
     AdminWeb["Admin Web App"]
-    ScannerApp["Scanner Mobile App<br/>offline manifest + local queue"]
+    ScannerApp["Scanner Web/PWA App<br/>offline manifest + local queue"]
 
     Auth["Auth / Keycloak"]
     Concert["Concert Service"]
@@ -86,7 +86,7 @@ flowchart TD
 | VNPAY/MoMo | Payment Service tạo payment intent/URL, gateway gửi webhook/callback. | Verify signature, idempotency key, payment state machine, reconciliation khi timeout. |
 | AI model | AI Artist Bio Service gửi text đã clean để sinh bio ngắn. | Async job, retry/backoff, lưu draft, admin review trước publish. |
 | CSV guest list | Import service đọc file CSV theo lịch từ object storage/drop folder. | Staging, validate, dedupe, publish version mới khi batch hợp lệ. |
-| Scanner offline | Mobile app tải signed manifest, ghi local queue, sync lại khi online. | QR signed token, local durable storage, idempotent sync, conflict policy. |
+| Scanner offline | Scanner PWA tải signed manifest, ghi local queue, sync lại khi online. | QR signed token, local durable storage, idempotent sync, conflict policy. |
 
 ## Luồng phụ thuộc khi checkout
 

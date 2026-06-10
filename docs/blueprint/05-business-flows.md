@@ -54,7 +54,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant App as Scanner Mobile App
+    participant App as Scanner Web/PWA App
     participant Checkin as Check-in Service
     participant DB as PostgreSQL
     participant QR as E-ticket QR

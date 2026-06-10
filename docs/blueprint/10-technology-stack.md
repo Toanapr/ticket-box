@@ -2,16 +2,16 @@
 
 ## Định hướng chính
 
-TicketBox chọn hướng self-hosted/container-based làm kiến trúc chính. Hệ thống chạy trên Docker và Kubernetes, dùng PostgreSQL làm nguồn dữ liệu giao dịch, Redis cho cache/rate limit/waiting room, RabbitMQ cho xử lý bất đồng bộ, MinIO cho object storage, Keycloak cho identity, và OpenTelemetry stack cho observability.
+TicketBox chọn Next.js làm frontend framework thống nhất cho audience web, admin web và scanner PWA; NestJS làm backend framework thống nhất cho API/worker. Hệ thống chạy theo hướng self-hosted/container-based trên Docker và Kubernetes, dùng PostgreSQL làm nguồn dữ liệu giao dịch, Redis cho cache/rate limit/waiting room, RabbitMQ cho xử lý bất đồng bộ, MinIO cho object storage, Keycloak cho identity và OpenTelemetry stack cho observability.
 
 ## Stack đề xuất
 
 | Thành phần | Công nghệ đề xuất | Dùng để làm gì | Vì sao phù hợp | Nhược điểm | Phương án thay thế |
 |---|---|---|---|---|---|
-| Frontend Web App | React/Next.js | Web khán giả, danh sách concert, chi tiết concert, checkout, e-ticket. | Hỗ trợ SSR/SSG, routing tốt, tối ưu cache và SEO cho trang public. | Cần kiểm soát caching để không lẫn dữ liệu user/payment. | React SPA + Vite, Nuxt nếu dùng Vue. |
-| Admin Web App | React/Next.js | Dashboard ban tổ chức, quản lý concert, upload PDF/CSV, báo cáo. | Có thể dùng chung design system và auth flow với web app. | Nếu gom chung repo với web audience cần tách quyền và route rõ. | React SPA, Angular. |
-| Mobile Scanner App | Flutter hoặc React Native | App quét QR, offline manifest, local durable check-in log, sync. | Cross-platform, đủ tốt cho camera/QR/local DB. | Cần test kỹ camera, storage encryption và offline sync trên thiết bị thật. | Native iOS/Android nếu cần hiệu năng/thiết bị chuyên dụng. |
-| Backend framework | NestJS hoặc Spring Boot | API backend, domain modules, workers, integration adapters. | NestJS hợp TypeScript/full-stack JS; Spring Boot mạnh về transaction và enterprise pattern. | NestJS cần discipline để không thành service quá lỏng; Spring Boot nặng hơn cho team nhỏ. | Fastify/Express, Go + Gin/Fiber. |
+| Audience Web App | Next.js | Web khán giả, danh sách concert, chi tiết concert, checkout, e-ticket. | Hỗ trợ SSR/SSG, routing tốt, tối ưu cache và SEO cho trang public. | Cần kiểm soát caching để không lẫn dữ liệu user/payment. | Không dùng framework frontend khác trong phạm vi dự án. |
+| Admin Web App | Next.js | Dashboard ban tổ chức, quản lý concert, upload PDF/CSV, báo cáo. | Dùng chung TypeScript, design system và auth flow với audience web. | Nếu gom chung repo với audience web cần tách quyền và route rõ. | Không dùng framework frontend khác trong phạm vi dự án. |
+| Scanner Web/PWA App | Next.js PWA | Quét QR, tải offline manifest, lưu durable check-in log và sync. | Đồng nhất frontend stack, cài đặt qua trình duyệt/PWA, hỗ trợ camera và IndexedDB. | Camera, background sync và storage quota phụ thuộc trình duyệt/thiết bị; cần test kỹ trên thiết bị thật. | Không dùng framework frontend khác trong phạm vi dự án. |
+| Backend framework | NestJS | API backend, domain modules, workers và integration adapters. | Đồng nhất TypeScript với Next.js, hỗ trợ module/DI rõ và phù hợp modular monolith. | Cần giữ module boundary và transaction discipline để tránh coupling. | Không dùng backend framework khác trong phạm vi dự án. |
 | Database | PostgreSQL | Concert, ticket type, reservation, order, payment, ticket, check-in, guest list, audit. | Transaction mạnh, lock/constraint rõ, query/reporting tốt, team dễ vận hành. | Hot row inventory có thể nghẽn nếu không có virtual queue và tối ưu transaction. | CockroachDB, MySQL, YugabyteDB. |
 | Cache/session/rate limit | Redis Cluster | Concert cache, inventory summary, waiting room token, rate limit counter, distributed lock ngắn hạn nếu cần. | Latency thấp, atomic counter tốt, dễ dùng cho flash-sale control. | Dữ liệu volatile, cần Sentinel/Cluster và eviction policy đúng. | KeyDB, Dragonfly, Hazelcast. |
 | Message broker | RabbitMQ | Notification, ticket issuance, payment reconciliation, CSV import, AI jobs, DLQ. | Dễ vận hành hơn Kafka, routing/retry/DLQ phù hợp workflow nghiệp vụ. | Không tối ưu cho event analytics volume cực lớn. | Kafka nếu cần event streaming lớn, NATS nếu cần nhẹ và nhanh. |

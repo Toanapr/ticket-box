@@ -4,7 +4,7 @@
 
 Tài liệu này là source of truth duy nhất cho lộ trình, số thứ tự, scope, checklist, tiêu chí hoàn thành và rủi ro của từng phase.
 
-Hướng triển khai mặc định là NestJS modular monolith, worker process riêng, PostgreSQL, Redis, RabbitMQ, MinIO và Keycloak. Các module vẫn giữ boundary rõ để có thể tách service sau này nếu có tải thật.
+Hướng triển khai mặc định là Next.js cho audience web, admin web và scanner PWA; NestJS modular monolith và NestJS worker process riêng; PostgreSQL, Redis, RabbitMQ, MinIO và Keycloak. Các module vẫn giữ boundary rõ để có thể tách service sau này nếu có tải thật.
 
 | Phase | Mục tiêu | Kết quả chính | Phụ thuộc |
 |---|---|---|---|
@@ -145,7 +145,7 @@ Mục tiêu là soát vé ổn định tại cổng, kể cả khi mạng yếu 
 - Scanner API.
 - Device assignment theo event/gate/zone.
 - Signed manifest cho ticket/guest list/revoked list.
-- Mobile local encrypted storage.
+- PWA local encrypted IndexedDB storage.
 - Offline check-in queue.
 - Sync batch idempotent.
 - Conflict policy: accepted/conflict/rejected.
@@ -284,7 +284,7 @@ Nếu thời gian đồ án hạn chế, ưu tiên theo thứ tự:
 
 ## Kết luận
 
-TicketBox nên đi theo hướng self-hosted/container-based trên Kubernetes, dùng NestJS hoặc Spring Boot cho backend, PostgreSQL cho dữ liệu giao dịch, Redis cho cache/rate limit/waiting room, RabbitMQ cho workflow bất đồng bộ, MinIO cho object storage và Keycloak cho identity.
+TicketBox nên đi theo hướng self-hosted/container-based trên Kubernetes, dùng Next.js cho frontend, NestJS cho backend và worker, PostgreSQL cho dữ liệu giao dịch, Redis cho cache/rate limit/waiting room, RabbitMQ cho workflow bất đồng bộ, MinIO cho object storage và Keycloak cho identity.
 
 Giai đoạn đầu nên bắt đầu bằng modular monolith có boundary rõ và worker process riêng. Khi có số liệu tải thực tế, tách dần các domain nóng như Inventory, Payment và Check-in thành service độc lập.
 

@@ -25,9 +25,16 @@ Blueprint này là nguồn tài liệu thiết kế chính cho đồ án TicketB
 | 10 | [10-technology-stack.md](10-technology-stack.md) | Lựa chọn công nghệ, nhược điểm, phương án thay thế và trade-off. |
 | 11 | [11-implementation-phases.md](11-implementation-phases.md) | Kế hoạch triển khai chi tiết theo phase, checklist và tiêu chí hoàn thành. |
 
+## Tài liệu giải thích chuyên sâu
+
+| Nhóm tài liệu | Nội dung |
+|---|---|
+| [Core design decisions](core-design-decisions/README.md) | Giải thích từng quyết định thiết kế cốt lõi, lý do chọn, trade-off, phương án không chọn và cách kiểm chứng. |
+
 ## Cách đọc
 
 - Đọc nhanh toàn cảnh: `01-system-design.md`, `02-c4-diagrams.md`, `03-high-level-architecture.md`.
+- Hiểu lý do và trade-off của thiết kế: `core-design-decisions/`.
 - Triển khai backend: `04-database-design.md`, `05-business-flows.md`, `06-access-control.md`.
 - Xử lý rủi ro hệ thống: `07-protection-mechanisms.md`, `08-requirements.md`.
 - Chọn công nghệ và lên kế hoạch triển khai: `09-implementation-roadmap.md`, `10-technology-stack.md`, `11-implementation-phases.md`.

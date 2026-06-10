@@ -102,3 +102,4 @@ worktrees/
 .repomixignore
 CLAUDE.md
 release-manifest.json
+AGENTS.md

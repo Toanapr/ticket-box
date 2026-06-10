@@ -1,6 +1,6 @@
 # 3. High-Level Architecture Diagram
 
-Mục tiêu của phần này là gom các thành phần, dependency và điểm tích hợp vào một sơ đồ đọc được ở mức blueprint.
+Mục tiêu của phần này là mô tả dependency chi tiết giữa domain service, critical path, điểm tích hợp và topology triển khai. Actor, system context và container logic cấp cao được quản lý tại [02-c4-diagrams.md](02-c4-diagrams.md).
 
 ## Sơ đồ tổng quan
 
@@ -93,6 +93,65 @@ flowchart TD
 Checkout phụ thuộc vào Auth, Inventory, Order, Payment và database transaction. Notification, analytics và email chỉ chạy sau qua queue. Nếu notification lỗi, checkout không rollback. Nếu payment gateway lỗi, hệ thống dừng bước thanh toán nhưng vẫn giữ được read path cho concert.
 
 ## Topology triển khai khuyến nghị
+
+```mermaid
+flowchart TD
+    Internet["Internet"]
+    Edge["Reverse Proxy / Edge Cache / WAF"]
+    Gateway["Kubernetes Ingress / API Gateway"]
+
+    Internet --> Edge --> Gateway
+
+    subgraph Apps["Application workloads"]
+        AudienceWeb["audience-web"]
+        AdminWeb["admin-web"]
+        BackendAPI["backend-api"]
+        Concert["concert-service"]
+        Inventory["inventory-service"]
+        Order["order-service"]
+        Payment["payment-service"]
+        Checkin["checkin-service"]
+    end
+
+    subgraph Workers["Async workers"]
+        NotificationWorker["notification-worker"]
+        ReservationSweeper["reservation-sweeper"]
+        PaymentReconciliation["payment-reconciliation-worker"]
+        CSVImport["csv-import-worker"]
+        AIBioWorker["ai-artist-bio-worker"]
+    end
+
+    subgraph Platform["Platform services"]
+        Postgres["PostgreSQL primary + replica"]
+        Redis["Redis Cluster"]
+        RabbitMQ["RabbitMQ cluster"]
+        MinIO["MinIO cluster"]
+        Keycloak["Keycloak"]
+        Observability["Prometheus / Grafana / Loki / Tempo"]
+    end
+
+    Gateway --> AudienceWeb
+    Gateway --> AdminWeb
+    Gateway --> BackendAPI
+    Gateway --> Concert
+    Gateway --> Inventory
+    Gateway --> Order
+    Gateway --> Payment
+    Gateway --> Checkin
+
+    BackendAPI --> Keycloak
+    BackendAPI --> Postgres
+    BackendAPI --> Redis
+    BackendAPI --> RabbitMQ
+    BackendAPI --> MinIO
+    BackendAPI --> Observability
+
+    RabbitMQ --> NotificationWorker
+    RabbitMQ --> ReservationSweeper
+    RabbitMQ --> PaymentReconciliation
+    RabbitMQ --> CSVImport
+    RabbitMQ --> AIBioWorker
+```
 
 | Layer | Khuyến nghị |
 |---|---|

@@ -1,5 +1,7 @@
 # 4. Thiết kế cơ sở dữ liệu
 
+Tài liệu này là source of truth cho schema, invariant dữ liệu và transaction algorithm của các luồng ghi quan trọng. Các tài liệu khác chỉ tham chiếu hoặc giải thích lý do thiết kế, không định nghĩa lại các invariant này.
+
 ## Lựa chọn database
 
 TicketBox nên dùng PostgreSQL làm database chính vì các luồng quan trọng cần transaction, lock, unique constraint và consistency mạnh: giữ vé, giới hạn vé theo user, payment, phát hành ticket và check-in. Redis được dùng làm cache/rate-limit/waiting-room, không dùng làm nguồn quyết định bán vé. Object storage dùng cho file lớn như PDF, CSV, ảnh và SVG seating map.

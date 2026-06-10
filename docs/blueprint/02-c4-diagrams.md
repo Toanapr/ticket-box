@@ -1,6 +1,6 @@
 # 2. C4 Diagram
 
-Các sơ đồ C4 dưới đây mô tả actor, container ứng dụng, container hạ tầng và cách TicketBox giao tiếp với hệ thống ngoài.
+Các sơ đồ C4 dưới đây mô tả actor, ranh giới hệ thống, container logic và cách TicketBox giao tiếp với hệ thống ngoài. Dependency chi tiết giữa domain service và topology triển khai được quản lý tại [03-high-level-architecture.md](03-high-level-architecture.md).
 
 ## Level 1 - System Context
 
@@ -99,63 +99,9 @@ flowchart TD
 | MinIO | Object storage | Lưu file lớn và asset versioned. |
 | Keycloak | OIDC provider | Login, JWT/session, role, MFA. |
 
-## Container topology triển khai
+## Phạm vi của sơ đồ C4
 
-```mermaid
-flowchart TD
-    Internet["Internet"]
-    Edge["Reverse Proxy / Edge Cache / WAF"]
-    Gateway["Kubernetes Ingress / API Gateway"]
-
-    Internet --> Edge --> Gateway
-
-    subgraph Apps["Application workloads"]
-        AudienceWeb["audience-web"]
-        AdminWeb["admin-web"]
-        BackendAPI["backend-api"]
-        Concert["concert-service"]
-        Inventory["inventory-service"]
-        Order["order-service"]
-        Payment["payment-service"]
-        Checkin["checkin-service"]
-    end
-
-    subgraph Workers["Async workers"]
-        NotificationWorker["notification-worker"]
-        ReservationSweeper["reservation-sweeper"]
-        PaymentReconciliation["payment-reconciliation-worker"]
-        CSVImport["csv-import-worker"]
-        AIBioWorker["ai-artist-bio-worker"]
-    end
-
-    subgraph Platform["Platform services"]
-        Postgres["PostgreSQL primary + replica"]
-        Redis["Redis Cluster"]
-        RabbitMQ["RabbitMQ cluster"]
-        MinIO["MinIO cluster"]
-        Keycloak["Keycloak"]
-        Observability["Prometheus / Grafana / Loki / Tempo"]
-    end
-
-    Gateway --> AudienceWeb
-    Gateway --> AdminWeb
-    Gateway --> BackendAPI
-    Gateway --> Concert
-    Gateway --> Inventory
-    Gateway --> Order
-    Gateway --> Payment
-    Gateway --> Checkin
-
-    BackendAPI --> Keycloak
-    BackendAPI --> Postgres
-    BackendAPI --> Redis
-    BackendAPI --> RabbitMQ
-    BackendAPI --> MinIO
-    BackendAPI --> Observability
-
-    RabbitMQ --> NotificationWorker
-    RabbitMQ --> ReservationSweeper
-    RabbitMQ --> PaymentReconciliation
-    RabbitMQ --> CSVImport
-    RabbitMQ --> AIBioWorker
-```
+- Level 1 trả lời TicketBox phục vụ ai và tích hợp với hệ thống ngoài nào.
+- Level 2 trả lời các container logic chính và trách nhiệm tổng quát của chúng.
+- Domain dependency, checkout critical path, topology Kubernetes và trade-off triển khai nằm tại [03-high-level-architecture.md](03-high-level-architecture.md).
+- Luồng xử lý theo từng nghiệp vụ nằm tại [05-business-flows.md](05-business-flows.md).

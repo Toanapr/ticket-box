@@ -1,25 +1,21 @@
 # 7. Thiết kế các cơ chế bảo vệ hệ thống
 
-Ngoài rate limiting, circuit breaker, idempotency key và caching, blueprint bổ sung consistency cho inventory/quota vì đây là rủi ro cốt lõi nhất của TicketBox.
+Tài liệu này tập trung vào các lớp bảo vệ ở biên hệ thống và quanh dependency: admission control, rate limiting, circuit breaker, idempotency, caching và policy xử lý lỗi.
 
-## Bảo vệ consistency inventory và quota
+Invariant dữ liệu, schema và transaction algorithm của inventory/quota được quản lý tại [04-database-design.md](04-database-design.md). Các lớp bảo vệ trong file này chỉ giảm tải và giảm request lỗi; chúng không thay thế transaction database.
 
-Inventory là nguồn quyết định bán vé, không phải cache. Mỗi request reserve phải đi qua transaction hoặc conditional write.
+## Bảo vệ đường ghi inventory và quota
 
-```text
-sold_count + active_reserved_count <= total_capacity
-paid_user_ticket_count <= configured_user_limit
-one successful payment confirmation issues ticket exactly once
-one ticket can have at most one accepted check-in
-```
+Inventory Service và PostgreSQL vẫn là nơi quyết định request reserve có hợp lệ hay không. Các lớp bên ngoài bảo vệ đường ghi như sau:
 
-### Cách hoạt động
+| Lớp bảo vệ | Trách nhiệm | Không được làm |
+|---|---|---|
+| Waiting room | Giới hạn số người được tiếp cận luồng reserve cùng lúc. | Quyết định vé còn hay hết. |
+| Rate limit | Chặn spam theo IP, user, device và endpoint. | Thay thế kiểm tra quota trong transaction. |
+| Idempotency | Làm retry an toàn và trả lại kết quả cũ cho request trùng. | Bỏ qua validation inventory/quota. |
+| Queue/backpressure | Giữ write concurrency trong ngưỡng backend và database chịu được. | Xác nhận reservation trước khi database commit. |
 
-- Reservation có TTL và tự release khi payment fail/timeout.
-- Transaction lock `ticket_inventory` và `user_ticket_quota` cùng lúc để chống oversell và chống vượt quota bằng request song song.
-- `reserved_count` tăng khi reserve, chuyển sang `sold_count` khi payment success.
-- Sweeper/reconciliation giải phóng reservation hết hạn.
-- Với ticket type hot, waiting room giới hạn concurrency để tránh row lock quá nóng.
+Chi tiết transaction giữ vé và quota ledger: [04-database-design.md](04-database-design.md#transaction-giữ-vé). Lý do và trade-off: [tranh chấp vé cuối cùng](core-design-decisions/last-ticket-contention.md) và [giới hạn vé mỗi tài khoản](core-design-decisions/per-user-ticket-limit.md).
 
 ## Kiểm soát tải đột biến
 

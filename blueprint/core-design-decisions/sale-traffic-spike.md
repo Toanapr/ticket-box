@@ -13,6 +13,7 @@ Dùng nhiều lớp kiểm soát tải:
 3. Queue hoặc admission control tạo backpressure cho request giữ vé.
 4. Autoscale workload stateless và pre-warm capacity trước giờ mở bán.
 5. Cache phục vụ read traffic để dành tài nguyên cho write-critical path.
+6. Đặt concurrency limit và queue depth tối đa; khi vượt ngưỡng, từ chối sớm bằng `429/503` kèm `Retry-After`.
 
 ## Lý do chọn
 
@@ -20,11 +21,13 @@ Dùng nhiều lớp kiểm soát tải:
 - Rate limit loại bỏ spam sớm, giảm chi phí xử lý bên trong.
 - Backpressure giữ hệ thống trong ngưỡng có thể xử lý thay vì nhận vô hạn.
 - Pre-warm xử lý khoảng trễ trước khi autoscale tạo instance mới.
+- Bounded queue tránh cạn connection/memory và cho client retry bằng cùng idempotency key.
 
 ## Trade-off
 
 - Người dùng phải chờ và cần UX hiển thị vị trí/trạng thái rõ ràng.
 - Queue tạo thêm trạng thái, timeout và bài toán retry.
+- Từ chối sớm làm một số người dùng phải quay lại hàng chờ dù hệ thống chưa sập.
 - Rate limit sai có thể chặn người dùng thật dùng chung IP.
 - Pre-warm tăng chi phí dù traffic thực tế thấp hơn dự kiến.
 - Autoscale backend không giải quyết được bottleneck ở database hoặc broker.
@@ -39,5 +42,6 @@ Dùng nhiều lớp kiểm soát tải:
 
 - Load test theo traffic profile của giờ mở bán, không chỉ tải đều.
 - Kiểm tra queue depth, p95/p99 latency, error rate và database saturation.
+- Mô phỏng Redis/waiting room lỗi để xác nhận reserve path không fail-open vào database.
 - Diễn tập mở bán với pre-warm, autoscale và cơ chế degrade.
 

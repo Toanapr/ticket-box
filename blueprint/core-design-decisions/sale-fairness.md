@@ -13,7 +13,7 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 - WAF chặn request độc hại hoặc bất thường phổ biến.
 - Bot score đánh giá rủi ro từ hành vi và tín hiệu request.
 - CAPTCHA chỉ áp dụng khi risk score cao.
-- Sale access token có TTL ngắn, scope rõ và được cấp sau waiting room.
+- Sale access token được ký, có TTL ngắn, nonce, scope theo concert/endpoint và bind với user/session sau waiting room.
 
 ## Lý do chọn
 
@@ -21,6 +21,7 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 - Chặn ở edge giảm tải trước khi request vào luồng nghiệp vụ.
 - CAPTCHA theo rủi ro giảm ảnh hưởng đến người dùng bình thường.
 - Token ngắn hạn chứng minh request đã qua admission control.
+- Nonce và binding giúp giảm replay, chia sẻ token hoặc gọi sai sale endpoint.
 
 ## Trade-off
 
@@ -28,6 +29,7 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 - Bot score và device fingerprint có vấn đề về quyền riêng tư và cần quản trị dữ liệu.
 - Bot tinh vi vẫn có thể dùng IP residential hoặc người thật giải CAPTCHA.
 - Waiting room cần chính sách rõ: first-come-first-served hay randomized admission.
+- Token binding có thể làm người dùng phải vào lại hàng chờ khi đổi thiết bị/session.
 
 ## Phương án không chọn
 
@@ -40,4 +42,5 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 - Mô phỏng bot spam, nhiều account và nhiều IP.
 - Theo dõi tỷ lệ CAPTCHA, false positive và request bị chặn.
 - Audit khả năng token bị replay, chia sẻ hoặc dùng sai scope.
+- Mô phỏng Redis/waiting room lỗi và xác nhận reserve fail-closed hoặc dùng emergency admission limit nhỏ.
 

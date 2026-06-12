@@ -13,6 +13,8 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 - Ghi mỗi lần scan vào durable append-only local queue.
 - Sync batch idempotent khi có mạng; backend là nguồn quyết định cuối cùng.
 - Backend trả conflict rõ ràng khi cùng vé đã được thiết bị khác check-in trước.
+- Tạo event id trước khi ghi local, ACK theo từng event và chỉ dọn payload accepted sau khi ACK đã được persist.
+- Giữ conflict/rejected local để nhân sự xử lý; retry batch timeout bằng cùng event id.
 
 ## Lý do chọn
 
@@ -20,6 +22,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 - Durable queue tránh mất dữ liệu khi app crash hoặc mạng mất.
 - Idempotent sync cho phép retry batch an toàn.
 - Phân vùng manifest theo cổng/khu giảm dữ liệu và giảm nguy cơ scan chéo.
+- Per-event ACK xử lý được response một phần và app crash giữa lúc sync.
 
 ## Trade-off
 
@@ -27,6 +30,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 - Manifest có thể cũ nếu vé vừa refund hoặc revoke.
 - Local storage chứa dữ liệu nhạy cảm nên cần mã hóa và quản lý thiết bị.
 - Conflict sau sync cần quy trình vận hành xử lý tại cổng.
+- Giữ event conflict/rejected làm tăng local storage và cần cleanup có kiểm soát.
 
 ## Phương án không chọn
 
@@ -37,6 +41,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 ## Cách kiểm chứng
 
 - Test mất mạng, app crash, restart và sync lại.
+- Test timeout/partial ACK, gửi lại toàn batch và crash sau ACK trước cleanup.
 - Scan cùng vé trên một thiết bị và trên hai thiết bị offline.
 - Kiểm tra manifest signature, version, TTL và revoke-list sync.
 

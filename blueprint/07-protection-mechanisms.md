@@ -164,7 +164,8 @@ sequenceDiagram
     end
 ```
 
-Webhook cũng idempotent theo `provider_transaction_id` và `payload_hash`. Ticket issuing có unique constraint theo `order_id` để một order không sinh nhiều vé.
+Webhook cũng idempotent theo `provider_transaction_id` và `payload_hash`.
+Ticket issuing retry không tạo vé trùng vì từng ticket được chống trùng bằng `UNIQUE(order_item_id, sequence_no)` và `UNIQUE(qr_token_hash)`.
 
 Kết thúc payment không được xóa durable idempotency record ngay. Cleanup chỉ chạy theo retention policy sau khi không còn webhook, reconciliation hoặc dispute cần đối chiếu.
 

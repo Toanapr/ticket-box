@@ -84,7 +84,7 @@ erDiagram
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
 | `ticket_type_id` | UUID | Primary key. |
-| `total_capacity` | int | Tổng số lượng. |
+| `total_capacity` | int | Tổng số lượng vé có. |
 | `reserved_count` | int | Vé đang giữ còn TTL. |
 | `sold_count` | int | Vé đã thanh toán/phát hành. |
 | `version` | int | Optimistic locking nếu cần. |
@@ -93,7 +93,7 @@ Invariant bắt buộc:
 
 ```text
 sold_count + active_reserved_count <= total_capacity
-paid_user_ticket_count <= configured_user_limit
+paid_user_ticket_count + active_reserved_user_ticket_count <= configured_user_limit
 one successful payment confirmation issues ticket exactly once
 one ticket can have at most one accepted check-in
 ```
@@ -129,16 +129,26 @@ Primary key: `(user_id, ticket_type_id)`.
 Inventory là phần cần consistency cao nhất. Checkout không được dựa vào Redis/cache để quyết định bán vé.
 
 Trong transaction tạo reservation:
-
-1. Lock row `ticket_inventory` bằng `SELECT ... FOR UPDATE`, hoặc dùng optimistic update `WHERE available >= quantity`.
-2. Lock/upsert row `user_ticket_quota`.
+1. Lock row `inventory_counters` bằng `SELECT ... FOR UPDATE`, hoặc dùng optimistic update `WHERE available >= quantity`. ( `available = total_capacity - reserved_count - sold_count`)
+2. Lock/upsert row `user_ticket_quotas`.
 3. Kiểm tra sale window hợp lệ.
 4. Kiểm tra `available >= quantity`.
 5. Kiểm tra quota sau khi cộng reservation không vượt `per_user_limit`.
 6. Insert reservation có TTL.
 7. Update `reserved_count` và quota reserved.
 
-Khi payment thành công, transaction confirm sẽ chuyển reservation sang sold và chuyển quota reserved sang paid. Sweeper chạy định kỳ để release reservation hết hạn.
+Khi payment thành công, transaction confirm sẽ chuyển reservation sang sold và chuyển quota reserved sang paid.
+
+Reservation TTL mặc định: ví dụ 10-15 phút.
+Sweeper chạy định kỳ, chỉ xử lý reservation có:
+- status = active
+- expires_at < now()
+Dùng SELECT ... FOR UPDATE SKIP LOCKED để batch an toàn.
+Khi expire:
+- reservations.status: active -> expired
+- inventory_counters.reserved_count giảm quantity
+- user_ticket_quotas.reserved_count giảm quantity
+- orders.status: pending_payment -> expired nếu chưa payment success
 
 ### Mở rộng khi PostgreSQL thành bottleneck
 
@@ -154,8 +164,21 @@ Khi payment thành công, transaction confirm sẽ chuyển reservation sang sol
 | Entity | Trường chính | Ghi chú |
 |---|---|---|
 | `orders` | `id`, `user_id`, `status`, `total_amount`, `idempotency_key` | State: pending, paid, issued, failed, expired, refunded. |
-| `payments` | `id`, `order_id`, `provider`, `provider_txn_id`, `status`, `payload_hash` | Webhook idempotent, audit raw payload hash. |
-| `tickets` | `id`, `order_id`, `ticket_type_id`, `owner_user_id`, `qr_token_hash`, `status` | QR chứa signed token hoặc ticket id + signature. |
+| `payments` | `id`, `order_id`, `provider`, `provider_txn_id`, `status`, `payload_hash` | Webhook idempotent, audit raw payload hash. State: created, pending, succeeded, failed, expired, refunded.  |
+| `tickets` | `id`, `order_id`, `order_item_id`, `ticket_type_id`, `owner_user_id`, `qr_token_hash`, `sequence_no`, `status` | `UNIQUE(order_item_id,sequence_no)`, `UNIQUE(qr_token_hash)`. QR chứa signed token hoặc ticket id + signature. State: issued, revoked, checked_in |
+
+### `order_items`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+|`id` |UUID | Primary Key |
+|`order_id`| UUID | FK |
+|`reservation_id` | UUID | FK |
+|`ticket_type_id`| UUID | FK |
+|`quantity`| int | |
+|`unit_price`| numeric| |
+|`subtotal_amount`| numeric| |
+|`status`| enum| pending, confirmed, refunded|
 
 ### `check_in_events`
 

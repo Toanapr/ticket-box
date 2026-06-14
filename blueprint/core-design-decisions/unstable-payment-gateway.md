@@ -11,8 +11,7 @@ Payment gateway có thể timeout, trả callback trễ hoặc gửi webhook nhi
 - Tạo order/payment bằng idempotency key.
 - Chỉ tin webhook đã verify hoặc kết quả reconciliation, không tin browser redirect.
 - Dùng circuit breaker và graceful degradation khi gateway lỗi kéo dài.
-- Dùng timeout budget, bulkhead riêng cho payment call và retry có giới hạn với exponential backoff/jitter.
-- Chỉ phát hành vé sau khi payment success được xác nhận đúng một lần.
+- Chỉ phát hành vé sau khi payment success được xác nhận đúng một lần và reservation liên quan vẫn còn hợp lệ; nếu reservation đã expired thì chuyển sang reconciliation/refund_required.
 
 ## Lý do chọn
 

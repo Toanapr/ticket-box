@@ -16,7 +16,7 @@ Dùng flow `reserve -> pay -> confirm`:
 
 1. Backend tạo reservation có TTL và giữ tạm số vé yêu cầu.
 2. Người dùng thanh toán trong thời gian reservation còn hiệu lực.
-3. Backend chỉ chuyển reservation thành vé đã bán sau khi payment được xác nhận.
+3. Backend chỉ chuyển reservation thành vé đã bán sau khi payment được xác nhận. Nếu payment success đến sau khi reservation expired, order chuyển sang reconciliation/refund_required.
 4. Reservation hết hạn hoặc payment thất bại được giải phóng.
 
 Thao tác reserve và confirm dùng PostgreSQL transaction với row lock hoặc conditional write. UI và cache không phải nguồn quyết định inventory.

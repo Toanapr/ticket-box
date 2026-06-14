@@ -24,7 +24,7 @@ sequenceDiagram
     API->>Auth: Xác thực user
     API->>Inventory: Reserve ticket
     Inventory->>DB: Transaction: kiểm tra sale window, capacity, quota
-    Inventory->>Order: Tạo order PENDING_PAYMENT
+    Inventory->>Order: Tạo order PENDING_PAYMENT và order_items từ reservation
     Order->>Payment: Tạo payment intent idempotent
     Payment->>Gateway: Tạo payment URL
     Payment-->>Web: Trả payment URL
@@ -46,8 +46,9 @@ sequenceDiagram
 | User vượt quota | Lock/upsert `user_ticket_quotas`, reject nếu vượt limit. |
 | Payment timeout | Order giữ `PENDING_PAYMENT`; reconciliation kiểm tra lại gateway; reservation hết TTL thì release. |
 | Webhook gửi nhiều lần | Payment Service dedupe theo provider transaction id/payload hash. |
-| Ticket issuing retry | Unique constraint theo `order_id` đảm bảo một order chỉ phát hành ticket một lần. |
+| Ticket issuing retry | Ticket issuing idempotent; bảng tickets chống trùng từng vé bằng `UNIQUE(order_item_id, sequence_no)` và `UNIQUE(qr_token_hash)`. |
 | Notification lỗi | Ghi delivery failure và retry qua queue; không rollback ticket đã issued. |
+| Payment success sau khi reservation expired | Không issue ticket tự động; chuyển order sang reconciliation/refund_required. |
 
 ## Luồng soát vé khi mất mạng và đồng bộ lại
 

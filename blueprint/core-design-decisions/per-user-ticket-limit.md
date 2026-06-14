@@ -12,7 +12,7 @@ paid_user_ticket_count + active_reserved_user_ticket_count <= configured_user_li
 
 ## Quyết định thiết kế
 
-Backend enforce quota trong cùng transaction tạo reservation/order. Hệ thống dùng per-user ticket quota ledger để lưu số vé đang giữ và đã mua theo user, concert hoặc ticket type.
+Backend enforce quota trong cùng transaction tạo reservation/order. Hệ thống dùng per-user ticket quota ledger theo `(user_id, ticket_type_id)` để lưu số vé đang giữ và đã mua của từng user cho từng loại vé.
 
 Transaction phải khóa hoặc atomic upsert cả inventory và quota liên quan trước khi tạo reservation.
 

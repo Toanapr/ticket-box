@@ -23,9 +23,9 @@ Chi tiết transaction giữ vé và quota ledger: [04-database-design.md](04-da
 
 Kết hợp nhiều lớp:
 
-1. Edge cache cho trang public và static assets.
+1. Public cache cho trang public và static assets.
 2. Waiting room/virtual queue trước giờ mở bán.
-3. Rate limiting bằng token bucket ở API Gateway/Redis.
+3. Rate limiting bằng token bucket ở Backend API/Redis.
 4. Per-user/per-IP/per-device limit cho endpoint nóng như `/reservations`.
 5. Bot detection bằng pattern request, CAPTCHA theo risk score.
 6. Bounded admission ở backend để từ chối sớm khi connection pool, worker hoặc database gần bão hòa.
@@ -41,7 +41,7 @@ Kết hợp nhiều lớp:
 
 ```mermaid
 flowchart LR
-    Client["Client"] --> Edge["WAF / Bot score"]
+    Client["Client"] --> Edge["Public cache / risk checks"]
     Edge --> Queue["Waiting room<br/>sale access token"]
     Queue --> RateLimit["Token bucket<br/>Redis counters"]
     RateLimit --> API["Backend API"]
@@ -55,7 +55,7 @@ Nếu vượt limit, API trả `429 Too Many Requests` kèm `Retry-After`. Nếu
 - Waiting room chốt trước chính sách admission cho từng đợt bán: FIFO hoặc randomized admission.
 - Sale access token được ký, có `user/session`, `concert_id`, scope endpoint, `issued_at`, `expires_at` và nonce; backend kiểm tra chữ ký, TTL, scope và chống replay.
 - Token không chứng minh còn vé và không thay thế transaction inventory/quota.
-- Khi Redis/waiting room không khả dụng, public read path tiếp tục phục vụ cache stale trong giới hạn. Reserve path fail-closed hoặc dùng emergency admission limit nhỏ tại gateway; không fail-open toàn bộ traffic vào database.
+- Khi Redis/waiting room không khả dụng, public read path tiếp tục phục vụ cache stale trong giới hạn. Reserve path fail-closed hoặc dùng emergency admission limit nhỏ tại Backend API; không fail-open toàn bộ traffic vào database.
 
 ### Backpressure và overload response
 
@@ -173,13 +173,13 @@ Kết thúc payment không được xóa durable idempotency record ngay. Cleanu
 
 ### Chiến lược
 
-Dùng cache-aside với Redis và reverse proxy cache. Database vẫn là nguồn dữ liệu đúng cuối cùng cho checkout; cache chỉ phục vụ đọc và hiển thị gần realtime.
+Dùng cache-aside với Redis và public cache khi phù hợp. Database vẫn là nguồn dữ liệu đúng cuối cùng cho checkout; cache chỉ phục vụ đọc và hiển thị gần realtime.
 
 | Dữ liệu | Cache | TTL/invalidation | Ghi chú |
 |---|---|---|---|
-| Static assets | Nginx/Varnish/Object Storage | Long TTL + versioned filename | Ảnh, SVG seating map. |
-| Concert list | Redis + edge cache | 30s-5m, invalidate khi publish/update | Đọc rất nhiều, đổi ít. |
-| Concert detail | Redis + edge cache | 30s-5m, invalidate khi update | Không nhúng dữ liệu user. |
+| Static assets | Object storage/public cache | Long TTL + versioned filename | Ảnh, SVG seating map. |
+| Concert list | Redis + public cache | 30s-5m, invalidate khi publish/update | Đọc rất nhiều, đổi ít. |
+| Concert detail | Redis + public cache | 30s-5m, invalidate khi update | Không nhúng dữ liệu user. |
 | Inventory summary | Redis | 1s-10s hoặc update theo event | Chỉ hiển thị gần đúng. |
 | Admin dashboard | Redis/read model | 5s-60s | Không query OLTP liên tục. |
 
@@ -196,7 +196,7 @@ sequenceDiagram
     participant Outbox as Outbox Publisher
     participant Bus as Event Bus
     participant CacheWorker
-    participant Cache as Redis/Edge Cache
+    participant Cache as Redis/Public Cache
 
     Admin->>Concert: Update concert
     Concert->>DB: Save + outbox event trong cùng transaction
@@ -208,7 +208,7 @@ sequenceDiagram
 
 Cache key cần có namespace/version và invalidation phải xóa cả detail, listing và key phụ thuộc. Khi payment thành công và vé được confirm, Inventory Service ghi outbox event để cập nhật inventory summary cache. Nếu event trễ, TTL ngắn giúp dữ liệu tự hồi phục.
 
-Khi Redis/edge cache lỗi, dùng request coalescing, concurrency limit và query budget cho fallback database. Nếu primary gần bão hòa, ưu tiên trả stale public data hoặc `503` thay vì cho cache miss không giới hạn làm ảnh hưởng reservation/payment.
+Khi Redis/public cache lỗi, dùng request coalescing, concurrency limit và query budget cho fallback database. Nếu primary gần bão hòa, ưu tiên trả stale public data hoặc `503` thay vì cho cache miss không giới hạn làm ảnh hưởng reservation/payment.
 
 ## Check-in offline conflict policy
 
@@ -284,7 +284,7 @@ RabbitMQ cung cấp delivery at-least-once, vì vậy mọi consumer phải idem
 | Poison message | Lỗi schema/validation vào DLQ ngay cùng error reason. |
 | Replay | Công cụ/manual action phải giữ message id và idempotency key cũ. |
 
-## Observability và graceful degradation
+## Quan sát hệ thống và graceful degradation
 
 Các dashboard/alert tối thiểu gồm:
 
@@ -295,4 +295,4 @@ Các dashboard/alert tối thiểu gồm:
 - Unsynced check-in count/age, conflict rate và manifest version distribution.
 - CSV batch failure/quarantine và AI job latency/failure.
 
-Log/trace dùng correlation id phù hợp như `order_id`, `payment_id`, `ticket_id`, `check_in_event_id`, `import_batch_id` và `artist_bio_job_id`, nhưng không ghi raw payment secret, QR token hoặc PII không cần thiết.
+Log và metrics dùng correlation id phù hợp như `order_id`, `payment_id`, `ticket_id`, `check_in_event_id`, `import_batch_id` và `artist_bio_job_id`, nhưng không ghi raw payment secret, QR token hoặc PII không cần thiết.

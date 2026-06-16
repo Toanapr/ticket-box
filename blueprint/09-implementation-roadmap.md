@@ -14,7 +14,7 @@
 | 3 | Event-day operations | Scanner app/API, offline manifest, offline check-in queue, sync, guest list CSV. | Phase 1, một phần Phase 2 |
 | 4 | Admin operations | Dashboard doanh thu/vé, audit log, refund/cancel workflow. | Phase 1 |
 | 5 | AI and extensibility | PDF pipeline, AI Artist Bio, notification adapter. | Phase 1, Phase 4 |
-| 6 | Production readiness | Load test, security review, observability, backup/restore, runbook. | Phase 2, 3, 4 |
+| 6 | Verification and operations readiness | Load test, security review, logs/metrics dashboard, backup/restore guide, runbook. | Phase 2, 3, 4 |
 
 ## Thứ tự ưu tiên kỹ thuật
 
@@ -22,7 +22,7 @@
 2. Idempotency và reconciliation.
 3. Cache, waiting room, rate limit, fairness control.
 4. Offline scanner và conflict policy.
-5. Observability cho sale day và event day.
+5. Logs, health checks và business metrics cho sale day và event day.
 6. AI Artist Bio và notification channel mở rộng.
 
 ## Phase 0: Foundation
@@ -31,9 +31,8 @@
 
 - Backend skeleton theo module: `auth`, `concert`, `inventory`, `order`, `payment`, `ticket`, `check-in`, `notification`, `guest-import`, `ai-artist-bio`.
 - PostgreSQL migration baseline.
-- Redis, broker, object storage cho local environment.
+- Redis, RabbitMQ, MinIO/object storage cho local environment.
 - Logging, config validation, request correlation id.
-- CI cơ bản: lint, test, build.
 
 ### Done khi
 
@@ -65,7 +64,7 @@
 
 ### Scope
 
-- Edge/API cache cho concert list/detail.
+- Public/API cache cho concert list/detail.
 - Redis inventory summary TTL ngắn.
 - Rate limit theo IP, user, device hoặc session.
 - Waiting room, sale access token, anti-bot controls.
@@ -139,20 +138,20 @@
 - AI lỗi không ảnh hưởng concert page và checkout.
 - Có thể thêm channel notification mới mà không sửa core ticketing flow.
 
-## Phase 6: Production readiness
+## Phase 6: Verification and operations readiness
 
 ### Scope
 
 - Load test sale day và read spike.
 - Security review cho auth, QR, webhook, file upload.
 - Backup/restore database và object storage.
-- Observability dashboard và alert.
+- Logs/metrics dashboard tối thiểu và cảnh báo thủ công cần theo dõi.
 - Runbook sale day và event day.
 
 ### Done khi
 
 - Có số liệu để đánh giá bottleneck thực tế.
-- Có cảnh báo cho payment pending, queue depth, DLQ, check-in conflict.
+- Có chỉ số/log rõ cho payment pending, queue depth, DLQ, check-in conflict.
 - Team có thể diễn tập ngày mở bán và ngày diễn.
 
 ## Quy tắc chuyển phase

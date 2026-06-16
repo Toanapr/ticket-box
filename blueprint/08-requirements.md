@@ -56,17 +56,17 @@
 
 | Nhóm | Vì sao quan trọng | Thiết kế đáp ứng |
 |---|---|---|
-| Scalability | Concert lớn có thể có hàng chục nghìn người truy cập trong vài phút đầu. | Edge cache, Redis, API Gateway rate limit, waiting room, queue async, warm capacity trước giờ mở bán. |
+| Scalability | Concert lớn có thể có hàng chục nghìn người truy cập trong vài phút đầu. | Public cache, Redis, Backend API rate limit, waiting room, queue async, chuẩn bị capacity trước giờ mở bán. |
 | High availability | Payment lỗi không được kéo sập trang concert, admin hoặc soát vé. | Tách read path khỏi payment path, circuit breaker, graceful degradation. |
 | Fault tolerance | Webhook, queue, mobile sync và CSV import đều có thể retry hoặc lỗi giữa chừng. | Idempotency key, retry backoff, DLQ, staging/quarantine, state machine rõ ràng. |
-| Security | Hệ thống có PII, payment status, QR ticket và quyền admin. | RBAC, ownership check, signed QR, encrypt at rest/in transit, secret management, audit log, file scanning. |
+| Security | Hệ thống có PII, payment status, QR ticket và quyền admin. | RBAC, ownership check, signed QR, encrypt at rest/in transit, config/secret hygiene, audit log, file scanning. |
 | Fairness | Bot/scalper có thể chiếm vé trong vài giây. | Waiting room token, randomized admission khi quá tải, rate limit account/IP/device, CAPTCHA theo risk score, sale access token TTL ngắn. |
 | Consistency | Inventory hữu hạn và quota phải đúng dưới concurrent request. | Reservation/payment/ticket issuance flow, reservation TTL, transaction/conditional write, quota ledger, sweeper. |
 | Performance | Public listing/detail có read traffic rất cao. | Cache static content, cache concert detail, inventory summary TTL ngắn, index và pagination. |
-| Observability | Sale day cần biết lỗi payment, oversell risk, queue backlog, check-in conflict. | Structured logs, correlation id, tracing, business metrics, dashboard sale/event day. |
+| Monitoring cơ bản | Sale day cần biết lỗi payment, oversell risk, queue backlog, check-in conflict. | Structured logs, correlation id, health checks, business metrics, dashboard sale/event day tối thiểu. |
 | Maintainability | Hệ thống sẽ mở rộng payment provider, notification channel, guest workflow và AI feature. | Domain boundary rõ, adapter interface, versioned event contract, automated tests. |
 | Offline support | Sân vận động hoặc nhà thi đấu có sóng yếu. | Encrypted local DB, signed manifest theo cổng/khu, append-only check-in log, batch sync idempotent, backend conflict resolution. |
-| Bot protection | Bot vừa gây bất công vừa tạo tải rác. | WAF, rate limit nhiều lớp, risk scoring, CAPTCHA theo rủi ro, device/session binding. |
+| Bot protection | Bot vừa gây bất công vừa tạo tải rác. | Rate limit nhiều lớp, risk scoring trong app, CAPTCHA theo rủi ro, device/session binding. |
 | Payment reliability | Đây là điểm dễ gây khiếu nại nhất. | Payment intent idempotent, webhook signature verification, không tin browser redirect, reconciliation job, ticket chỉ issue sau payment success đã verify. |
 
 ## Tiêu chí chấp nhận kiến trúc

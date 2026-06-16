@@ -10,15 +10,15 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 
 - Waiting room/virtual queue kiểm soát thứ tự hoặc phân phối lượt vào.
 - Rate limit theo account, IP, device/session và endpoint.
-- WAF chặn request độc hại hoặc bất thường phổ biến.
-- Bot score đánh giá rủi ro từ hành vi và tín hiệu request.
+- Risk checks trong Backend API chặn request bất thường phổ biến.
+- Bot score đơn giản đánh giá rủi ro từ hành vi và tín hiệu request.
 - CAPTCHA chỉ áp dụng khi risk score cao.
 - Sale access token được ký, có TTL ngắn, nonce, scope theo concert/endpoint và bind với user/session sau waiting room.
 
 ## Lý do chọn
 
 - Không có một cơ chế đơn lẻ nào chặn được mọi bot.
-- Chặn ở edge giảm tải trước khi request vào luồng nghiệp vụ.
+- Chặn sớm ở public cache/reverse proxy hoặc Backend API giảm tải trước khi request vào luồng nghiệp vụ.
 - CAPTCHA theo rủi ro giảm ảnh hưởng đến người dùng bình thường.
 - Token ngắn hạn chứng minh request đã qua admission control.
 - Nonce và binding giúp giảm replay, chia sẻ token hoặc gọi sai sale endpoint.
@@ -43,4 +43,3 @@ Kết hợp nhiều tín hiệu và lớp bảo vệ:
 - Theo dõi tỷ lệ CAPTCHA, false positive và request bị chặn.
 - Audit khả năng token bị replay, chia sẻ hoặc dùng sai scope.
 - Mô phỏng Redis/waiting room lỗi và xác nhận reserve fail-closed hoặc dùng emergency admission limit nhỏ.
-

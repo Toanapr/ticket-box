@@ -159,7 +159,7 @@ sequenceDiagram
 | Cache worker lỗi | TTL ngắn giúp cache tự hết hạn; worker retry event. |
 | Event bus retry | Invalidation idempotent, xóa key nhiều lần vẫn an toàn. |
 | Cache stampede | Dùng request coalescing, stale-while-revalidate và prewarm trước giờ mở bán. |
-| Redis/edge cache lỗi | Phục vụ stale public data nếu có; fallback DB có concurrency/query budget và trả `503` khi primary gần bão hòa. |
+| Redis/public cache lỗi | Phục vụ stale public data nếu có; fallback DB có concurrency/query budget và trả `503` khi primary gần bão hòa. |
 
 ## Luồng AI Artist Bio
 

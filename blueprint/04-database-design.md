@@ -8,7 +8,7 @@ TicketBox nên dùng PostgreSQL làm database chính vì các luồng quan trọ
 
 | Nhóm dữ liệu | Lưu ở đâu | Lý do |
 |---|---|---|
-| User, role, organization | PostgreSQL/Keycloak | Cần quan hệ và audit quyền. |
+| User, role, organization | PostgreSQL | Cần quan hệ, RBAC, ownership check và audit quyền. |
 | Concert, venue, ticket type | PostgreSQL | Dữ liệu nghiệp vụ có quan hệ rõ. |
 | Inventory, reservation, quota | PostgreSQL | Cần transaction để không oversell và không vượt quota. |
 | Order, payment, ticket | PostgreSQL | Cần state machine, idempotency, audit. |

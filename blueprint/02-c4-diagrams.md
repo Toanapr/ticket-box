@@ -45,13 +45,12 @@ flowchart TD
         AudienceWeb["Audience Web App<br/>Next.js"]
         AdminWeb["Admin Web App<br/>Next.js"]
         ScannerApp["Scanner Web/PWA App<br/>Next.js"]
-        Gateway["API Gateway / Backend API<br/>NestJS"]
+        Gateway["Backend API<br/>NestJS + Auth/RBAC"]
         Workers["Background Workers<br/>NestJS / TypeScript"]
         Postgres["PostgreSQL<br/>transactional database"]
         Redis["Redis<br/>cache/rate limit/waiting room"]
         RabbitMQ["RabbitMQ<br/>event bus/job queue"]
         ObjectStorage["MinIO/Object Storage<br/>PDF, CSV, SVG, ticket assets"]
-        Keycloak["Keycloak<br/>OIDC/RBAC/MFA"]
     end
 
     Payment["VNPAY / MoMo"]
@@ -67,7 +66,6 @@ flowchart TD
     AdminWeb --> Gateway
     ScannerApp --> Gateway
 
-    Gateway --> Keycloak
     Gateway --> Postgres
     Gateway --> Redis
     Gateway --> RabbitMQ
@@ -89,7 +87,7 @@ flowchart TD
 
 | Container | Công nghệ | Giao tiếp chính |
 |---|---|---|
-| Audience/Admin Web | Next.js | HTTPS tới API Gateway, cache public page ở edge. |
+| Audience/Admin Web | Next.js | HTTPS tới Backend API, cache public page khi phù hợp. |
 | Scanner Web/PWA App | Next.js PWA | HTTPS khi online, IndexedDB mã hóa khi offline. |
 | Backend API | NestJS | REST, transaction PostgreSQL, Redis, RabbitMQ. |
 | Workers | NestJS/TypeScript | RabbitMQ consumer, gọi AI/email/CSV/object storage. |
@@ -97,11 +95,10 @@ flowchart TD
 | Redis | In-memory data store | Cache-aside, token bucket, waiting room token. |
 | RabbitMQ | Message broker | Retry, DLQ, asynchronous workflow. |
 | MinIO | Object storage | Lưu file lớn và asset versioned. |
-| Keycloak | OIDC provider | Login, JWT/session, role, MFA. |
 
 ## Phạm vi của sơ đồ C4
 
 - Level 1 trả lời TicketBox phục vụ ai và tích hợp với hệ thống ngoài nào.
 - Level 2 trả lời các container logic chính và trách nhiệm tổng quát của chúng.
-- Domain dependency, checkout critical path, topology Kubernetes và trade-off triển khai nằm tại [03-high-level-architecture.md](03-high-level-architecture.md).
+- Domain dependency, checkout critical path, topology Docker Compose và trade-off triển khai nằm tại [03-high-level-architecture.md](03-high-level-architecture.md).
 - Luồng xử lý theo từng nghiệp vụ nằm tại [05-business-flows.md](05-business-flows.md).

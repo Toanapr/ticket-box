@@ -7,14 +7,14 @@ Mục tiêu của phần này là mô tả dependency chi tiết giữa domain s
 ```mermaid
 flowchart TD
     Internet["Internet"]
-    Edge["Reverse Proxy / Edge Cache / WAF<br/>Nginx/Varnish/Coraza"]
-    Gateway["API Gateway / Backend API"]
+    Edge["Reverse Proxy / Public Cache<br/>optional"]
+    Gateway["Backend API<br/>NestJS"]
 
     AudienceWeb["Audience Web App"]
     AdminWeb["Admin Web App"]
     ScannerApp["Scanner Web/PWA App<br/>offline manifest + local queue"]
 
-    Auth["Auth / Keycloak"]
+    Auth["Auth Module<br/>JWT/session/RBAC"]
     Concert["Concert Service"]
     Inventory["Inventory Service"]
     Order["Order Service"]
@@ -97,20 +97,15 @@ Checkout phụ thuộc vào Auth, Inventory, Order, Payment và database transac
 ```mermaid
 flowchart TD
     Internet["Internet"]
-    Edge["Reverse Proxy / Edge Cache / WAF"]
-    Gateway["Kubernetes Ingress / API Gateway"]
+    Edge["Reverse Proxy / Public Cache<br/>optional"]
 
-    Internet --> Edge --> Gateway
+    Internet --> Edge
 
-    subgraph Apps["Application workloads"]
+    subgraph Apps["Docker Compose application containers"]
         AudienceWeb["audience-web"]
         AdminWeb["admin-web"]
-        BackendAPI["backend-api"]
-        Concert["concert-service"]
-        Inventory["inventory-service"]
-        Order["order-service"]
-        Payment["payment-service"]
-        Checkin["checkin-service"]
+        ScannerWeb["scanner-pwa"]
+        BackendAPI["backend-api<br/>NestJS modular monolith"]
     end
 
     subgraph Workers["Async workers"]
@@ -121,30 +116,24 @@ flowchart TD
         AIBioWorker["ai-artist-bio-worker"]
     end
 
-    subgraph Platform["Platform services"]
-        Postgres["PostgreSQL primary + replica"]
-        Redis["Redis Cluster"]
-        RabbitMQ["RabbitMQ cluster"]
-        MinIO["MinIO cluster"]
-        Keycloak["Keycloak"]
-        Observability["Prometheus / Grafana / Loki / Tempo"]
+    subgraph Platform["Docker Compose platform containers"]
+        Postgres["PostgreSQL"]
+        Redis["Redis"]
+        RabbitMQ["RabbitMQ"]
+        MinIO["MinIO / S3-compatible storage"]
     end
 
-    Gateway --> AudienceWeb
-    Gateway --> AdminWeb
-    Gateway --> BackendAPI
-    Gateway --> Concert
-    Gateway --> Inventory
-    Gateway --> Order
-    Gateway --> Payment
-    Gateway --> Checkin
+    Edge --> AudienceWeb
+    Edge --> AdminWeb
+    Edge --> ScannerWeb
+    AudienceWeb --> BackendAPI
+    AdminWeb --> BackendAPI
+    ScannerWeb --> BackendAPI
 
-    BackendAPI --> Keycloak
     BackendAPI --> Postgres
     BackendAPI --> Redis
     BackendAPI --> RabbitMQ
     BackendAPI --> MinIO
-    BackendAPI --> Observability
 
     RabbitMQ --> NotificationWorker
     RabbitMQ --> ReservationSweeper
@@ -155,20 +144,19 @@ flowchart TD
 
 | Layer | Khuyến nghị |
 |---|---|
-| Public edge | Nginx/HAProxy edge, Varnish hoặc Nginx cache cho static assets, WAF bằng ModSecurity/Coraza trước Kubernetes. |
-| Kubernetes cluster | Tối thiểu 3 node worker production, tách node pool cho stateless app và stateful workload nếu tự host DB/broker trong cluster. |
-| Database | PostgreSQL primary-replica, backup PITR, read replica cho dashboard/reporting. |
-| Redis | Redis Cluster hoặc Redis Sentinel, memory sizing theo peak cache/rate-limit/waiting-room token. |
-| RabbitMQ | 3-node cluster, durable queue, quorum queue cho event quan trọng, DLQ cho job lỗi. |
-| Object storage | MinIO distributed mode, versioning cho PDF/CSV/seating map, lifecycle policy cho file tạm. |
-| Observability | OpenTelemetry SDK trong backend, Prometheus scrape metrics, Loki collect logs, Tempo trace, Grafana dashboard. |
-| CI/CD | Build image, scan vulnerabilities, push registry, deploy bằng Argo CD theo environment dev/staging/prod. |
+| Public edge | Reverse proxy/cache là tùy chọn cho demo; Next.js/Backend API vẫn phải hoạt động trực tiếp qua Docker Compose. |
+| Runtime | Docker Compose chạy audience web, admin web, scanner PWA, backend API, worker và platform containers. |
+| Database | PostgreSQL single instance cho đồ án; backup script hoặc dump hướng dẫn trong README. |
+| Redis | Redis single instance cho cache, rate limit, waiting room token và inventory summary gần realtime. |
+| RabbitMQ | Durable queue, retry và DLQ cho event/job quan trọng. |
+| Object storage | MinIO hoặc S3-compatible storage cho PDF/CSV/seating map/ticket assets. |
+| Monitoring cơ bản | Structured logs, health checks, metrics endpoint và dashboard tối thiểu nếu có thời gian. |
 
 ## Trade-off chính
 
 | Tiêu chí | Lợi ích | Rủi ro/chi phí | Cách giảm rủi ro |
 |---|---|---|---|
-| Kiểm soát hạ tầng | Chủ động cấu hình networking, data locality, version, scaling. | Team phải chịu trách nhiệm vận hành toàn bộ stack. | IaC/GitOps, runbook, staging giống production. |
-| Chi phí | Có thể tối ưu nếu đã có server/cluster và traffic lớn. | Phải trả chi phí nền cho node, DB, broker kể cả khi ít traffic. | Autoscale stateless workload, capacity planning theo concert campaign. |
+| Kiểm soát hạ tầng | Chủ động cấu hình networking, data locality, version, scaling. | Team phải chịu trách nhiệm vận hành nhiều container. | Docker Compose, `.env` rõ ràng, runbook tối giản. |
+| Chi phí | Dễ chạy local và demo bằng container OSS. | DB/broker/cache vẫn tiêu tốn tài nguyên máy local. | Chỉ bật thành phần cần demo, seed data gọn. |
 | Consistency | PostgreSQL transaction giúp reservation/payment dễ kiểm soát. | Hot row inventory có thể nghẽn dưới concurrent write lớn. | Waiting room, short transaction, row-level lock tối ưu, partition theo ticket type/concert. |
-| Vận hành sự kiện | Có thể build dashboard và runbook sát nhu cầu vận hành. | Cần trực ca, alert, backup/restore, disaster recovery. | Sale-day checklist, game day test, load test, DR drill. |
+| Vận hành sự kiện | Có thể build dashboard và runbook sát nhu cầu vận hành. | Cần trực ca, log, backup/restore nếu chạy thật. | Sale-day checklist, load test nhỏ và hướng dẫn xử lý sự cố cơ bản. |

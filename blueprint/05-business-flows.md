@@ -67,14 +67,14 @@ sequenceDiagram
     Note over App,QR: Offline tại cổng
     App->>QR: Scan QR token
     App->>App: Verify signature, concert, zone, local checked-in set
-    App->>App: Append CheckInAttempt vào local durable queue
+    App->>App: Tạo event id + append CheckInAttempt pending
     App->>App: Mark ticket locally used
 
     Note over App,Checkin: Khi online lại
-    App->>Checkin: Sync CheckInAttempt batch
+    App->>Checkin: Sync batch bằng event id đã lưu
     Checkin->>DB: Idempotent insert + kiểm tra ticket status
-    Checkin-->>App: ACK accepted/conflict/rejected
-    App->>App: Persist sync result
+    Checkin-->>App: ACK từng event accepted/conflict/rejected
+    App->>App: Persist ACK rồi mới dọn payload đã accepted
 ```
 
 ### Xử lý lỗi giữa chừng
@@ -86,6 +86,9 @@ sequenceDiagram
 | Một vé scan hai lần cùng device | Local checked-in set chặn lần thứ hai. |
 | Một vé scan ở hai device offline | Backend nhận sync trước thì accepted; sync sau conflict. |
 | Manifest cũ | App bắt buộc refresh trước ca; manifest có version, TTL và revoked list. |
+| Batch sync timeout hoặc ACK một phần | App gửi lại event chưa có ACK bằng cùng event id; backend dedupe. |
+| Event conflict/rejected | Giữ kết quả local để nhân sự xử lý, không tự xóa như event accepted. |
+| Manifest hết TTL hoặc sai chữ ký/checksum | Dừng offline scan và yêu cầu tải manifest hợp lệ. |
 
 ## Luồng nhập danh sách khách mời từ CSV
 
@@ -98,6 +101,7 @@ sequenceDiagram
     participant Import as Guest List Import Service
     participant Staging as Staging Tables
     participant DB as PostgreSQL
+    participant Outbox as Outbox Publisher
     participant Bus as RabbitMQ
     participant Checkin as Check-in Service
     participant Admin as Admin Dashboard
@@ -107,8 +111,9 @@ sequenceDiagram
     Import->>Storage: Read CSV file
     Import->>Staging: Parse, validate, normalize
     Import->>Import: Deduplicate guest identity
-    Import->>DB: Publish guest list version nếu batch hợp lệ
-    Import->>Bus: Publish GuestListUpdated
+    Import->>DB: Publish version + outbox nếu toàn batch hợp lệ
+    Outbox->>DB: Đọc outbox đã commit
+    Outbox->>Bus: Publish GuestListUpdated
     Bus-->>Checkin: Notify manifest update
     Import-->>Admin: Summary + invalid rows
 ```
@@ -118,10 +123,11 @@ sequenceDiagram
 | Lỗi | Hành vi |
 |---|---|
 | File không đọc được | Batch `FAILED`, giữ guest list version hiện tại. |
-| Dòng thiếu field hoặc sai format | Ghi invalid row vào staging, hiển thị ở dashboard. |
+| Dòng thiếu field hoặc sai format | Ghi invalid row vào staging, không publish cả batch và hiển thị error report. |
 | Trùng khách mời | Dedupe theo concert + identity + sponsor; không publish bản trùng. |
 | Batch lỗi nặng | Quarantine file, không ghi đè dữ liệu production. |
-| Import service restart | Job có idempotency theo file checksum/batch id. |
+| Import service restart | Retry theo `(concert_id, file checksum, schema version)`, không tạo version hoặc row trùng. |
+| Worker crash sau DB commit | Outbox tiếp tục publish `GuestListUpdated`; version đã active không bị publish lại thành version mới. |
 
 ## Luồng cập nhật cache concert
 
@@ -131,14 +137,16 @@ sequenceDiagram
     actor Admin as Admin
     participant Concert as Concert Service
     participant DB as DB
+    participant Outbox as Outbox Publisher
     participant EventBus as Event Bus
     participant CacheWorker as Cache Worker
     participant Cache as Nginx/Varnish/Redis
     participant PublicAPI as Public API
 
     Admin->>Concert: Update concert
-    Concert->>DB: Save
-    Concert->>EventBus: Publish ConcertUpdated
+    Concert->>DB: Save + outbox event trong cùng transaction
+    Outbox->>DB: Đọc outbox đã commit
+    Outbox->>EventBus: Publish ConcertUpdated
     EventBus-->>CacheWorker: Deliver ConcertUpdated
     CacheWorker->>Cache: Invalidate concert detail/listing keys
     PublicAPI->>Cache: Serve updated content
@@ -151,6 +159,7 @@ sequenceDiagram
 | Cache worker lỗi | TTL ngắn giúp cache tự hết hạn; worker retry event. |
 | Event bus retry | Invalidation idempotent, xóa key nhiều lần vẫn an toàn. |
 | Cache stampede | Dùng request coalescing, stale-while-revalidate và prewarm trước giờ mở bán. |
+| Redis/edge cache lỗi | Phục vụ stale public data nếu có; fallback DB có concurrency/query budget và trả `503` khi primary gần bão hòa. |
 
 ## Luồng AI Artist Bio
 
@@ -169,11 +178,11 @@ sequenceDiagram
     participant PublicPage as Public Page
 
     Admin->>Storage: Upload PDF
-    Event->>AI: Start job
+    Event->>AI: Start idempotent job theo object/pipeline version
     AI->>PDF: Extract text
-    AI->>AI: Clean, truncate, remove irrelevant content
+    AI->>AI: Clean, sanitize, truncate, remove irrelevant content
     AI->>Model: Generate short artist bio
-    AI->>DB: Save draft bio
+    AI->>DB: Upsert một draft cho job
     Admin->>AdminWeb: Review/publish
     AdminWeb->>Concert: Publish approved bio
     Concert-->>PublicPage: Display published bio
@@ -185,5 +194,7 @@ sequenceDiagram
 |---|---|
 | PDF lỗi hoặc quá lớn | Reject upload hoặc đưa job vào failed, không ảnh hưởng trang concert. |
 | Extract text lỗi | Lưu lỗi job để admin upload lại hoặc nhập bio thủ công. |
-| AI model timeout | Retry/backoff; nếu vẫn lỗi, giữ draft trống hoặc bio thủ công. |
+| AI model timeout | Retry có giới hạn với backoff/jitter; vượt budget thì vào DLQ/failed để admin retry thủ công. |
 | AI sinh nội dung không phù hợp | Không auto-publish; admin phải review/edit/publish. |
+| Worker nhận lại cùng message | Dedupe theo job/stage key, không tạo thêm draft hoặc gọi model lại khi stage đã hoàn tất. |
+| Nội dung PDF cố điều khiển model | Xem PDF là input không tin cậy; sanitize và giữ system instruction cố định. |

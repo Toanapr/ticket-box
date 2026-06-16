@@ -9,7 +9,7 @@
 | Phase | Mục tiêu | Kết quả chính | Phụ thuộc |
 |---|---|---|---|
 | 0 | Foundation | Repo, môi trường chạy, migration, auth skeleton. | Không |
-| 1 | Core ticketing | Concert, ticket type, quota, reservation, order, payment, e-ticket. | Phase 0 |
+| 1 | Core ticketing | Admin tối thiểu để tạo concert/ticket type, quota, reservation, order, payment, e-ticket. | Phase 0 |
 | 2 | Flash-sale hardening | Cache, waiting room, rate limit, idempotency hardening, payment reconciliation, metrics. | Phase 1 |
 | 3 | Event-day operations | Scanner app/API, offline manifest, offline check-in queue, sync, guest list CSV. | Phase 1, một phần Phase 2 |
 | 4 | Admin operations | Dashboard doanh thu/vé, audit log, refund/cancel workflow. | Phase 1 |
@@ -44,7 +44,7 @@
 
 ### Scope
 
-- Concert CRUD cho organizer.
+- Admin tối thiểu cho organizer tạo/cập nhật concert phục vụ bán vé.
 - Ticket type, sale window, capacity, per-user quota.
 - Public listing/detail API.
 - Reservation transaction với TTL.
@@ -67,7 +67,7 @@
 - Public/API cache cho concert list/detail.
 - Redis inventory summary TTL ngắn.
 - Rate limit theo IP, user, device hoặc session.
-- Waiting room, sale access token, anti-bot controls.
+- Waiting room, sale access token, risk checks trong Backend API, CAPTCHA optional theo risk score.
 - Payment circuit breaker.
 - Payment reconciliation job.
 - Metrics sale day, queue depth, DLQ, inventory remaining.
@@ -86,7 +86,7 @@
 - Scanner API và scanner app.
 - Device assignment theo event, gate, zone.
 - Signed manifest cho ticket, guest list, revoked list.
-- Encrypted local storage cho scanner.
+- Durable local storage cho scanner; encryption hoặc device binding nếu feasible trên PWA target.
 - Offline check-in queue bắt buộc.
 - Batch sync idempotent.
 - Conflict policy: accepted, conflict, rejected.
@@ -171,7 +171,7 @@ Nếu thời gian đồ án hạn chế, ưu tiên theo thứ tự:
 3. Phase 2 tối thiểu: rate limit, idempotency, reconciliation, metrics cơ bản.
 4. Phase 3 với offline check-in bắt buộc và guest list CSV an toàn.
 5. Phase 4 dashboard tối thiểu.
-6. Phase 5 AI chỉ làm khi core đã ổn.
+6. Phase 5 AI làm bản tối giản khi thiếu thời gian: upload PDF, extract text, AI adapter configurable/mock, admin review trước publish.
 
 ## Kết luận
 

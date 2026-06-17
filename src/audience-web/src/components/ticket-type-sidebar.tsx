@@ -27,6 +27,7 @@ export function TicketTypeSidebar({
             <Link
               key={type.id}
               href={`/concerts/${concert.id}?ticketType=${type.id}`}
+              scroll={false}
               className={`rounded-lg border p-4 transition ${
                 type.id === selectedTicketTypeId
                   ? "border-ticket-green bg-ticket-green/5"

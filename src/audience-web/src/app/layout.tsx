@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TicketBox Audience Web",
-  description: "Xem concert, chon ve, checkout va nhan e-ticket QR.",
+  description: "Xem concert, chọn vé, checkout và nhận e-ticket QR.",
 };
 
 export default function RootLayout({
@@ -16,6 +16,7 @@ export default function RootLayout({
     <html
       lang="vi"
       className="h-full scroll-smooth antialiased"
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
         <SiteHeader />

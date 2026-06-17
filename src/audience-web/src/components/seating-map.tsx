@@ -14,10 +14,10 @@ export function SeatingMap({
   return (
     <div className="grid gap-5">
       <div className="rounded-lg border border-black/10 bg-ticket-stone p-4 md:p-6">
-        <svg viewBox="0 0 400 300" className="h-auto w-full" role="img" aria-label="So do khu vuc khan dai">
+        <svg viewBox="0 0 400 300" className="h-auto w-full" role="img" aria-label="Sơ đồ khu vực khán đài">
           <rect x="100" y="12" width="200" height="30" rx="5" fill="#1e3a8a" />
           <text x="200" y="31" textAnchor="middle" fill="white" fontSize="12" fontWeight="800">
-            STAGE / SAN KHAU
+            STAGE / SÂN KHẤU
           </text>
           {concert.ticketTypes.map((type) => (
             <ZoneShape
@@ -78,7 +78,7 @@ function ZoneShape({
   };
 
   return (
-    <Link href={href} aria-label={`Chon khu ${label}`}>
+    <Link href={href} aria-label={`Chọn khu ${label}`}>
       <path
         d={pathByZone[zone]}
         fill={zoneColors[zone]}

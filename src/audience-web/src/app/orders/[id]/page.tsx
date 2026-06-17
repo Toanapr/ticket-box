@@ -11,7 +11,7 @@ export default async function OrderPage({ params }: OrderPageProps): Promise<Rea
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Concerts", href: "/concerts" }, { label: "Trang thai don hang" }]} />
+      <Breadcrumbs items={[{ label: "Concerts", href: "/concerts" }, { label: "Trạng thái đơn hàng" }]} />
       <OrderStatusClient orderId={id} />
     </PageShell>
   );

@@ -1,9 +1,9 @@
 import type { ConcertStatus } from "@/lib/types";
 
 const labelByStatus: Record<ConcertStatus, string> = {
-  selling: "Dang ban ve",
-  upcoming: "Sap mo ban",
-  soldout: "Het ve",
+  selling: "Đang bán vé",
+  upcoming: "Sắp mở bán",
+  soldout: "Hết vé",
 };
 
 const classByStatus: Record<ConcertStatus, string> = {

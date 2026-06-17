@@ -114,7 +114,7 @@ export async function createOrder(input: {
       provider: "mock-bank",
       bankName: "VIETCOMBANK (VCB)",
       accountNo: "9837482937",
-      accountName: "CONG TY TICKETBOX VIET NAM",
+    accountName: "CONG TY TICKETBOX VIET NAM",
       memo: orderId,
       amount: totalAmount,
     },
@@ -188,11 +188,11 @@ export async function getTicket(ticketId: string): Promise<TicketRecord | null> 
 
 function mockError(code: ReservationErrorCode): ReservationApiError {
   const messages: Record<ReservationErrorCode, string> = {
-    SOLD_OUT: "Loai ve nay vua het. Vui long chon khu vuc khac.",
-    QUOTA_EXCEEDED: "So luong ve vuot han muc cho phep cua tai khoan.",
-    SALE_NOT_OPEN: "Cong ban ve chua mo hoac da dong.",
-    RESERVATION_EXPIRED: "Phien giu ve da het han. Vui long thu lai.",
-    UNKNOWN: "Khong the tao giao dich luc nay.",
+    SOLD_OUT: "Loại vé này vừa hết. Vui lòng chọn khu vực khác.",
+    QUOTA_EXCEEDED: "Số lượng vé vượt hạn mức cho phép của tài khoản.",
+    SALE_NOT_OPEN: "Cổng bán vé chưa mở hoặc đã đóng.",
+    RESERVATION_EXPIRED: "Phiên giữ vé đã hết hạn. Vui lòng thử lại.",
+    UNKNOWN: "Không thể tạo giao dịch lúc này.",
   };
   return new ReservationApiError(code, messages[code]);
 }

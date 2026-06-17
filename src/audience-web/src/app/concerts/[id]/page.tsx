@@ -46,7 +46,7 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
               </div>
             </div>
             <div className="mt-8 border-t border-white/10 pt-6">
-              <div className="text-sm font-bold text-white/80">Gia tu</div>
+              <div className="text-sm font-bold text-white/80">Giá từ</div>
               <div className="font-display text-3xl font-black text-ticket-green">{formatCurrency(minPrice)}</div>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
 
       <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
         <div className="grid gap-10">
-          <InfoSection title="Dan nghe si bieu dien" icon={<UsersIcon className="h-6 w-6 text-ticket-green" />}>
+          <InfoSection title="Dàn nghệ sĩ biểu diễn" icon={<UsersIcon className="h-6 w-6 text-ticket-green" />}>
             <div className="flex flex-wrap gap-3">
               {concert.artists.map((artist) => (
                 <span key={artist} className="inline-flex min-h-11 items-center gap-2 rounded border border-black/10 bg-ticket-stone px-4 text-sm font-black">
@@ -69,11 +69,11 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
             </div>
           </InfoSection>
 
-          <InfoSection title="So do khu vuc khan dai" icon={<LayersIcon className="h-6 w-6 text-ticket-green" />}>
+          <InfoSection title="Sơ đồ khu vực khán đài" icon={<LayersIcon className="h-6 w-6 text-ticket-green" />}>
             <SeatingMap concert={concert} selectedTicketTypeId={selectedTicketType.id} />
           </InfoSection>
 
-          <InfoSection title="Thong tin chi tiet" icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}>
+          <InfoSection title="Thông tin chi tiết" icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}>
             <p className="max-w-3xl text-base leading-8 text-slate-600">{concert.description}</p>
           </InfoSection>
         </div>

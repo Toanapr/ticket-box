@@ -16,11 +16,11 @@ import type { BuyerInfo, ConcertDetail, ReservationErrorCode } from "@/lib/types
 type MockFailure = ReservationErrorCode | "NORMAL";
 
 const errorTitles: Record<ReservationErrorCode, string> = {
-  SOLD_OUT: "Ve da ban het",
-  QUOTA_EXCEEDED: "Vuot han muc mua ve",
-  SALE_NOT_OPEN: "Cong ban ve chua mo",
-  RESERVATION_EXPIRED: "Phien giu ve het han",
-  UNKNOWN: "Khong the tao don",
+  SOLD_OUT: "Vé đã bán hết",
+  QUOTA_EXCEEDED: "Vượt hạn mức mua vé",
+  SALE_NOT_OPEN: "Cổng bán vé chưa mở",
+  RESERVATION_EXPIRED: "Phiên giữ vé hết hạn",
+  UNKNOWN: "Không thể tạo đơn",
 };
 
 export function CheckoutClient({
@@ -34,7 +34,7 @@ export function CheckoutClient({
   const ticketType = concert.ticketTypes.find((item) => item.id === ticketTypeId) ?? concert.ticketTypes[0];
   const [quantity, setQuantity] = useState(1);
   const [buyer, setBuyer] = useState<BuyerInfo>({
-    fullName: "Nguyen Van Khan Gia",
+    fullName: "Nguyễn Văn Khán Giả",
     phone: "0912345678",
     email: "audience@ticketbox.vn",
   });
@@ -73,7 +73,7 @@ export function CheckoutClient({
       if (caught instanceof ReservationApiError) {
         setError({ title: errorTitles[caught.code], message: caught.message });
       } else {
-        setError({ title: "Khong the tao don", message: "He thong dang ban. Vui long thu lai sau." });
+        setError({ title: "Không thể tạo đơn", message: "Hệ thống đang bận. Vui lòng thử lại sau." });
       }
       setSubmitting(false);
     }
@@ -87,8 +87,8 @@ export function CheckoutClient({
             <CreditCardIcon className="h-6 w-6" />
           </div>
           <div className="flex-1">
-            <h1 className="font-display text-xl font-black">Dang giu ve cua ban</h1>
-            <p className="text-sm text-slate-300">Hoan tat thanh toan sau khi tao order. Reservation/order backend la nguon quyet dinh.</p>
+            <h1 className="font-display text-xl font-black">Đang giữ vé của bạn</h1>
+            <p className="text-sm text-slate-300">Hoàn tất thanh toán sau khi tạo order. Reservation/order backend là nguồn quyết định.</p>
           </div>
           <span className="font-mono text-xl font-black text-ticket-green">10:00</span>
         </div>
@@ -104,12 +104,12 @@ export function CheckoutClient({
         ) : null}
 
         <section className="border-b border-black/10 pb-8">
-          <h2 className="font-display text-2xl font-black">1. Chon so luong ve</h2>
+          <h2 className="font-display text-2xl font-black">1. Chọn số lượng vé</h2>
           <div className="mt-5 flex flex-col gap-5 rounded-lg border border-black/10 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="font-black">{ticketType.name}</div>
-              <div className="mt-1 text-sm font-bold text-slate-600">{formatCurrency(ticketType.price)} / ve</div>
-              <div className="mt-2 text-xs font-bold text-slate-500">Han muc hien thi: {ticketType.maxPerUser} ve/tai khoan</div>
+              <div className="mt-1 text-sm font-bold text-slate-600">{formatCurrency(ticketType.price)} / vé</div>
+              <div className="mt-2 text-xs font-bold text-slate-500">Hạn mức hiển thị: {ticketType.maxPerUser} vé/tài khoản</div>
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -134,12 +134,12 @@ export function CheckoutClient({
         </section>
 
         <section className="border-b border-black/10 pb-8">
-          <h2 className="font-display text-2xl font-black">2. Thong tin nhan e-ticket</h2>
+          <h2 className="font-display text-2xl font-black">2. Thông tin nhận e-ticket</h2>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <CheckoutField label="Ho va ten" value={buyer.fullName} onChange={(fullName) => setBuyer((value) => ({ ...value, fullName }))} />
-            <CheckoutField label="So dien thoai" value={buyer.phone} type="tel" onChange={(phone) => setBuyer((value) => ({ ...value, phone }))} />
+            <CheckoutField label="Họ và tên" value={buyer.fullName} onChange={(fullName) => setBuyer((value) => ({ ...value, fullName }))} />
+            <CheckoutField label="Số điện thoại" value={buyer.phone} type="tel" onChange={(phone) => setBuyer((value) => ({ ...value, phone }))} />
             <CheckoutField
-              label="Email nhan ve"
+              label="Email nhận vé"
               value={buyer.email}
               type="email"
               className="sm:col-span-2"
@@ -150,22 +150,22 @@ export function CheckoutClient({
 
         <section className="rounded-lg border border-dashed border-black/20 bg-ticket-stone p-5">
           <h2 className="text-sm font-black uppercase tracking-wide">Local demo controls</h2>
-          <p className="mt-1 text-sm text-slate-600">Dung de test response backend khi Person 2 chua ban giao API.</p>
+          <p className="mt-1 text-sm text-slate-600">Dùng để test response backend khi Person 2 chưa bàn giao API.</p>
           <select
             value={mockFailure}
             onChange={(event) => setMockFailure(event.target.value as MockFailure)}
             className="mt-4 min-h-12 w-full rounded border border-black/10 bg-white px-3 text-base font-bold"
           >
-            <option value="NORMAL">Dat cho thanh cong</option>
-            <option value="SOLD_OUT">Loi: sold out</option>
-            <option value="QUOTA_EXCEEDED">Loi: quota exceeded</option>
-            <option value="SALE_NOT_OPEN">Loi: sale not open</option>
+            <option value="NORMAL">Đặt chỗ thành công</option>
+            <option value="SOLD_OUT">Lỗi: sold out</option>
+            <option value="QUOTA_EXCEEDED">Lỗi: quota exceeded</option>
+            <option value="SALE_NOT_OPEN">Lỗi: sale not open</option>
           </select>
         </section>
       </section>
 
       <aside className="sticky top-24 rounded-lg border border-ticket-obsidian bg-white p-6 shadow-[6px_6px_0_#0d1118]">
-        <h2 className="font-display text-xl font-black">Tom tat don hang</h2>
+        <h2 className="font-display text-xl font-black">Tóm tắt đơn hàng</h2>
         <div className="mt-5 flex gap-4 border-b border-black/10 pb-5">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded border border-black/10">
             <Image src={concert.posterPath} alt={`${concert.title} poster`} fill sizes="80px" className="object-cover" />
@@ -177,9 +177,9 @@ export function CheckoutClient({
           </div>
         </div>
         <SummaryRow label={`${ticketType.name} x ${quantity}`} value={formatCurrency(totals.ticketTotal)} />
-        <SummaryRow label="Phi dich vu he thong 2%" value={formatCurrency(totals.fee)} />
+        <SummaryRow label="Phí dịch vụ hệ thống 2%" value={formatCurrency(totals.fee)} />
         <div className="mt-5 flex justify-between border-t border-dashed border-black/20 pt-5 font-black">
-          <span>Tong thanh toan</span>
+          <span>Tổng thanh toán</span>
           <span className="font-display text-xl text-ticket-green">{formatCurrency(totals.total)}</span>
         </div>
         <button
@@ -188,7 +188,7 @@ export function CheckoutClient({
           disabled={submitting}
           className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded bg-ticket-green px-4 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-obsidian disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Dang tao reservation..." : "Xac nhan & thanh toan"}
+          {submitting ? "Đang tạo reservation..." : "Xác nhận & thanh toán"}
           <CreditCardIcon className="h-5 w-5" />
         </button>
       </aside>

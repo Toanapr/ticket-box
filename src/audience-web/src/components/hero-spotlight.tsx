@@ -9,7 +9,7 @@ export function HeroSpotlight({ concert }: { concert: ConcertSummary }): React.R
     <section className="mb-12 grid gap-8 border-b-2 border-ticket-obsidian pb-12 lg:grid-cols-[1fr_340px] lg:items-center">
       <div>
         <span className="mb-5 inline-flex border border-ticket-obsidian px-3 py-1 text-xs font-black uppercase tracking-widest">
-          Noi bat
+          Nổi bật
         </span>
         <h1 className="max-w-3xl font-display text-4xl font-black leading-[1.05] tracking-tight md:text-6xl">
           {concert.title}
@@ -29,7 +29,7 @@ export function HeroSpotlight({ concert }: { concert: ConcertSummary }): React.R
           href={`/concerts/${concert.id}`}
           className="mt-8 inline-flex min-h-12 items-center gap-2 rounded bg-ticket-obsidian px-6 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-green"
         >
-          Mua ve ngay
+          Mua vé ngay
           <ArrowRightIcon className="h-5 w-5" />
         </Link>
       </div>

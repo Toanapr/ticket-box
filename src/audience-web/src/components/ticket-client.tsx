@@ -22,14 +22,14 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
   }, [ticketId]);
 
   if (loading) {
-    return <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">Dang tai e-ticket...</div>;
+    return <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">Đang tải e-ticket...</div>;
   }
 
   if (!ticket) {
     return (
       <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-8">
-        <h1 className="font-display text-2xl font-black text-red-900">Khong tim thay ticket</h1>
-        <p className="mt-2 text-sm text-red-800">Hay hoan tat mock payment success tu trang order truoc.</p>
+        <h1 className="font-display text-2xl font-black text-red-900">Không tìm thấy ticket</h1>
+        <p className="mt-2 text-sm text-red-800">Hãy hoàn tất mock payment success từ trang order trước.</p>
       </div>
     );
   }
@@ -46,13 +46,13 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
           className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded border border-ticket-obsidian bg-white px-4 text-sm font-black uppercase tracking-wide"
         >
           <PrinterIcon className="h-5 w-5" />
-          In ve / Luu PDF
+          In vé / Lưu PDF
         </button>
         <Link
           href="/concerts"
           className="flex min-h-12 flex-1 items-center justify-center rounded bg-ticket-green px-4 text-sm font-black uppercase tracking-wide text-white"
         >
-          Trang chu
+          Trang chủ
         </Link>
       </div>
 
@@ -67,11 +67,11 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
         <div className="p-6 md:p-8">
           <h1 className="font-display text-3xl font-black tracking-tight">{concert?.title ?? "TicketBox Concert"}</h1>
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            <Meta label="Thoi gian" value={concert ? formatDateTime(concert.startsAt) : "-"} />
-            <Meta label="Dia diem" value={concert ? shortVenue(concert.venue) : "-"} />
-            <Meta label="Khu ve" value={ticketType?.name ?? ticket.ticketTypeId} />
-            <Meta label="Vi tri / ghe" value={ticket.seats.join(", ")} />
-            <Meta label="Chu so huu" value={ticket.owner.fullName} />
+            <Meta label="Thời gian" value={concert ? formatDateTime(concert.startsAt) : "-"} />
+            <Meta label="Địa điểm" value={concert ? shortVenue(concert.venue) : "-"} />
+            <Meta label="Khu vé" value={ticketType?.name ?? ticket.ticketTypeId} />
+            <Meta label="Vị trí / ghế" value={ticket.seats.join(", ")} />
+            <Meta label="Chủ sở hữu" value={ticket.owner.fullName} />
             <Meta label="Email" value={ticket.owner.email} />
           </div>
         </div>
@@ -80,10 +80,10 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
           <div className="mx-auto h-44 w-44 rounded border border-ticket-obsidian bg-white p-3">
             <MockQr payload={ticket.qrPayload} className="h-full w-full" />
           </div>
-          <div className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">Ma so ve dien tu</div>
+          <div className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">Mã số vé điện tử</div>
           <div className="mt-1 font-mono text-lg font-black tracking-wide">{ticket.ticketId}</div>
           <div className="mt-4 inline-flex rounded-full bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase text-ticket-green">
-            Chua check-in
+            Chưa check-in
           </div>
           <div className="mt-5 break-all font-mono text-[11px] uppercase text-slate-500">{ticket.signedPayload}</div>
         </div>

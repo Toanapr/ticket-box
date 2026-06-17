@@ -46,14 +46,14 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
   }
 
   if (loading) {
-    return <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">Dang tai order...</div>;
+    return <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">Đang tải order...</div>;
   }
 
   if (!order) {
     return (
       <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-8">
-        <h1 className="font-display text-2xl font-black text-red-900">Khong tim thay order</h1>
-        <p className="mt-2 text-sm text-red-800">Mock order chi ton tai tren trinh duyet da tao giao dich.</p>
+        <h1 className="font-display text-2xl font-black text-red-900">Không tìm thấy order</h1>
+        <p className="mt-2 text-sm text-red-800">Mock order chỉ tồn tại trên trình duyệt đã tạo giao dịch.</p>
       </div>
     );
   }
@@ -67,10 +67,10 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
       <section className="rounded-lg border border-black/10 bg-white p-6 md:p-8">
         <h1 className="flex items-center gap-3 font-display text-2xl font-black">
           <QrIcon className="h-7 w-7 text-ticket-green" />
-          Chuyen khoan nhanh qua VietQR
+          Chuyển khoản nhanh qua VietQR
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          Mo app ngan hang, quet QR hoac chuyen khoan dung so tien va noi dung. Trang nay poll `GET /orders/:id` theo no-store.
+          Mở app ngân hàng, quét QR hoặc chuyển khoản đúng số tiền và nội dung. Trang này poll `GET /orders/:id` theo no-store.
         </p>
         <div className="mt-8 grid gap-8 md:grid-cols-[260px_1fr]">
           <div className="grid justify-items-center rounded-lg border border-black/10 bg-ticket-stone p-5">
@@ -80,11 +80,11 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
             <p className="mt-3 text-center text-xs font-bold text-slate-500">Mock QR cho local demo</p>
           </div>
           <div className="grid gap-4">
-            <TransferRow label="Ngan hang" value={order.paymentIntent?.bankName ?? "Mock bank"} />
-            <TransferRow label="So tai khoan" value={order.paymentIntent?.accountNo ?? "9837482937"} />
-            <TransferRow label="Ten nguoi thu huong" value={order.paymentIntent?.accountName ?? "CONG TY TICKETBOX VIET NAM"} />
-            <TransferRow label="Noi dung" value={order.paymentIntent?.memo ?? order.orderId} />
-            <TransferRow label="So tien" value={formatCurrency(order.totalAmount)} />
+            <TransferRow label="Ngân hàng" value={order.paymentIntent?.bankName ?? "Mock bank"} />
+            <TransferRow label="Số tài khoản" value={order.paymentIntent?.accountNo ?? "9837482937"} />
+            <TransferRow label="Tên người thụ hưởng" value={order.paymentIntent?.accountName ?? "CONG TY TICKETBOX VIET NAM"} />
+            <TransferRow label="Nội dung" value={order.paymentIntent?.memo ?? order.orderId} />
+            <TransferRow label="Số tiền" value={formatCurrency(order.totalAmount)} />
           </div>
         </div>
       </section>
@@ -96,13 +96,13 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
         <div className="mt-5 inline-flex rounded bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-ticket-green">
           {order.status}
         </div>
-        <h2 className="mt-4 font-display text-2xl font-black">{order.status === "TICKET_ISSUED" ? "Da xuat e-ticket" : "Dang cho thanh toan"}</h2>
+        <h2 className="mt-4 font-display text-2xl font-black">{order.status === "TICKET_ISSUED" ? "Đã xuất e-ticket" : "Đang chờ thanh toán"}</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {concert?.title ?? "Concert"} - {ticketType?.name ?? "Ticket"} x {order.quantity}
         </p>
         <div className="mt-6 border-t border-black/10 pt-5 text-left text-sm">
-          <SummaryLine label="Ma don" value={order.orderId} />
-          <SummaryLine label="Tong tien" value={formatCurrency(order.totalAmount)} />
+          <SummaryLine label="Mã đơn" value={order.orderId} />
+          <SummaryLine label="Tổng tiền" value={formatCurrency(order.totalAmount)} />
         </div>
 
         {order.status === "TICKET_ISSUED" && order.ticketId ? (

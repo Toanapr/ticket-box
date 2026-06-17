@@ -12,21 +12,21 @@ export function SiteHeader(): React.ReactElement {
           </span>
         </Link>
 
-        <nav aria-label="Dieu huong chinh" className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
+        <nav aria-label="Điều hướng chính" className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
           <Link className="transition hover:text-ticket-green" href="/concerts">
-            Su kien
+            Sự kiện
           </Link>
           <Link className="transition hover:text-ticket-green" href="/concerts">
-            Lich dien
+            Lịch diễn
           </Link>
           <Link className="transition hover:text-ticket-green" href="/concerts">
-            Huong dan
+            Hướng dẫn
           </Link>
         </nav>
 
         <div className="flex min-h-11 items-center rounded-full border border-black/10 bg-white px-2 py-1 text-sm font-bold">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-ticket-green text-xs text-white">KG</span>
-          <span className="hidden px-2 sm:inline">Khan gia</span>
+          <span className="hidden px-2 sm:inline">Khán giả</span>
         </div>
       </div>
     </header>
@@ -43,7 +43,7 @@ export function SiteFooter(): React.ReactElement {
             Ticket<span className="text-ticket-green">Box</span>
           </div>
           <p className="max-w-md text-sm leading-6 text-slate-600">
-            He thong ban ve concert cho khan gia: xem su kien, giu ve, theo doi thanh toan va nhan e-ticket QR.
+            Hệ thống bán vé concert cho khán giả: xem sự kiện, giữ vé, theo dõi thanh toán và nhận e-ticket QR.
           </p>
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
             <span className="rounded border border-black/10 bg-ticket-alabaster px-3 py-2">SSL Secure</span>
@@ -51,24 +51,24 @@ export function SiteFooter(): React.ReactElement {
           </div>
         </div>
         <div>
-          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Dich vu</h2>
+          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Dịch vụ</h2>
           <div className="grid gap-3 text-sm text-slate-600">
-            <Link href="/concerts">Chinh sach bao mat</Link>
-            <Link href="/concerts">Dieu khoan su dung</Link>
-            <Link href="/concerts">Chinh sach hoan tien</Link>
+            <Link href="/concerts">Chính sách bảo mật</Link>
+            <Link href="/concerts">Điều khoản sử dụng</Link>
+            <Link href="/concerts">Chính sách hoàn tiền</Link>
           </div>
         </div>
         <div>
-          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Tro giup</h2>
+          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Trợ giúp</h2>
           <div className="grid gap-3 text-sm text-slate-600">
             <span>1900 6408 (8:30 - 18:30)</span>
             <span>support@ticketbox.vn</span>
-            <span>Quan 1, TP. Ho Chi Minh</span>
+            <span>Quận 1, TP. Hồ Chí Minh</span>
           </div>
         </div>
       </div>
       <div className="border-t border-black/10 px-5 py-5 text-center text-xs text-slate-500">
-        © 2026 TicketBox Viet Nam. Phase 1 audience web demo.
+        © 2026 TicketBox Việt Nam. Phase 1 audience web demo.
       </div>
     </footer>
   );

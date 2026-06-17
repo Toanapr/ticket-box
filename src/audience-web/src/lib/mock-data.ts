@@ -16,11 +16,11 @@ export const mockConcerts: ConcertDetail[] = [
     id: "say-hi-2026",
     title: "Anh Trai Say Hi - Concert 2026",
     artists: ["HIEUTHUHAI", "RHYDER", "Quang Hung MasterD", "Negav", "ISAAC", "HURRYKNG"],
-    venue: "San van dong Quoc gia My Dinh, Ha Noi",
+    venue: "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
     startsAt: "2026-10-15T19:00:00+07:00",
     status: "selling",
     description:
-      "Concert Anh Trai Say Hi 2026 quay tro lai voi quy mo san van dong, dan nghe si tre va he thong am thanh anh sang dau tu cho dem dien lon.",
+      "Concert Anh Trai Say Hi 2026 quay trở lại với quy mô sân vận động, dàn nghệ sĩ trẻ và hệ thống âm thanh ánh sáng đầu tư cho đêm diễn lớn.",
     posterPath: "/concert-posters/say-hi-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -33,13 +33,13 @@ export const mockConcerts: ConcertDetail[] = [
   },
   {
     id: "chong-gai-2",
-    title: "Anh Trai Vuot Ngan Chong Gai - Concert 2",
-    artists: ["Soobin Hoang Son", "Bang Kieu", "Tu Long", "Cuong Seven", "Kay Tran", "Jun Pham"],
-    venue: "San van dong Quan khu 7, TP. Ho Chi Minh",
+    title: "Anh Trai Vượt Ngàn Chông Gai - Concert 2",
+    artists: ["Soobin Hoàng Sơn", "Bằng Kiều", "Tự Long", "Cường Seven", "Kay Trần", "Jun Phạm"],
+    venue: "Sân vận động Quân khu 7, TP. Hồ Chí Minh",
     startsAt: "2026-11-20T19:30:00+07:00",
     status: "upcoming",
     description:
-      "Dai nhac hoi cua cac Anh Tai voi ban phoi moi, san khau nang luong cao va cam xuc tu hao cho khan gia.",
+      "Đại nhạc hội của các Anh Tài với bản phối mới, sân khấu năng lượng cao và cảm xúc tự hào cho khán giả.",
     posterPath: "/concert-posters/chong-gai-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -52,13 +52,13 @@ export const mockConcerts: ConcertDetail[] = [
   },
   {
     id: "chi-dep-2026",
-    title: "Chi Dep Dap Gio Re Song 2026",
-    artists: ["Toc Tien", "Minh Hang", "Thieu Bao Tram", "Ngoc Thanh Tam", "Dong Anh Quynh"],
-    venue: "Nha thi dau Phu Tho, TP. Ho Chi Minh",
+    title: "Chị Đẹp Đạp Gió Rẽ Sóng 2026",
+    artists: ["Tóc Tiên", "Minh Hằng", "Thiều Bảo Trâm", "Ngọc Thanh Tâm", "Đồng Ánh Quỳnh"],
+    venue: "Nhà thi đấu Phú Thọ, TP. Hồ Chí Minh",
     startsAt: "2026-12-05T18:30:00+07:00",
     status: "selling",
     description:
-      "Dem concert ton vinh nang luong cua cac Chi Dep, ket hop vu dao, band live va san khau lay cam hung tu dai duong.",
+      "Đêm concert tôn vinh năng lượng của các Chị Đẹp, kết hợp vũ đạo, band live và sân khấu lấy cảm hứng từ đại dương.",
     posterPath: "/concert-posters/chi-dep-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -73,11 +73,11 @@ export const mockConcerts: ConcertDetail[] = [
     id: "em-xinh-showcase",
     title: "Em Xinh Say Hi - Showcases",
     artists: ["Amee", "Mono", "tlinh", "Wren Evans", "Grey D", "hieuthuhai"],
-    venue: "Trung tam Hoi cho va Trien lam Sai Gon SECC",
+    venue: "Trung tâm Hội chợ và Triển lãm Sài Gòn SECC",
     startsAt: "2026-08-10T20:00:00+07:00",
     status: "soldout",
     description:
-      "Showcase cho the he tre voi nang luong tuoi moi, thoi thuong va khong gian dung gan san khau.",
+      "Showcase cho thế hệ trẻ với năng lượng tươi mới, thời thượng và không gian đứng gần sân khấu.",
     posterPath: "/concert-posters/em-xinh-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [

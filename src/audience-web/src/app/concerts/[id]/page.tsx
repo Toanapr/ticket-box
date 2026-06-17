@@ -1,7 +1,8 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { CalendarIcon, InfoIcon, LayersIcon, MapPinIcon, UsersIcon } from "@/components/icons";
+import { ArrowRightIcon, CalendarIcon, InfoIcon, LayersIcon, MapPinIcon, UsersIcon } from "@/components/icons";
 import { PageShell } from "@/components/site-shell";
 import { SeatingMap } from "@/components/seating-map";
 import { TicketTypeSidebar } from "@/components/ticket-type-sidebar";
@@ -24,33 +25,78 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
     concert.ticketTypes.find((type) => type.availableApprox > 0) ??
     concert.ticketTypes[0];
   const minPrice = Math.min(...concert.ticketTypes.map((type) => type.price));
+  const [venueMain, ...venueRest] = concert.venue.split(",");
+  const venueSub = venueRest.join(",").trim();
+  const canBuy = concert.status === "selling" && selectedTicketType.availableApprox > 0;
+  const heroCtaLabel = concert.status === "upcoming" ? "Sắp mở bán" : concert.status === "soldout" ? "Hết vé" : "Mua vé ngay";
 
   return (
     <PageShell>
       <Breadcrumbs items={[{ label: "Concerts", href: "/concerts" }, { label: concert.title }]} />
 
-      <section className="mb-10 overflow-hidden rounded-3xl bg-ticket-obsidian text-white shadow-[0_20px_40px_rgba(0,0,0,0.15)]">
-        <div className="grid lg:grid-cols-[390px_1fr]">
-          <div className="flex flex-col justify-between p-6 md:p-9">
+      <section className="mb-10 overflow-hidden rounded-[24px] bg-[#111315] text-white shadow-[0_20px_40px_rgba(0,0,0,0.15)]">
+        <div className="flex flex-col lg:h-[400px] lg:flex-row">
+          <div className="order-3 flex flex-col justify-between bg-[#1a1c1e] p-6 md:p-9 lg:order-1 lg:w-[380px] lg:shrink-0">
             <div>
-              <h1 className="font-display text-3xl font-black uppercase leading-tight tracking-tight">{concert.title}</h1>
-              <div className="mt-6 grid gap-4 text-sm font-bold">
-                <span className="flex items-start gap-3 text-ticket-green">
-                  <CalendarIcon className="mt-0.5 h-5 w-5 text-white" />
-                  {formatDateTime(concert.startsAt)}
-                </span>
-                <span className="flex items-start gap-3 text-ticket-green">
-                  <MapPinIcon className="mt-0.5 h-5 w-5 text-white" />
-                  {concert.venue}
-                </span>
+              <h1 className="font-display text-[24px] font-black uppercase leading-[1.25] tracking-tight text-white md:text-[28px] lg:line-clamp-3 lg:text-[24px]">
+                {concert.title}
+              </h1>
+              <div className="mt-7 grid gap-4">
+                <div className="flex items-start gap-3">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center text-white">
+                    <CalendarIcon className="h-[18px] w-[18px]" />
+                  </span>
+                  <div className="grid gap-1">
+                    <span className="text-sm font-black text-ticket-green">{formatDateTime(concert.startsAt)}</span>
+                    <span className="w-max rounded border border-[#3d4145] bg-[#27292b] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-white">
+                      + 1 ngày khác
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center text-white">
+                    <MapPinIcon className="h-[18px] w-[18px]" />
+                  </span>
+                  <div className="grid gap-1">
+                    <span className="text-sm font-black uppercase tracking-[0.03em] text-ticket-green">{venueMain}</span>
+                    {venueSub ? <span className="text-[12.5px] leading-5 text-slate-400">{venueSub}</span> : null}
+                  </div>
+                </div>
               </div>
             </div>
             <div className="mt-8 border-t border-white/10 pt-6">
-              <div className="text-sm font-bold text-white/80">Giá từ</div>
-              <div className="font-display text-3xl font-black text-ticket-green">{formatCurrency(minPrice)}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-bold text-white">Giá từ</span>
+                <span className="font-display text-[30px] font-black leading-none text-ticket-green md:text-[34px] lg:text-[22px]">
+                  {formatCurrency(minPrice)}
+                </span>
+                <ArrowRightIcon className="h-5 w-5 text-ticket-green" />
+              </div>
+              {canBuy ? (
+                <Link
+                  href={`/concerts/${concert.id}/checkout?ticketType=${selectedTicketType.id}`}
+                  className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-ticket-green px-5 py-3 text-[15px] font-black uppercase tracking-wide text-white transition hover:bg-[#00964a]"
+                >
+                  {heroCtaLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 min-h-12 w-full rounded-lg border border-white/5 bg-[#2b2e31] px-5 py-3 text-[15px] font-black uppercase tracking-wide text-slate-500"
+                >
+                  {heroCtaLabel}
+                </button>
+              )}
             </div>
           </div>
-          <div className="relative min-h-72 lg:min-h-[400px]">
+          <div className="relative order-2 h-8 shrink-0 bg-[#1a1c1e] lg:h-full lg:w-8">
+            <div className="absolute inset-y-0 left-1/2 hidden -translate-x-1/2 border-l border-dashed border-white/20 lg:block" />
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 border-t border-dashed border-white/20 lg:hidden" />
+            <div className="absolute -left-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-ticket-alabaster lg:left-1/2 lg:top-[-12px] lg:-translate-x-1/2 lg:translate-y-0" />
+            <div className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-ticket-alabaster lg:bottom-[-12px] lg:left-1/2 lg:right-auto lg:top-auto lg:-translate-x-1/2 lg:translate-y-0" />
+          </div>
+          <div className="relative order-1 h-[300px] overflow-hidden bg-black lg:order-3 lg:h-full lg:flex-1">
             <Image src={concert.posterPath} alt={`${concert.title} poster`} fill priority sizes="(max-width: 1024px) 100vw, 800px" className="object-cover" />
           </div>
         </div>

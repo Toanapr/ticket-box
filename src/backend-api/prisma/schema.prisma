@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReservationStatus {
+  active
+  confirmed
+  released
+  expired
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  issued
+  failed
+  expired
+}
+
+enum PaymentStatus {
+  created
+  pending
+  succeeded
+  failed
+}
+
+enum TicketStatus {
+  issued
+  revoked
+  checked_in
+}
+
+model TicketType {
+  id             String             @id @default(uuid()) @db.Uuid
+  concertId      String             @db.Uuid
+  zoneCode       String
+  name           String
+  price          Decimal            @db.Decimal(12, 2)
+  capacity       Int
+  perUserLimit   Int
+  saleStartAt    DateTime           @db.Timestamptz(6)
+  saleEndAt      DateTime           @db.Timestamptz(6)
+  inventory      InventoryCounter?
+  reservations   Reservation[]
+  quotas         UserTicketQuota[]
+  orderItems     OrderItem[]
+  tickets        Ticket[]
+}
+
+model InventoryCounter {
+  ticketTypeId   String   @id @db.Uuid
+  totalCapacity  Int
+  reservedCount  Int      @default(0)
+  soldCount      Int      @default(0)
+  version        Int      @default(0)
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id])
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  ticketTypeId   String            @db.Uuid
+  quantity       Int
+  orderId        String?           @db.Uuid
+  status         ReservationStatus
+  expiresAt      DateTime          @db.Timestamptz(6)
+  idempotencyKey String
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+  ticketType     TicketType        @relation(fields: [ticketTypeId], references: [id])
+  order          Order?            @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, expiresAt])
+}
+
+model UserTicketQuota {
+  userId         String   @db.Uuid
+  ticketTypeId   String   @db.Uuid
+  reservedCount  Int      @default(0)
+  paidCount      Int      @default(0)
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id])
+
+  @@id([userId, ticketTypeId])
+}
+
+model Order {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @db.Uuid
+  status         OrderStatus
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  idempotencyKey String
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+  reservations   Reservation[]
+  items          OrderItem[]
+  payments       Payment[]
+  tickets        Ticket[]
+
+  @@index([userId, status])
+  @@unique([userId, idempotencyKey])
+}
+
+model OrderItem {
+  id             String    @id @default(uuid()) @db.Uuid
+  orderId        String    @db.Uuid
+  reservationId  String    @db.Uuid
+  ticketTypeId   String    @db.Uuid
+  quantity       Int
+  unitPrice      Decimal   @db.Decimal(12, 2)
+  subtotalAmount Decimal   @db.Decimal(12, 2)
+  status         String
+  order          Order     @relation(fields: [orderId], references: [id])
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id])
+  tickets        Ticket[]
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  orderId        String        @db.Uuid
+  provider       String
+  providerTxnId  String?
+  status         PaymentStatus
+  payloadHash    String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+  order          Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, status])
+}
+
+model Ticket {
+  id             String       @id @default(uuid()) @db.Uuid
+  orderId        String       @db.Uuid
+  orderItemId    String       @db.Uuid
+  ticketTypeId   String       @db.Uuid
+  ownerUserId    String       @db.Uuid
+  qrTokenHash    String
+  sequenceNo     Int
+  status         TicketStatus
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(6)
+  order          Order        @relation(fields: [orderId], references: [id])
+  orderItem      OrderItem    @relation(fields: [orderItemId], references: [id])
+  ticketType     TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@unique([orderItemId, sequenceNo])
+  @@unique([qrTokenHash])
+}

@@ -60,17 +60,20 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
 
   const concert = findConcert(order.concertId);
   const ticketType = concert?.ticketTypes.find((item) => item.id === order.ticketTypeId);
-  const qrPayload = `vietqr://payment?bank=vcb&acc=${order.paymentIntent?.accountNo}&amount=${Math.round(order.totalAmount)}&memo=${order.orderId}`;
+  const providerName = order.paymentIntent?.providerName ?? (order.paymentIntent?.provider === "mock-bank" ? "Mock bank" : "VNPAY");
+  const qrPayload =
+    order.paymentIntent?.qrPayload ??
+    `vnpay://payment?orderId=${order.orderId}&amount=${Math.round(order.totalAmount)}`;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
       <section className="rounded-lg border border-black/10 bg-white p-6 md:p-8">
         <h1 className="flex items-center gap-3 font-display text-2xl font-black">
           <QrIcon className="h-7 w-7 text-ticket-green" />
-          Chuyển khoản nhanh qua VietQR
+          Thanh toán qua {providerName}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          Mở app ngân hàng, quét QR hoặc chuyển khoản đúng số tiền và nội dung. Trang này poll `GET /orders/:id` theo no-store.
+          Quét QR hoặc mở ứng dụng {providerName} để thanh toán đúng số tiền và mã đơn. Trang này poll `GET /orders/:id` theo no-store.
         </p>
         <div className="mt-8 grid gap-8 md:grid-cols-[260px_1fr]">
           <div className="grid justify-items-center rounded-lg border border-black/10 bg-ticket-stone p-5">
@@ -80,9 +83,7 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
             <p className="mt-3 text-center text-xs font-bold text-slate-500">Mock QR cho local demo</p>
           </div>
           <div className="grid gap-4">
-            <TransferRow label="Ngân hàng" value={order.paymentIntent?.bankName ?? "Mock bank"} />
-            <TransferRow label="Số tài khoản" value={order.paymentIntent?.accountNo ?? "9837482937"} />
-            <TransferRow label="Tên người thụ hưởng" value={order.paymentIntent?.accountName ?? "CONG TY TICKETBOX VIET NAM"} />
+            <TransferRow label="Cổng thanh toán" value={providerName} />
             <TransferRow label="Nội dung" value={order.paymentIntent?.memo ?? order.orderId} />
             <TransferRow label="Số tiền" value={formatCurrency(order.totalAmount)} />
           </div>
@@ -102,6 +103,7 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
         </p>
         <div className="mt-6 border-t border-black/10 pt-5 text-left text-sm">
           <SummaryLine label="Mã đơn" value={order.orderId} />
+          <SummaryLine label="Thanh toán" value={providerName} />
           <SummaryLine label="Tổng tiền" value={formatCurrency(order.totalAmount)} />
         </div>
 

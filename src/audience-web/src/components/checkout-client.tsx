@@ -3,15 +3,11 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CheckoutField, SummaryRow } from "./checkout-parts";
+import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
 import { AlertIcon, CreditCardIcon } from "./icons";
-import {
-  createOrder,
-  createReservation,
-  ReservationApiError,
-} from "@/lib/client-api";
+import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
 import { formatCurrency, formatDateTime, makeIdempotencyKey, serviceFee, shortVenue } from "@/lib/format";
-import type { BuyerInfo, ConcertDetail, ReservationErrorCode } from "@/lib/types";
+import type { BuyerInfo, ConcertDetail, PaymentMethod, ReservationErrorCode } from "@/lib/types";
 
 type MockFailure = ReservationErrorCode | "NORMAL";
 
@@ -38,6 +34,7 @@ export function CheckoutClient({
     phone: "0912345678",
     email: "audience@ticketbox.vn",
   });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("VNPAY");
   const [mockFailure, setMockFailure] = useState<MockFailure>("NORMAL");
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +63,7 @@ export function CheckoutClient({
         reservation,
         concertId: concert.id,
         buyer,
+        paymentMethod,
         idempotencyKey: makeIdempotencyKey("order"),
       });
       router.push(`/orders/${order.orderId}`);
@@ -92,7 +90,6 @@ export function CheckoutClient({
           </div>
           <span className="font-mono text-xl font-black text-ticket-green">10:00</span>
         </div>
-
         {error ? (
           <div role="alert" className="flex gap-3 rounded border border-red-600 bg-red-50 p-4 text-red-900">
             <AlertIcon className="mt-0.5 h-6 w-6 shrink-0" />
@@ -102,7 +99,6 @@ export function CheckoutClient({
             </div>
           </div>
         ) : null}
-
         <section className="border-b border-black/10 pb-8">
           <h2 className="font-display text-2xl font-black">1. Chọn số lượng vé</h2>
           <div className="mt-5 flex flex-col gap-5 rounded-lg border border-black/10 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -132,7 +128,6 @@ export function CheckoutClient({
             </div>
           </div>
         </section>
-
         <section className="border-b border-black/10 pb-8">
           <h2 className="font-display text-2xl font-black">2. Thông tin nhận e-ticket</h2>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -147,7 +142,10 @@ export function CheckoutClient({
             />
           </div>
         </section>
-
+        <section className="border-b border-black/10 pb-8">
+          <h2 className="font-display text-2xl font-black">3. Phương thức thanh toán</h2>
+          <PaymentMethodSelector value={paymentMethod} disabled={submitting} onChange={setPaymentMethod} />
+        </section>
         <section className="rounded-lg border border-dashed border-black/20 bg-ticket-stone p-5">
           <h2 className="text-sm font-black uppercase tracking-wide">Local demo controls</h2>
           <p className="mt-1 text-sm text-slate-600">Dùng để test response backend khi Person 2 chưa bàn giao API.</p>
@@ -178,6 +176,7 @@ export function CheckoutClient({
         </div>
         <SummaryRow label={`${ticketType.name} x ${quantity}`} value={formatCurrency(totals.ticketTotal)} />
         <SummaryRow label="Phí dịch vụ hệ thống 2%" value={formatCurrency(totals.fee)} />
+        <SummaryRow label="Phương thức" value={paymentMethod} />
         <div className="mt-5 flex justify-between border-t border-dashed border-black/20 pt-5 font-black">
           <span>Tổng thanh toán</span>
           <span className="font-display text-xl text-ticket-green">{formatCurrency(totals.total)}</span>

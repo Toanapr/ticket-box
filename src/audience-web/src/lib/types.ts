@@ -48,6 +48,8 @@ export interface BuyerInfo {
   email: string;
 }
 
+export type PaymentMethod = "VNPAY" | "MOMO";
+
 export interface ReservationRequest {
   concertId: string;
   ticketTypeId: string;
@@ -73,10 +75,12 @@ export interface OrderRecord {
   totalAmount: number;
   createdAt: string;
   paymentIntent?: {
-    provider: "mock-bank";
-    bankName: string;
-    accountNo: string;
-    accountName: string;
+    provider: PaymentMethod | "mock-bank";
+    providerName?: string;
+    bankName?: string;
+    accountNo?: string;
+    accountName?: string;
+    qrPayload?: string;
     memo: string;
     amount: number;
   };

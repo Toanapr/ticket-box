@@ -9,6 +9,7 @@ import type {
   ReservationErrorCode,
   ReservationRequest,
   ReservationResponse,
+  PaymentMethod,
   TicketRecord,
 } from "./types";
 
@@ -79,6 +80,7 @@ export async function createOrder(input: {
   reservation: ReservationResponse;
   concertId: string;
   buyer: BuyerInfo;
+  paymentMethod: PaymentMethod;
   idempotencyKey: string;
 }): Promise<OrderRecord> {
   if (apiBaseUrl) {
@@ -88,6 +90,7 @@ export async function createOrder(input: {
       body: JSON.stringify({
         reservationId: input.reservation.reservationId,
         buyer: input.buyer,
+        paymentMethod: input.paymentMethod,
         idempotencyKey: input.idempotencyKey,
       }),
     });
@@ -96,10 +99,10 @@ export async function createOrder(input: {
   const concert = findConcert(input.concertId);
   const ticketType = concert?.ticketTypes.find((item) => item.id === input.reservation.ticketTypeId);
   if (!concert || !ticketType) throw mockError("UNKNOWN");
-
   const ticketTotal = ticketType.price * input.reservation.quantity;
   const totalAmount = ticketTotal + serviceFee(ticketTotal);
   const orderId = `TB-${Math.floor(100000 + Math.random() * 900000)}`;
+  const providerName = input.paymentMethod;
   const order: OrderRecord = {
     orderId,
     reservationId: input.reservation.reservationId,
@@ -111,12 +114,11 @@ export async function createOrder(input: {
     totalAmount,
     createdAt: new Date().toISOString(),
     paymentIntent: {
-      provider: "mock-bank",
-      bankName: "VIETCOMBANK (VCB)",
-      accountNo: "9837482937",
-    accountName: "CONG TY TICKETBOX VIET NAM",
+      provider: input.paymentMethod,
+      providerName,
       memo: orderId,
       amount: totalAmount,
+      qrPayload: `${input.paymentMethod.toLowerCase()}://payment?orderId=${orderId}&amount=${Math.round(totalAmount)}`,
     },
   };
   const orders = readMap<OrderRecord>(ordersKey);
@@ -145,7 +147,6 @@ export async function mockPaymentSuccess(orderId: string): Promise<OrderRecord> 
   const orders = readMap<OrderRecord>(ordersKey);
   const order = orders[orderId];
   if (!order) throw new Error("Order not found");
-
   const ticketId = `ticket-${orderId}`;
   const ticket: TicketRecord = {
     ticketId,

@@ -11,7 +11,7 @@ type EditConcertPageProps = {
 
 export default async function EditConcertPage({ params }: EditConcertPageProps) {
   const { id } = await params;
-  const concert = await apiFetch<Concert>(`/concerts/${id}`).catch(() => null);
+  const concert = await apiFetch<Concert>(`/admin/concerts/${id}`).catch(() => null);
 
   if (!concert) {
     notFound();

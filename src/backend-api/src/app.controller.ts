@@ -2,12 +2,14 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
 } from '@nestjs/common';
-import { AppService, ConcertStatus } from './app.service';
+import { AppService, ConcertStatus, DEFAULT_ORGANIZATION_ID } from './app.service';
 import { NotificationService, TicketIssuedEvent } from './notification.service';
 
 type ConcertBody = {
@@ -26,6 +28,10 @@ type TicketTypeBody = {
   perUserLimit?: number;
 };
 
+type AdminContext = {
+  organizationId: string;
+};
+
 @Controller()
 export class AppController {
   constructor(
@@ -34,27 +40,43 @@ export class AppController {
   ) {}
 
   @Get('admin/concerts')
-  listAdminConcerts() {
-    return this.appService.listAdminConcerts();
+  listAdminConcerts(
+    @Headers('x-user-role') role?: string,
+    @Headers('x-organization-id') organizationId?: string,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    return this.appService.listAdminConcerts(admin.organizationId);
   }
 
   @Post('admin/concerts')
-  createConcert(@Body() body: ConcertBody) {
-    this.assertConcertBody(body);
+  createConcert(
+    @Headers('x-user-role') role: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Body() body: ConcertBody,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    const payload = this.assertConcertBody(body);
 
     return this.appService.createConcert({
-      title: body.title,
-      venue: body.venue,
-      startsAt: body.startsAt,
-      status: body.status,
+      organizationId: admin.organizationId,
+      title: payload.title,
+      venue: payload.venue,
+      startsAt: payload.startsAt,
+      status: payload.status,
     });
   }
 
   @Patch('admin/concerts/:id')
-  updateConcert(@Param('id') id: string, @Body() body: ConcertBody) {
-    this.assertOptionalConcertBody(body);
+  updateConcert(
+    @Headers('x-user-role') role: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('id') id: string,
+    @Body() body: ConcertBody,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    const payload = this.assertOptionalConcertBody(body);
 
-    return this.appService.updateConcert(id, body);
+    return this.appService.updateConcert(id, admin.organizationId, payload);
   }
 
   @Get('concerts')
@@ -67,29 +89,44 @@ export class AppController {
     return this.appService.getConcert(id);
   }
 
-  @Post('admin/concerts/:id/ticket-types')
-  createTicketType(@Param('id') concertId: string, @Body() body: TicketTypeBody) {
-    this.assertTicketTypeBody(body);
+  @Get('admin/concerts/:id')
+  getAdminConcert(
+    @Headers('x-user-role') role: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('id') id: string,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    return this.appService.getConcert(id, admin.organizationId);
+  }
 
-    return this.appService.createTicketType(concertId, {
-      zoneCode: body.zoneCode,
-      price: body.price,
-      capacity: body.capacity,
-      saleStartsAt: body.saleStartsAt,
-      saleEndsAt: body.saleEndsAt,
-      perUserLimit: body.perUserLimit,
-    });
+  @Post('admin/concerts/:id/ticket-types')
+  createTicketType(
+    @Headers('x-user-role') role: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('id') concertId: string,
+    @Body() body: TicketTypeBody,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    const payload = this.assertTicketTypeBody(body);
+
+    return this.appService.createTicketType(concertId, admin.organizationId, payload);
   }
 
   @Patch('admin/ticket-types/:id')
-  updateTicketType(@Param('id') id: string, @Body() body: TicketTypeBody) {
-    this.assertOptionalTicketTypeBody(body);
+  updateTicketType(
+    @Headers('x-user-role') role: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('id') id: string,
+    @Body() body: TicketTypeBody,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    const payload = this.assertOptionalTicketTypeBody(body);
 
-    return this.appService.updateTicketType(id, body);
+    return this.appService.updateTicketType(id, admin.organizationId, payload);
   }
 
   @Post('tickets/issue')
-  async issueTicket(@Body() body: Partial<TicketIssuedEvent>) {
+  issueTicket(@Body() body: Partial<TicketIssuedEvent>) {
     if (!body.concertId) {
       throw new BadRequestException('concertId is required');
     }
@@ -101,7 +138,7 @@ export class AppController {
       recipientEmail: body.recipientEmail,
     };
 
-    await this.notificationService.handleTicketIssued({
+    this.notificationService.dispatchTicketIssued({
       ...ticket,
       forceNotificationFailure: body.forceNotificationFailure,
     });
@@ -113,71 +150,127 @@ export class AppController {
   }
 
   @Get('admin/notifications')
-  listNotifications() {
-    return this.notificationService.listRecords();
+  listNotifications(
+    @Headers('x-user-role') role?: string,
+    @Headers('x-organization-id') organizationId?: string,
+  ) {
+    const admin = this.assertAdmin(role, organizationId);
+    return this.notificationService.listRecords(admin.organizationId);
   }
 
-  private assertConcertBody(body: ConcertBody): asserts body is Required<ConcertBody> {
-    this.assertRequiredText(body.title, 'title');
-    this.assertRequiredText(body.venue, 'venue');
-    this.assertRequiredText(body.startsAt, 'startsAt');
+  private assertAdmin(role: string | undefined, organizationId: string | undefined): AdminContext {
+    if (role !== 'organizer' && role !== 'system_admin') {
+      throw new ForbiddenException('organizer or system_admin role is required');
+    }
+
+    const scopedOrganizationId = organizationId?.trim() || DEFAULT_ORGANIZATION_ID;
+
+    return {
+      organizationId: scopedOrganizationId,
+    };
+  }
+
+  private assertConcertBody(body: ConcertBody) {
+    const title = this.assertRequiredText(body.title, 'title');
+    const venue = this.assertRequiredText(body.venue, 'venue');
+    const startsAt = this.assertRequiredDate(body.startsAt, 'startsAt');
     this.assertStatus(body.status);
+
+    return {
+      title,
+      venue,
+      startsAt,
+      status: body.status,
+    };
   }
 
   private assertOptionalConcertBody(body: ConcertBody) {
-    this.assertOptionalText(body.title, 'title');
-    this.assertOptionalText(body.venue, 'venue');
-    this.assertOptionalText(body.startsAt, 'startsAt');
     this.assertStatus(body.status);
+
+    return {
+      ...(body.title !== undefined ? { title: this.assertRequiredText(body.title, 'title') } : {}),
+      ...(body.venue !== undefined ? { venue: this.assertRequiredText(body.venue, 'venue') } : {}),
+      ...(body.startsAt !== undefined
+        ? { startsAt: this.assertRequiredDate(body.startsAt, 'startsAt') }
+        : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+    };
   }
 
-  private assertTicketTypeBody(body: TicketTypeBody): asserts body is Required<TicketTypeBody> {
-    this.assertRequiredText(body.zoneCode, 'zoneCode');
-    this.assertPositiveNumber(body.price, 'price');
-    this.assertPositiveNumber(body.capacity, 'capacity');
-    this.assertRequiredText(body.saleStartsAt, 'saleStartsAt');
-    this.assertRequiredText(body.saleEndsAt, 'saleEndsAt');
-    this.assertPositiveNumber(body.perUserLimit, 'perUserLimit');
+  private assertTicketTypeBody(body: TicketTypeBody) {
+    const zoneCode = this.assertRequiredText(body.zoneCode, 'zoneCode');
+    const price = this.assertPositiveNumber(body.price, 'price');
+    const capacity = this.assertPositiveNumber(body.capacity, 'capacity');
+    const saleStartsAt = this.assertRequiredDate(body.saleStartsAt, 'saleStartsAt');
+    const saleEndsAt = this.assertRequiredDate(body.saleEndsAt, 'saleEndsAt');
+    const perUserLimit = this.assertPositiveNumber(body.perUserLimit, 'perUserLimit');
 
-    if (String(body.saleEndsAt) <= String(body.saleStartsAt)) {
+    if (saleEndsAt <= saleStartsAt) {
       throw new BadRequestException('saleEndsAt must be after saleStartsAt');
     }
+
+    return {
+      zoneCode,
+      price,
+      capacity,
+      saleStartsAt,
+      saleEndsAt,
+      perUserLimit,
+    };
   }
 
   private assertOptionalTicketTypeBody(body: TicketTypeBody) {
-    this.assertOptionalText(body.zoneCode, 'zoneCode');
-    this.assertOptionalText(body.saleStartsAt, 'saleStartsAt');
-    this.assertOptionalText(body.saleEndsAt, 'saleEndsAt');
+    const payload = {
+      ...(body.zoneCode !== undefined
+        ? { zoneCode: this.assertRequiredText(body.zoneCode, 'zoneCode') }
+        : {}),
+      ...(body.price !== undefined ? { price: this.assertPositiveNumber(body.price, 'price') } : {}),
+      ...(body.capacity !== undefined
+        ? { capacity: this.assertPositiveNumber(body.capacity, 'capacity') }
+        : {}),
+      ...(body.saleStartsAt !== undefined
+        ? { saleStartsAt: this.assertRequiredDate(body.saleStartsAt, 'saleStartsAt') }
+        : {}),
+      ...(body.saleEndsAt !== undefined
+        ? { saleEndsAt: this.assertRequiredDate(body.saleEndsAt, 'saleEndsAt') }
+        : {}),
+      ...(body.perUserLimit !== undefined
+        ? { perUserLimit: this.assertPositiveNumber(body.perUserLimit, 'perUserLimit') }
+        : {}),
+    };
 
-    if (body.price !== undefined) {
-      this.assertPositiveNumber(body.price, 'price');
+    if (payload.saleStartsAt && payload.saleEndsAt && payload.saleEndsAt <= payload.saleStartsAt) {
+      throw new BadRequestException('saleEndsAt must be after saleStartsAt');
     }
 
-    if (body.capacity !== undefined) {
-      this.assertPositiveNumber(body.capacity, 'capacity');
-    }
-
-    if (body.perUserLimit !== undefined) {
-      this.assertPositiveNumber(body.perUserLimit, 'perUserLimit');
-    }
+    return payload;
   }
 
-  private assertRequiredText(value: unknown, field: string): asserts value is string {
+  private assertRequiredText(value: unknown, field: string): string {
     if (typeof value !== 'string' || value.trim().length === 0) {
       throw new BadRequestException(`${field} is required`);
     }
+
+    return value.trim();
   }
 
-  private assertOptionalText(value: unknown, field: string) {
-    if (value !== undefined) {
-      this.assertRequiredText(value, field);
+  private assertRequiredDate(value: unknown, field: string): Date {
+    const text = this.assertRequiredText(value, field);
+    const date = new Date(text);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} must be a valid date`);
     }
+
+    return date;
   }
 
-  private assertPositiveNumber(value: unknown, field: string): asserts value is number {
+  private assertPositiveNumber(value: unknown, field: string): number {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
       throw new BadRequestException(`${field} must be a positive number`);
     }
+
+    return value;
   }
 
   private assertStatus(value: unknown) {

@@ -9,6 +9,8 @@ export type TicketType = {
   saleStartsAt: string;
   saleEndsAt: string;
   perUserLimit: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type Concert = {
@@ -18,6 +20,8 @@ export type Concert = {
   startsAt: string;
   status: ConcertStatus;
   ticketTypes: TicketType[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type NotificationRecord = {
@@ -52,12 +56,20 @@ export type TicketTypePayload = {
 export const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
 
+const adminHeaders = {
+  "x-user-role": process.env.NEXT_PUBLIC_ADMIN_ROLE ?? "organizer",
+  "x-organization-id": process.env.NEXT_PUBLIC_ORGANIZATION_ID ?? "org-demo",
+};
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const isAdminPath = path.startsWith("/admin");
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     cache: "no-store",
     headers: {
       "Content-Type": "application/json",
+      ...(isAdminPath ? adminHeaders : {}),
       ...init?.headers,
     },
   });

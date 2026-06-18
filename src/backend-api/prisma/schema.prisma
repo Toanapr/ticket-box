@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Concert {
+  id             String       @id
+  organizationId String
+  title          String
+  venue          String
+  startsAt       DateTime
+  status         String
+  ticketTypes    TicketType[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model TicketType {
+  id           String   @id
+  concertId    String
+  zoneCode     String
+  price        Int
+  capacity     Int
+  saleStartsAt DateTime
+  saleEndsAt   DateTime
+  perUserLimit Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  concert      Concert  @relation(fields: [concertId], references: [id], onDelete: Cascade)
+
+  @@index([concertId])
+}
+
+model NotificationRecord {
+  id        String   @id
+  eventType String
+  ticketId  String
+  orderId   String
+  concertId String
+  channel   String
+  status    String
+  message   String
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([ticketId])
+  @@index([concertId])
+}

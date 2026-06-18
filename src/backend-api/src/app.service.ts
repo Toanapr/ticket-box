@@ -1,18 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
 
 export type ConcertStatus = 'draft' | 'published';
-
-export type Concert = {
-  id: string;
-  organizationId: string;
-  title: string;
-  venue: string;
-  startsAt: string;
-  status: ConcertStatus;
-  ticketTypes: TicketType[];
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type TicketType = {
   id: string;
@@ -27,10 +16,23 @@ export type TicketType = {
   updatedAt: string;
 };
 
-type ConcertInput = {
+export type Concert = {
+  id: string;
+  organizationId: string;
   title: string;
   venue: string;
   startsAt: string;
+  status: ConcertStatus;
+  ticketTypes: TicketType[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ConcertInput = {
+  organizationId: string;
+  title: string;
+  venue: string;
+  startsAt: Date;
   status?: ConcertStatus;
 };
 
@@ -38,148 +40,248 @@ type TicketTypeInput = {
   zoneCode: string;
   price: number;
   capacity: number;
-  saleStartsAt: string;
-  saleEndsAt: string;
+  saleStartsAt: Date;
+  saleEndsAt: Date;
   perUserLimit: number;
 };
 
-const DEFAULT_ORGANIZATION_ID = 'org-demo';
+export const DEFAULT_ORGANIZATION_ID = 'org-demo';
 
 @Injectable()
-export class AppService {
-  private readonly concerts = new Map<string, Concert>();
+export class AppService implements OnModuleInit {
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor() {
-    const concert = this.createConcert({
+  async onModuleInit() {
+    await this.prisma.ensureSqliteSchema();
+
+    const count = await this.prisma.concert.count();
+
+    if (count > 0) {
+      return;
+    }
+
+    const concert = await this.createConcert({
+      organizationId: DEFAULT_ORGANIZATION_ID,
       title: 'TicketBox Live Demo',
       venue: 'Saigon Exhibition Hall',
-      startsAt: '2026-08-15T19:30',
+      startsAt: new Date('2026-08-15T19:30:00.000Z'),
       status: 'published',
     });
 
-    this.createTicketType(concert.id, {
+    await this.createTicketType(concert.id, DEFAULT_ORGANIZATION_ID, {
       zoneCode: 'GA',
       price: 450000,
       capacity: 500,
-      saleStartsAt: '2026-06-01T09:00',
-      saleEndsAt: '2026-08-15T18:00',
+      saleStartsAt: new Date('2026-06-01T09:00:00.000Z'),
+      saleEndsAt: new Date('2026-08-15T18:00:00.000Z'),
       perUserLimit: 4,
     });
   }
 
-  listAdminConcerts(): Concert[] {
-    return [...this.concerts.values()].map((concert) => this.cloneConcert(concert));
+  async listAdminConcerts(organizationId: string): Promise<Concert[]> {
+    const concerts = await this.prisma.concert.findMany({
+      where: { organizationId },
+      include: { ticketTypes: { orderBy: { createdAt: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return concerts.map((concert) => this.toConcert(concert));
   }
 
-  listPublicConcerts(): Concert[] {
-    return this.listAdminConcerts().filter((concert) => concert.status === 'published');
+  async listPublicConcerts(): Promise<Concert[]> {
+    const concerts = await this.prisma.concert.findMany({
+      where: { status: 'published' },
+      include: { ticketTypes: { orderBy: { createdAt: 'asc' } } },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    return concerts.map((concert) => this.toConcert(concert));
   }
 
-  getConcert(id: string): Concert {
-    const concert = this.concerts.get(id);
+  async getConcert(id: string, organizationId?: string): Promise<Concert> {
+    const concert = await this.prisma.concert.findFirst({
+      where: {
+        id,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      include: { ticketTypes: { orderBy: { createdAt: 'asc' } } },
+    });
 
     if (!concert) {
       throw new NotFoundException('Concert not found');
     }
 
-    return this.cloneConcert(concert);
+    return this.toConcert(concert);
   }
 
-  createConcert(input: ConcertInput): Concert {
-    const now = new Date().toISOString();
-    const concert: Concert = {
-      id: this.createId('concert'),
-      organizationId: DEFAULT_ORGANIZATION_ID,
-      title: input.title.trim(),
-      venue: input.venue.trim(),
-      startsAt: input.startsAt,
-      status: input.status ?? 'draft',
-      ticketTypes: [],
-      createdAt: now,
-      updatedAt: now,
-    };
+  async createConcert(input: ConcertInput): Promise<Concert> {
+    const concert = await this.prisma.concert.create({
+      data: {
+        id: this.createId('concert'),
+        organizationId: input.organizationId,
+        title: input.title.trim(),
+        venue: input.venue.trim(),
+        startsAt: input.startsAt,
+        status: input.status ?? 'draft',
+      },
+      include: { ticketTypes: true },
+    });
 
-    this.concerts.set(concert.id, concert);
-
-    return this.cloneConcert(concert);
+    return this.toConcert(concert);
   }
 
-  updateConcert(id: string, input: Partial<ConcertInput>): Concert {
-    const concert = this.concerts.get(id);
+  async updateConcert(
+    id: string,
+    organizationId: string,
+    input: Partial<Omit<ConcertInput, 'organizationId'>>,
+  ): Promise<Concert> {
+    await this.assertConcertOwnership(id, organizationId);
+
+    const concert = await this.prisma.concert.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title.trim() } : {}),
+        ...(input.venue !== undefined ? { venue: input.venue.trim() } : {}),
+        ...(input.startsAt !== undefined ? { startsAt: input.startsAt } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+      },
+      include: { ticketTypes: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    return this.toConcert(concert);
+  }
+
+  async createTicketType(
+    concertId: string,
+    organizationId: string,
+    input: TicketTypeInput,
+  ): Promise<TicketType> {
+    await this.assertConcertOwnership(concertId, organizationId);
+
+    const ticketType = await this.prisma.ticketType.create({
+      data: {
+        id: this.createId('ticket-type'),
+        concertId,
+        zoneCode: input.zoneCode.trim().toUpperCase(),
+        price: Number(input.price),
+        capacity: Number(input.capacity),
+        saleStartsAt: input.saleStartsAt,
+        saleEndsAt: input.saleEndsAt,
+        perUserLimit: Number(input.perUserLimit),
+      },
+    });
+
+    return this.toTicketType(ticketType);
+  }
+
+  async updateTicketType(
+    id: string,
+    organizationId: string,
+    input: Partial<TicketTypeInput>,
+  ): Promise<TicketType> {
+    const existing = await this.prisma.ticketType.findFirst({
+      where: { id, concert: { organizationId } },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Ticket type not found');
+    }
+
+    const saleStartsAt = input.saleStartsAt ?? existing.saleStartsAt;
+    const saleEndsAt = input.saleEndsAt ?? existing.saleEndsAt;
+
+    if (saleEndsAt <= saleStartsAt) {
+      throw new BadRequestException('saleEndsAt must be after saleStartsAt');
+    }
+
+    const ticketType = await this.prisma.ticketType.update({
+      where: { id },
+      data: {
+        ...(input.zoneCode !== undefined ? { zoneCode: input.zoneCode.trim().toUpperCase() } : {}),
+        ...(input.price !== undefined ? { price: Number(input.price) } : {}),
+        ...(input.capacity !== undefined ? { capacity: Number(input.capacity) } : {}),
+        ...(input.saleStartsAt !== undefined ? { saleStartsAt: input.saleStartsAt } : {}),
+        ...(input.saleEndsAt !== undefined ? { saleEndsAt: input.saleEndsAt } : {}),
+        ...(input.perUserLimit !== undefined ? { perUserLimit: Number(input.perUserLimit) } : {}),
+      },
+    });
+
+    return this.toTicketType(ticketType);
+  }
+
+  private async assertConcertOwnership(id: string, organizationId: string) {
+    const concert = await this.prisma.concert.findFirst({
+      where: { id, organizationId },
+      select: { id: true },
+    });
 
     if (!concert) {
       throw new NotFoundException('Concert not found');
     }
-
-    concert.title = input.title?.trim() ?? concert.title;
-    concert.venue = input.venue?.trim() ?? concert.venue;
-    concert.startsAt = input.startsAt ?? concert.startsAt;
-    concert.status = input.status ?? concert.status;
-    concert.updatedAt = new Date().toISOString();
-
-    return this.cloneConcert(concert);
-  }
-
-  createTicketType(concertId: string, input: TicketTypeInput): TicketType {
-    const concert = this.concerts.get(concertId);
-
-    if (!concert) {
-      throw new NotFoundException('Concert not found');
-    }
-
-    const now = new Date().toISOString();
-    const ticketType: TicketType = {
-      id: this.createId('ticket-type'),
-      concertId,
-      zoneCode: input.zoneCode.trim().toUpperCase(),
-      price: Number(input.price),
-      capacity: Number(input.capacity),
-      saleStartsAt: input.saleStartsAt,
-      saleEndsAt: input.saleEndsAt,
-      perUserLimit: Number(input.perUserLimit),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    concert.ticketTypes.push(ticketType);
-    concert.updatedAt = now;
-
-    return { ...ticketType };
-  }
-
-  updateTicketType(id: string, input: Partial<TicketTypeInput>): TicketType {
-    for (const concert of this.concerts.values()) {
-      const ticketType = concert.ticketTypes.find((item) => item.id === id);
-
-      if (ticketType) {
-        ticketType.zoneCode = input.zoneCode?.trim().toUpperCase() ?? ticketType.zoneCode;
-        ticketType.price = input.price === undefined ? ticketType.price : Number(input.price);
-        ticketType.capacity =
-          input.capacity === undefined ? ticketType.capacity : Number(input.capacity);
-        ticketType.saleStartsAt = input.saleStartsAt ?? ticketType.saleStartsAt;
-        ticketType.saleEndsAt = input.saleEndsAt ?? ticketType.saleEndsAt;
-        ticketType.perUserLimit =
-          input.perUserLimit === undefined
-            ? ticketType.perUserLimit
-            : Number(input.perUserLimit);
-        ticketType.updatedAt = new Date().toISOString();
-        concert.updatedAt = ticketType.updatedAt;
-
-        return { ...ticketType };
-      }
-    }
-
-    throw new NotFoundException('Ticket type not found');
   }
 
   private createId(prefix: string): string {
     return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   }
 
-  private cloneConcert(concert: Concert): Concert {
+  private toConcert(concert: {
+    id: string;
+    organizationId: string;
+    title: string;
+    venue: string;
+    startsAt: Date;
+    status: string;
+    ticketTypes: Array<{
+      id: string;
+      concertId: string;
+      zoneCode: string;
+      price: number;
+      capacity: number;
+      saleStartsAt: Date;
+      saleEndsAt: Date;
+      perUserLimit: number;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    createdAt: Date;
+    updatedAt: Date;
+  }): Concert {
     return {
-      ...concert,
-      ticketTypes: concert.ticketTypes.map((ticketType) => ({ ...ticketType })),
+      id: concert.id,
+      organizationId: concert.organizationId,
+      title: concert.title,
+      venue: concert.venue,
+      startsAt: concert.startsAt.toISOString(),
+      status: concert.status as ConcertStatus,
+      ticketTypes: concert.ticketTypes.map((ticketType) => this.toTicketType(ticketType)),
+      createdAt: concert.createdAt.toISOString(),
+      updatedAt: concert.updatedAt.toISOString(),
+    };
+  }
+
+  private toTicketType(ticketType: {
+    id: string;
+    concertId: string;
+    zoneCode: string;
+    price: number;
+    capacity: number;
+    saleStartsAt: Date;
+    saleEndsAt: Date;
+    perUserLimit: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }): TicketType {
+    return {
+      id: ticketType.id,
+      concertId: ticketType.concertId,
+      zoneCode: ticketType.zoneCode,
+      price: ticketType.price,
+      capacity: ticketType.capacity,
+      saleStartsAt: ticketType.saleStartsAt.toISOString(),
+      saleEndsAt: ticketType.saleEndsAt.toISOString(),
+      perUserLimit: ticketType.perUserLimit,
+      createdAt: ticketType.createdAt.toISOString(),
+      updatedAt: ticketType.updatedAt.toISOString(),
     };
   }
 }

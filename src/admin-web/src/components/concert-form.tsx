@@ -13,7 +13,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(concert?.title ?? "");
   const [venue, setVenue] = useState(concert?.venue ?? "");
-  const [startsAt, setStartsAt] = useState(concert?.startsAt ?? "");
+  const [startsAt, setStartsAt] = useState(toDateTimeLocalValue(concert?.startsAt));
   const [status, setStatus] = useState<ConcertPayload["status"]>(
     concert?.status ?? "draft",
   );
@@ -118,4 +118,18 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
       </button>
     </form>
   );
+}
+
+function toDateTimeLocalValue(value?: string) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toISOString().slice(0, 16);
 }

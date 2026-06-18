@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local Prisma SQLite data
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/memdb*
+
 # vercel
 .vercel
 

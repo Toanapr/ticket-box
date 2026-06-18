@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TicketIcon } from "./icons";
+import { SiteAuthControls } from "./site-auth-controls";
 
 export function SiteHeader(): React.ReactElement {
   return (
@@ -27,10 +28,7 @@ export function SiteHeader(): React.ReactElement {
           </Link>
         </nav>
 
-        <Link href="/user" className="flex min-h-11 items-center rounded-full border border-black/10 bg-white px-2 py-1 text-sm font-bold transition hover:border-ticket-green/50">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-ticket-green text-xs text-white">KG</span>
-          <span className="hidden px-2 sm:inline">Khán giả</span>
-        </Link>
+        <SiteAuthControls />
       </div>
     </header>
   );

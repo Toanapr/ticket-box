@@ -1,13 +1,44 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRightIcon, CalendarIcon, MapPinIcon } from "./icons";
 import { formatDateTime } from "@/lib/format";
 import type { ConcertSummary } from "@/lib/types";
 
-export function HeroSpotlight({ concert }: { concert: ConcertSummary }): React.ReactElement {
+const autoRotateMs = 5000;
+
+export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): React.ReactElement | null {
+  const spotlightConcerts = useMemo(
+    () => concerts.filter((concert) => concert.status !== "soldout"),
+    [concerts],
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+  const concert = spotlightConcerts[activeIndex];
+
+  useEffect(() => {
+    if (spotlightConcerts.length <= 1) return undefined;
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((current) => (current + 1) % spotlightConcerts.length);
+    }, autoRotateMs);
+
+    return () => window.clearInterval(timer);
+  }, [spotlightConcerts.length]);
+
+  if (!concert) return null;
+
+  function moveSpotlight(direction: "next" | "previous"): void {
+    setActiveIndex((current) => {
+      const delta = direction === "next" ? 1 : -1;
+      return (current + delta + spotlightConcerts.length) % spotlightConcerts.length;
+    });
+  }
+
   return (
     <section className="mb-12 grid gap-8 border-b-2 border-ticket-obsidian pb-12 lg:grid-cols-[1fr_340px] lg:items-center">
-      <div>
+      <div key={concert.id} className="motion-safe:[animation:spotlight-in_450ms_ease-out]">
         <span className="mb-5 inline-flex border border-ticket-obsidian px-3 py-1 text-xs font-black uppercase tracking-widest">
           Nổi bật
         </span>
@@ -32,8 +63,43 @@ export function HeroSpotlight({ concert }: { concert: ConcertSummary }): React.R
           Mua vé ngay
           <ArrowRightIcon className="h-5 w-5" />
         </Link>
+
+        {spotlightConcerts.length > 1 ? (
+          <div className="mt-8 flex flex-wrap items-center gap-3" aria-label="Điều khiển concert nổi bật">
+            <button
+              type="button"
+              onClick={() => moveSpotlight("previous")}
+              className="grid h-11 w-11 place-items-center rounded border border-black/10 bg-white text-ticket-obsidian transition hover:border-ticket-green hover:text-ticket-green"
+              aria-label="Concert nổi bật trước"
+            >
+              <ArrowRightIcon className="h-5 w-5 rotate-180" />
+            </button>
+            <div className="flex items-center gap-2">
+              {spotlightConcerts.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  className={`h-2.5 rounded-full transition-all ${
+                    index === activeIndex ? "w-8 bg-ticket-green" : "w-2.5 bg-slate-300 hover:bg-slate-400"
+                  }`}
+                  aria-label={`Chọn ${item.title}`}
+                  aria-current={index === activeIndex ? "true" : undefined}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => moveSpotlight("next")}
+              className="grid h-11 w-11 place-items-center rounded border border-black/10 bg-white text-ticket-obsidian transition hover:border-ticket-green hover:text-ticket-green"
+              aria-label="Concert nổi bật tiếp theo"
+            >
+              <ArrowRightIcon className="h-5 w-5" />
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div className="relative aspect-square overflow-hidden rounded-lg border border-black/10 bg-slate-100 shadow-sm">
+      <div key={`${concert.id}-poster`} className="relative aspect-square overflow-hidden rounded-lg border border-black/10 bg-slate-100 shadow-sm motion-safe:[animation:spotlight-poster_500ms_ease-out]">
         <Image src={concert.posterPath} alt={`${concert.title} poster`} fill priority sizes="340px" className="object-cover" />
       </div>
     </section>

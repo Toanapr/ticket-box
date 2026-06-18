@@ -6,12 +6,11 @@ import { getConcerts } from "@/lib/server-api";
 
 export default async function ConcertsPage(): Promise<React.ReactElement> {
   const concerts = await getConcerts();
-  const spotlight = concerts.find((concert) => concert.status === "selling") ?? concerts[0];
 
   return (
     <PageShell>
       <Breadcrumbs items={[{ label: "Kham pha concerts" }]} />
-      {spotlight ? <HeroSpotlight concert={spotlight} /> : null}
+      <HeroSpotlight concerts={concerts} />
       <ConcertListClient concerts={concerts} />
     </PageShell>
   );

@@ -17,10 +17,7 @@ export function SiteHeader(): React.ReactElement {
           <Link className="transition hover:text-ticket-green" href="/concerts">
             Sự kiện
           </Link>
-          <Link className="transition hover:text-ticket-green" href="/concerts">
-            Lịch diễn
-          </Link>
-          <Link className="transition hover:text-ticket-green" href="/concerts">
+          <Link className="transition hover:text-ticket-green" href="/guide">
             Hướng dẫn
           </Link>
           <Link className="transition hover:text-ticket-green" href="/user">

@@ -1,11 +1,24 @@
 export function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Bangkok",
-  }).format(new Date(value));
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  const bangkokTime = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  const month = MONTHS[bangkokTime.getUTCMonth()];
+  const day = bangkokTime.getUTCDate();
+  const year = bangkokTime.getUTCFullYear();
+  const hours24 = bangkokTime.getUTCHours();
+  const minutes = String(bangkokTime.getUTCMinutes()).padStart(2, "0");
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+
+  return `${month} ${day}, ${year}, ${hours12}:${minutes} ${period}`;
 }
 
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US").format(value);
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

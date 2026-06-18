@@ -7,11 +7,41 @@ import type { ConcertStatus, ConcertSummary } from "@/lib/types";
 
 type Filter = "all" | ConcertStatus;
 
+interface FilterTabProps {
+  label: string;
+  value: Filter;
+  active: boolean;
+  onSelect: (value: Filter) => void;
+}
+
 const filters: Array<{ label: string; value: Filter }> = [
   { label: "Tất cả", value: "all" },
   { label: "Đang bán vé", value: "selling" },
   { label: "Sắp diễn ra", value: "upcoming" },
 ];
+
+const filterTabBaseClass =
+  "inline-flex min-h-11 shrink-0 cursor-pointer items-center border-b-[3px] px-0 pb-4 pt-2 text-sm font-black uppercase tracking-wide transition-colors";
+
+function FilterTab({ label, value, active, onSelect }: FilterTabProps): React.ReactElement {
+  return (
+    <label
+      className={`${filterTabBaseClass} ${
+        active ? "border-ticket-green text-ticket-obsidian" : "border-transparent text-slate-500 hover:text-ticket-obsidian"
+      }`}
+    >
+      <input
+        type="radio"
+        name="concert-filter"
+        value={value}
+        checked={active}
+        onChange={() => onSelect(value)}
+        className="sr-only"
+      />
+      {label}
+    </label>
+  );
+}
 
 export function ConcertListClient({ concerts }: { concerts: ConcertSummary[] }): React.ReactElement {
   const [query, setQuery] = useState("");
@@ -31,18 +61,13 @@ export function ConcertListClient({ concerts }: { concerts: ConcertSummary[] }):
       <div className="mb-10 flex flex-col gap-5 border-b border-black/10 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-wrap gap-6">
           {filters.map((item) => (
-            <button
+            <FilterTab
               key={item.value}
-              type="button"
-              onClick={() => setFilter(item.value)}
-              className={`min-h-11 border-b-[3px] px-0 pb-4 pt-2 text-sm font-black uppercase tracking-wide transition ${
-                filter === item.value
-                  ? "border-ticket-green text-ticket-obsidian"
-                  : "border-transparent text-slate-500 hover:text-ticket-obsidian"
-              }`}
-            >
-              {item.label}
-            </button>
+              label={item.label}
+              value={item.value}
+              active={filter === item.value}
+              onSelect={setFilter}
+            />
           ))}
         </div>
         <label className="relative mb-4 block w-full md:w-80">

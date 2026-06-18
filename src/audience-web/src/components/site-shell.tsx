@@ -75,5 +75,5 @@ export function SiteFooter(): React.ReactElement {
 }
 
 export function PageShell({ children }: { children: React.ReactNode }): React.ReactElement {
-  return <main className="mx-auto min-h-[calc(100dvh-18rem)] max-w-7xl px-5 py-8 md:px-10 md:py-12">{children}</main>;
+  return <main className="mx-auto min-h-[calc(100dvh-18rem)] w-full max-w-7xl px-5 py-8 md:px-10 md:py-12">{children}</main>;
 }

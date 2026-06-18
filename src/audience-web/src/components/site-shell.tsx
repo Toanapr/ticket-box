@@ -22,12 +22,15 @@ export function SiteHeader(): React.ReactElement {
           <Link className="transition hover:text-ticket-green" href="/concerts">
             Hướng dẫn
           </Link>
+          <Link className="transition hover:text-ticket-green" href="/user">
+            Tài khoản
+          </Link>
         </nav>
 
-        <div className="flex min-h-11 items-center rounded-full border border-black/10 bg-white px-2 py-1 text-sm font-bold">
+        <Link href="/user" className="flex min-h-11 items-center rounded-full border border-black/10 bg-white px-2 py-1 text-sm font-bold transition hover:border-ticket-green/50">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-ticket-green text-xs text-white">KG</span>
           <span className="hidden px-2 sm:inline">Khán giả</span>
-        </div>
+        </Link>
       </div>
     </header>
   );

@@ -4,4 +4,5 @@ export enum OrderStatus {
   ISSUED = 'issued',
   FAILED = 'failed',
   EXPIRED = 'expired',
+  REFUND_REQUIRED = 'refund_required',
 }

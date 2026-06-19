@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 enum ReservationStatus {
@@ -20,6 +21,7 @@ enum OrderStatus {
   issued
   failed
   expired
+  refund_required
 }
 
 enum PaymentStatus {
@@ -140,6 +142,7 @@ model Ticket {
   orderItemId    String       @db.Uuid
   ticketTypeId   String       @db.Uuid
   ownerUserId    String       @db.Uuid
+  qrToken        String?
   qrTokenHash    String
   sequenceNo     Int
   status         TicketStatus
@@ -150,5 +153,6 @@ model Ticket {
   ticketType     TicketType   @relation(fields: [ticketTypeId], references: [id])
 
   @@unique([orderItemId, sequenceNo])
+  @@unique([qrToken])
   @@unique([qrTokenHash])
 }

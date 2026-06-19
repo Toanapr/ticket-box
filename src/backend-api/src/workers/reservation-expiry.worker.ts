@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
+import { formatStructuredLog } from '../common/logging/structured-log.util';
 import { InventoryService } from '../modules/inventory/inventory.service';
 
 @Injectable()
@@ -25,7 +26,11 @@ export class ReservationExpiryWorker {
     }
 
     this.logger.log(
-      `Reservation expiry batch completed: scanned=${result.scannedCount}, expired=${result.expiredCount}, expiredOrders=${result.expiredOrderCount}`,
+      formatStructuredLog('reservation_expiry_batch_completed', {
+        scannedCount: result.scannedCount,
+        expiredCount: result.expiredCount,
+        expiredOrderCount: result.expiredOrderCount,
+      }),
     );
   }
 

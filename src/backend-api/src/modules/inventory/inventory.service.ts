@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DomainError } from '../../common/errors/domain-error';
+import { formatStructuredLog } from '../../common/logging/structured-log.util';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { InventoryRepository } from './inventory.repository';
 
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger(InventoryService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly inventoryRepository: InventoryRepository,
@@ -19,11 +22,26 @@ export class InventoryService {
 
     if (existingReservation) {
       this.ensureDuplicatePayloadMatches(existingReservation, dto);
+      this.logger.log(
+        formatStructuredLog('reservation_idempotent_replay', {
+          reservationId: existingReservation.id,
+          ticketTypeId: dto.ticketTypeId,
+          quantity: dto.quantity,
+        }),
+      );
       return this.toReservationResponse(existingReservation);
     }
 
     try {
       const reservation = await this.inventoryRepository.reserve(userId, dto, this.getReservationTtlMinutes());
+      this.logger.log(
+        formatStructuredLog('reservation_created', {
+          reservationId: reservation.id,
+          ticketTypeId: reservation.ticketTypeId,
+          quantity: reservation.quantity,
+          expiresAt: reservation.expiresAt.toISOString(),
+        }),
+      );
       return this.toReservationResponse(reservation);
     } catch (error) {
       if (!this.inventoryRepository.isDuplicateReservationError(error)) {
@@ -40,6 +58,13 @@ export class InventoryService {
       }
 
       this.ensureDuplicatePayloadMatches(duplicateReservation, dto);
+      this.logger.log(
+        formatStructuredLog('reservation_duplicate_resolved', {
+          reservationId: duplicateReservation.id,
+          ticketTypeId: duplicateReservation.ticketTypeId,
+          quantity: duplicateReservation.quantity,
+        }),
+      );
       return this.toReservationResponse(duplicateReservation);
     }
   }

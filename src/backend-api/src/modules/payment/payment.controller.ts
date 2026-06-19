@@ -1,11 +1,16 @@
-import { BadRequestException, Body, Controller, Headers, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, UnauthorizedException, Post } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { verifyWebhookSignature } from '../../common/utils/webhook-signature.util';
 import { MockPaymentSuccessDto } from './dto/mock-payment-success.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { PaymentService } from './payment.service';
 
 @Controller('payments')
 export class PaymentController {
-  constructor(private readonly paymentService: PaymentService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   @Post('mock-success')
   async mockSuccess(
@@ -16,7 +21,11 @@ export class PaymentController {
   }
 
   @Post('webhook')
-  async webhook(@Body() dto: PaymentWebhookDto) {
+  async webhook(
+    @Headers('x-webhook-signature') signature: string | undefined,
+    @Body() dto: PaymentWebhookDto,
+  ) {
+    this.verifySignatureIfConfigured(signature, dto);
     return this.paymentService.processWebhook(dto);
   }
 
@@ -32,5 +41,25 @@ export class PaymentController {
     }
 
     return userId;
+  }
+
+  private verifySignatureIfConfigured(
+    signature: string | undefined,
+    payload: PaymentWebhookDto,
+  ): void {
+    const secret =
+      process.env.WEBHOOK_SIGNING_SECRET ??
+      this.configService.get<string>('WEBHOOK_SIGNING_SECRET');
+
+    if (!secret) {
+      return;
+    }
+
+    if (!verifyWebhookSignature(secret, payload, signature)) {
+      throw new UnauthorizedException({
+        error: 'invalid_webhook_signature',
+        message: 'Webhook signature verification failed',
+      });
+    }
   }
 }

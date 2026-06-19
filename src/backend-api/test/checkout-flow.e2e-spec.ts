@@ -5,6 +5,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { AppModule } from './../src/app.module';
+import { setupApp } from './../src/app.setup';
+import { createWebhookSignature } from './../src/common/utils/webhook-signature.util';
+import { InventoryService } from './../src/modules/inventory/inventory.service';
 
 type TestTicketType = {
   id: string;
@@ -19,6 +22,7 @@ type TestTicketType = {
 describe('Checkout flow and invariants (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaClient;
+  let inventoryService: InventoryService;
   const ticketTypeIds: string[] = [];
   const concertIds: string[] = [];
 
@@ -29,8 +33,9 @@ describe('Checkout flow and invariants (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = setupApp(moduleFixture.createNestApplication());
     await app.init();
+    inventoryService = app.get(InventoryService);
   });
 
   afterAll(async () => {
@@ -250,6 +255,141 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(tickets).toHaveLength(1);
   });
 
+  it('marks order as failed for failed payment webhook without issuing tickets', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Failed Payment',
+      zoneCode: 'FAIL',
+      price: '210000.00',
+      capacity: 8,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    const failedWebhook = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send({
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'failed',
+        payload: { eventType: 'payment.failed' },
+      });
+
+    expect(failedWebhook.status).toBe(201);
+    expect(failedWebhook.body.orderStatus).toBe('failed');
+    expect(failedWebhook.body.paymentStatus).toBe('failed');
+    expect(failedWebhook.body.issuedTicketCount).toBe(0);
+
+    const tickets = await prisma.ticket.findMany({
+      where: { orderId: orderRes.body.id },
+    });
+
+    expect(tickets).toHaveLength(0);
+  });
+
+  it('moves late payment success to refund_required and does not issue tickets', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Late Success',
+      zoneCode: 'LATE',
+      price: '190000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await prisma.reservation.update({
+      where: { id: reservationRes.body.id },
+      data: {
+        status: 'expired',
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    await prisma.inventoryCounter.update({
+      where: { ticketTypeId: testTicketType.id },
+      data: {
+        reservedCount: { decrement: 1 },
+      },
+    });
+
+    await prisma.userTicketQuota.update({
+      where: {
+        userId_ticketTypeId: {
+          userId,
+          ticketTypeId: testTicketType.id,
+        },
+      },
+      data: {
+        reservedCount: { decrement: 1 },
+      },
+    });
+
+    await prisma.order.update({
+      where: { id: orderRes.body.id },
+      data: {
+        status: 'expired',
+      },
+    });
+
+    const webhookRes = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send({
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'succeeded',
+        payload: { eventType: 'payment.succeeded' },
+      });
+
+    expect(webhookRes.status).toBe(201);
+    expect(webhookRes.body.orderStatus).toBe('refund_required');
+    expect(webhookRes.body.paymentStatus).toBe('succeeded');
+    expect(webhookRes.body.reservationStatus).toBe('expired');
+    expect(webhookRes.body.issuedTicketCount).toBe(0);
+
+    const tickets = await prisma.ticket.findMany({
+      where: { orderId: orderRes.body.id },
+    });
+
+    expect(tickets).toHaveLength(0);
+  });
+
   it('does not let one user exceed quota with parallel requests', async () => {
     const testTicketType = await createTestTicketType({
       name: 'Quota Guard',
@@ -322,6 +462,219 @@ describe('Checkout flow and invariants (e2e)', () => {
     });
 
     expect((inventory?.reservedCount ?? 0) + (inventory?.soldCount ?? 0)).toBeLessThanOrEqual(1);
+  });
+
+  it('returns renderable opaque QR token for newly issued ticket', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Renderable QR',
+      zoneCode: 'QR1',
+      price: '175000.00',
+      capacity: 4,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('x-user-id', userId)
+      .send({
+        orderId: orderRes.body.id,
+      });
+
+    const ticket = await prisma.ticket.findFirstOrThrow({
+      where: { orderId: orderRes.body.id },
+      orderBy: { sequenceNo: 'asc' },
+    });
+
+    const ticketRes = await request(app.getHttpServer())
+      .get(`/tickets/${ticket.id}`)
+      .set('x-user-id', userId);
+
+    expect(ticketRes.status).toBe(200);
+    expect(ticketRes.body.qrCode.mode).toBe('opaque_token');
+    expect(ticketRes.body.qrCode.renderable).toBe(true);
+    expect(typeof ticketRes.body.qrCode.value).toBe('string');
+    expect(ticketRes.body.qrCode.value.length).toBeGreaterThan(10);
+  });
+
+  it('expires reservation batch safely when worker reruns', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Expiry Rerun Safe',
+      zoneCode: 'EXP1',
+      price: '165000.00',
+      capacity: 3,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await prisma.reservation.update({
+      where: { id: reservationRes.body.id },
+      data: {
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    const firstRun = await inventoryService.expireReservationsBatch();
+    expect(firstRun.expiredCount).toBeGreaterThanOrEqual(1);
+
+    const afterFirstRun = await Promise.all([
+      prisma.reservation.findUniqueOrThrow({
+        where: { id: reservationRes.body.id },
+      }),
+      prisma.order.findUniqueOrThrow({
+        where: { id: orderRes.body.id },
+      }),
+      prisma.inventoryCounter.findUniqueOrThrow({
+        where: { ticketTypeId: testTicketType.id },
+      }),
+      prisma.userTicketQuota.findUniqueOrThrow({
+        where: {
+          userId_ticketTypeId: {
+            userId,
+            ticketTypeId: testTicketType.id,
+          },
+        },
+      }),
+    ]);
+
+    const [reservationAfterFirstRun, orderAfterFirstRun, inventoryAfterFirstRun, quotaAfterFirstRun] =
+      afterFirstRun;
+
+    expect(reservationAfterFirstRun.status).toBe('expired');
+    expect(orderAfterFirstRun.status).toBe('expired');
+    expect(inventoryAfterFirstRun.reservedCount).toBe(0);
+    expect(inventoryAfterFirstRun.soldCount).toBe(0);
+    expect(quotaAfterFirstRun.reservedCount).toBe(0);
+    expect(quotaAfterFirstRun.paidCount).toBe(0);
+
+    const secondRun = await inventoryService.expireReservationsBatch();
+    expect(secondRun.expiredCount).toBeGreaterThanOrEqual(0);
+
+    const [reservationAfterSecondRun, orderAfterSecondRun, inventoryAfterSecondRun, quotaAfterSecondRun] =
+      await Promise.all([
+        prisma.reservation.findUniqueOrThrow({
+          where: { id: reservationRes.body.id },
+        }),
+        prisma.order.findUniqueOrThrow({
+          where: { id: orderRes.body.id },
+        }),
+        prisma.inventoryCounter.findUniqueOrThrow({
+          where: { ticketTypeId: testTicketType.id },
+        }),
+        prisma.userTicketQuota.findUniqueOrThrow({
+          where: {
+            userId_ticketTypeId: {
+              userId,
+              ticketTypeId: testTicketType.id,
+            },
+          },
+        }),
+      ]);
+
+    expect(reservationAfterSecondRun.status).toBe('expired');
+    expect(orderAfterSecondRun.status).toBe('expired');
+    expect(inventoryAfterSecondRun.reservedCount).toBe(inventoryAfterFirstRun.reservedCount);
+    expect(inventoryAfterSecondRun.soldCount).toBe(inventoryAfterFirstRun.soldCount);
+    expect(quotaAfterSecondRun.reservedCount).toBe(quotaAfterFirstRun.reservedCount);
+    expect(quotaAfterSecondRun.paidCount).toBe(quotaAfterFirstRun.paidCount);
+  });
+
+  it('rejects webhook with invalid signature when signing secret is configured', async () => {
+    const previousSecret = process.env.WEBHOOK_SIGNING_SECRET;
+    process.env.WEBHOOK_SIGNING_SECRET = 'test-secret';
+
+    try {
+      const testTicketType = await createTestTicketType({
+        name: 'Signed Webhook',
+        zoneCode: 'SIG1',
+        price: '155000.00',
+        capacity: 4,
+        perUserLimit: 2,
+      });
+
+      const userId = randomUUID();
+
+      const reservationRes = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('x-user-id', userId)
+        .send({
+          ticketTypeId: testTicketType.id,
+          quantity: 1,
+          idempotencyKey: randomUUID(),
+        });
+
+      const orderRes = await request(app.getHttpServer())
+        .post('/orders')
+        .set('x-user-id', userId)
+        .send({
+          reservationId: reservationRes.body.id,
+          idempotencyKey: randomUUID(),
+        });
+
+      const payload = {
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'succeeded',
+        payload: { eventType: 'payment.succeeded' },
+      } as const;
+
+      const invalidSignatureRes = await request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set('x-webhook-signature', 'invalid-signature')
+        .send(payload);
+
+      expect(invalidSignatureRes.status).toBe(401);
+
+      const validSignatureRes = await request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set('x-webhook-signature', createWebhookSignature('test-secret', payload))
+        .send(payload);
+
+      expect(validSignatureRes.status).toBe(201);
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env.WEBHOOK_SIGNING_SECRET;
+      } else {
+        process.env.WEBHOOK_SIGNING_SECRET = previousSecret;
+      }
+    }
   });
 
   async function createTestTicketType(input: Omit<TestTicketType, 'id' | 'concertId'>) {

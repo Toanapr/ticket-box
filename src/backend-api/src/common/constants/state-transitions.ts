@@ -25,6 +25,7 @@ export const orderTransitions: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.ISSUED]: [],
   [OrderStatus.FAILED]: [],
   [OrderStatus.EXPIRED]: [],
+  [OrderStatus.REFUND_REQUIRED]: [],
 };
 
 export const paymentTransitions: Record<PaymentStatus, PaymentStatus[]> = {

@@ -22,11 +22,17 @@ export class TicketService {
       status: ticket.status,
       sequenceNo: ticket.sequenceNo,
       paymentStatus: ticket.order.payments[0]?.status ?? null,
-      qrCode: {
-        mode: 'hash_reference',
-        value: ticket.qrTokenHash,
-        renderable: false,
-      },
+      qrCode: ticket.qrToken
+        ? {
+            mode: 'opaque_token',
+            value: ticket.qrToken,
+            renderable: true,
+          }
+        : {
+            mode: 'hash_reference',
+            value: ticket.qrTokenHash,
+            renderable: false,
+          },
     };
   }
 }

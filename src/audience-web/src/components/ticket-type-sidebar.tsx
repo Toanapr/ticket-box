@@ -13,6 +13,7 @@ export function TicketTypeSidebar({
 }): React.ReactElement {
   const selectedType = concert.ticketTypes.find((item) => item.id === selectedTicketTypeId);
   const canCheckout = concert.status === "selling" && selectedType && selectedType.availableApprox > 0;
+  const saleStartsAt = selectedType?.saleStartsAt ?? concert.ticketTypes[0]?.saleStartsAt;
 
   return (
     <aside className="sticky top-24 rounded-lg border border-black/10 bg-white p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]">
@@ -20,16 +21,24 @@ export function TicketTypeSidebar({
         <h2 className="font-display text-xl font-black">Chọn khu vực vé</h2>
         <StatusBadge status={concert.status} />
       </div>
+      {saleStartsAt ? (
+        <div className="mb-4 rounded-lg bg-ticket-stone px-4 py-3">
+          <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">Mở bán</div>
+          <div className="mt-1 text-sm font-black text-ticket-obsidian">{formatDateTime(saleStartsAt)}</div>
+        </div>
+      ) : null}
       <div className="grid gap-3">
         {concert.ticketTypes.map((type) => {
           const soldOut = type.availableApprox <= 0;
+          const selected = type.id === selectedTicketTypeId;
           return (
             <Link
               key={type.id}
               href={`/concerts/${concert.id}?ticketType=${type.id}`}
               scroll={false}
+              aria-current={selected ? "true" : undefined}
               className={`rounded-lg border p-4 transition ${
-                type.id === selectedTicketTypeId
+                selected
                   ? "border-ticket-green bg-ticket-green/5"
                   : soldOut
                     ? "border-black/10 bg-slate-50 opacity-60"
@@ -37,13 +46,19 @@ export function TicketTypeSidebar({
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="font-black">{type.name}</span>
-                <span className="text-right font-display font-black text-ticket-obsidian">{formatCurrency(type.price)}</span>
+                <div className="min-w-0">
+                  <span className="block font-black leading-tight">{type.name}</span>
+                  <span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-600 ring-1 ring-black/10">
+                    {soldOut ? "Hết vé" : `Còn ~${type.availableApprox}`}
+                  </span>
+                </div>
+                <span className="shrink-0 text-right font-display text-lg font-black leading-tight text-ticket-obsidian">
+                  {formatCurrency(type.price)}
+                </span>
               </div>
-              <div className="mt-2 grid gap-1 text-xs font-bold text-slate-500">
-                <span>{soldOut ? "Hết vé" : `~${type.availableApprox} vé gần realtime`}</span>
-                <span>Hạn mức: {type.maxPerUser} vé/tài khoản</span>
-                <span>Mở bán: {formatDateTime(type.saleStartsAt)}</span>
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-black/10 pt-3 text-xs font-bold text-slate-500">
+                <span>Tối đa {type.maxPerUser} vé/tài khoản</span>
+                {selected ? <span className="text-ticket-green">Đang chọn</span> : null}
               </div>
             </Link>
           );
@@ -68,7 +83,7 @@ export function TicketTypeSidebar({
         </button>
       )}
       <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-        Số vé còn lại chỉ gần realtime. Backend reservation/order mới quyết định còn vé và quota.
+        Số vé còn lại là ước tính gần realtime. Checkout sẽ xác nhận tồn vé và hạn mức cuối cùng.
       </p>
     </aside>
   );

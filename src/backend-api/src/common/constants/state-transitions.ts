@@ -3,7 +3,10 @@ import { PaymentStatus } from '../enums/payment-status.enum';
 import { ReservationStatus } from '../enums/reservation-status.enum';
 import { TicketStatus } from '../enums/ticket-status.enum';
 
-export const reservationTransitions: Record<ReservationStatus, ReservationStatus[]> = {
+export const reservationTransitions: Record<
+  ReservationStatus,
+  ReservationStatus[]
+> = {
   [ReservationStatus.ACTIVE]: [
     ReservationStatus.CONFIRMED,
     ReservationStatus.RELEASED,
@@ -29,7 +32,11 @@ export const orderTransitions: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export const paymentTransitions: Record<PaymentStatus, PaymentStatus[]> = {
-  [PaymentStatus.CREATED]: [PaymentStatus.PENDING, PaymentStatus.SUCCEEDED, PaymentStatus.FAILED],
+  [PaymentStatus.CREATED]: [
+    PaymentStatus.PENDING,
+    PaymentStatus.SUCCEEDED,
+    PaymentStatus.FAILED,
+  ],
   [PaymentStatus.PENDING]: [PaymentStatus.SUCCEEDED, PaymentStatus.FAILED],
   [PaymentStatus.SUCCEEDED]: [],
   [PaymentStatus.FAILED]: [],

@@ -1,4 +1,10 @@
-import { BadRequestException, Body, Controller, Headers, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Headers,
+  Post,
+} from '@nestjs/common';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { InventoryService } from './inventory.service';
 
@@ -11,7 +17,10 @@ export class InventoryController {
     @Headers('x-user-id') userId: string | undefined,
     @Body() dto: CreateReservationDto,
   ) {
-    return this.inventoryService.createReservation(this.requireUserId(userId), dto);
+    return this.inventoryService.createReservation(
+      this.requireUserId(userId),
+      dto,
+    );
   }
 
   private requireUserId(userId: string | undefined): string {

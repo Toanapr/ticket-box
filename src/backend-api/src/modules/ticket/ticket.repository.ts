@@ -6,7 +6,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TicketRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findOrderItems(tx: Prisma.TransactionClient, orderId: string): Promise<OrderItem[]> {
+  async findOrderItems(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<OrderItem[]> {
     return tx.orderItem.findMany({
       where: {
         orderId,
@@ -17,7 +20,10 @@ export class TicketRepository {
     });
   }
 
-  async findExistingSequenceSet(tx: Prisma.TransactionClient, orderItemId: string): Promise<Set<number>> {
+  async findExistingSequenceSet(
+    tx: Prisma.TransactionClient,
+    orderItemId: string,
+  ): Promise<Set<number>> {
     const existingTickets = await tx.ticket.findMany({
       where: {
         orderItemId,
@@ -47,7 +53,11 @@ export class TicketRepository {
     return tx.ticket.create({ data });
   }
 
-  async updateOrderStatus(tx: Prisma.TransactionClient, orderId: string, status: OrderStatus) {
+  async updateOrderStatus(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    status: OrderStatus,
+  ) {
     return tx.order.update({
       where: {
         id: orderId,
@@ -58,7 +68,10 @@ export class TicketRepository {
     });
   }
 
-  async countTicketsByOrderId(tx: Prisma.TransactionClient, orderId: string): Promise<number> {
+  async countTicketsByOrderId(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<number> {
     return tx.ticket.count({
       where: {
         orderId,

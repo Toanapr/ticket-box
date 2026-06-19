@@ -1,4 +1,9 @@
-import { OrderStatus, PaymentStatus, Prisma, ReservationStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentStatus,
+  Prisma,
+  ReservationStatus,
+} from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { DomainError } from '../../common/errors/domain-error';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -63,20 +68,36 @@ export class OrderRepository {
       });
 
       if (!reservation) {
-        throw new DomainError('Reservation was not found', 'reservation_not_found', 404);
+        throw new DomainError(
+          'Reservation was not found',
+          'reservation_not_found',
+          404,
+        );
       }
 
       if (reservation.userId !== userId) {
-        throw new DomainError('Reservation does not belong to the current user', 'reservation_forbidden', 403);
+        throw new DomainError(
+          'Reservation does not belong to the current user',
+          'reservation_forbidden',
+          403,
+        );
       }
 
       if (reservation.status !== ReservationStatus.active) {
-        throw new DomainError('Reservation is not active', 'reservation_not_active', 409);
+        throw new DomainError(
+          'Reservation is not active',
+          'reservation_not_active',
+          409,
+        );
       }
 
       const now = new Date();
       if (reservation.expiresAt <= now) {
-        throw new DomainError('Reservation has expired', 'reservation_expired', 409);
+        throw new DomainError(
+          'Reservation has expired',
+          'reservation_expired',
+          409,
+        );
       }
 
       if (reservation.orderId) {
@@ -88,7 +109,9 @@ export class OrderRepository {
         );
       }
 
-      const totalAmountDecimal = reservation.ticketType.price.mul(reservation.quantity);
+      const totalAmountDecimal = reservation.ticketType.price.mul(
+        reservation.quantity,
+      );
 
       const order = await tx.order.create({
         data: {

@@ -35,7 +35,9 @@ export class ReservationExpiryWorker {
   }
 
   private isWorkerEnabled(): boolean {
-    const configuredValue = this.configService.get<string>('RESERVATION_EXPIRY_WORKER_ENABLED');
+    const configuredValue = this.configService.get<string>(
+      'RESERVATION_EXPIRY_WORKER_ENABLED',
+    );
 
     if (!configuredValue) {
       return true;

@@ -20,7 +20,8 @@ export class TicketIssuanceService {
     let createdNow = false;
 
     for (const item of orderItems) {
-      const existingSequenceSet = await this.ticketRepository.findExistingSequenceSet(tx, item.id);
+      const existingSequenceSet =
+        await this.ticketRepository.findExistingSequenceSet(tx, item.id);
 
       for (let sequenceNo = 1; sequenceNo <= item.quantity; sequenceNo += 1) {
         if (existingSequenceSet.has(sequenceNo)) {
@@ -44,15 +45,30 @@ export class TicketIssuanceService {
       }
     }
 
-    await this.ticketRepository.updateOrderStatus(tx, orderId, OrderStatus.issued);
+    await this.ticketRepository.updateOrderStatus(
+      tx,
+      orderId,
+      OrderStatus.issued,
+    );
 
     return {
-      issuedTicketCount: await this.ticketRepository.countTicketsByOrderId(tx, orderId),
+      issuedTicketCount: await this.ticketRepository.countTicketsByOrderId(
+        tx,
+        orderId,
+      ),
       createdNow,
     };
   }
 
-  async notifyIssuedTickets(orderId: string, ownerUserId: string, ticketCount: number): Promise<void> {
-    await this.ticketNotificationPublisher.publishTicketIssued(orderId, ownerUserId, ticketCount);
+  async notifyIssuedTickets(
+    orderId: string,
+    ownerUserId: string,
+    ticketCount: number,
+  ): Promise<void> {
+    await this.ticketNotificationPublisher.publishTicketIssued(
+      orderId,
+      ownerUserId,
+      ticketCount,
+    );
   }
 }

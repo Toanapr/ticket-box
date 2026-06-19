@@ -15,10 +15,11 @@ export class InventoryService {
   ) {}
 
   async createReservation(userId: string, dto: CreateReservationDto) {
-    const existingReservation = await this.inventoryRepository.findReservationByIdempotencyKey(
-      userId,
-      dto.idempotencyKey,
-    );
+    const existingReservation =
+      await this.inventoryRepository.findReservationByIdempotencyKey(
+        userId,
+        dto.idempotencyKey,
+      );
 
     if (existingReservation) {
       this.ensureDuplicatePayloadMatches(existingReservation, dto);
@@ -33,7 +34,11 @@ export class InventoryService {
     }
 
     try {
-      const reservation = await this.inventoryRepository.reserve(userId, dto, this.getReservationTtlMinutes());
+      const reservation = await this.inventoryRepository.reserve(
+        userId,
+        dto,
+        this.getReservationTtlMinutes(),
+      );
       this.logger.log(
         formatStructuredLog('reservation_created', {
           reservationId: reservation.id,
@@ -48,10 +53,11 @@ export class InventoryService {
         throw error;
       }
 
-      const duplicateReservation = await this.inventoryRepository.findReservationByIdempotencyKey(
-        userId,
-        dto.idempotencyKey,
-      );
+      const duplicateReservation =
+        await this.inventoryRepository.findReservationByIdempotencyKey(
+          userId,
+          dto.idempotencyKey,
+        );
 
       if (!duplicateReservation) {
         throw error;
@@ -93,7 +99,9 @@ export class InventoryService {
   }
 
   private getReservationTtlMinutes(): number {
-    const configuredValue = this.configService.get<string>('RESERVATION_TTL_MINUTES');
+    const configuredValue = this.configService.get<string>(
+      'RESERVATION_TTL_MINUTES',
+    );
     const ttl = Number(configuredValue ?? 10);
 
     if (!Number.isFinite(ttl) || ttl <= 0) {
@@ -104,7 +112,9 @@ export class InventoryService {
   }
 
   private getReservationExpiryBatchSize(): number {
-    const configuredValue = this.configService.get<string>('RESERVATION_EXPIRY_BATCH_SIZE');
+    const configuredValue = this.configService.get<string>(
+      'RESERVATION_EXPIRY_BATCH_SIZE',
+    );
     const batchSize = Number(configuredValue ?? 100);
 
     if (!Number.isFinite(batchSize) || batchSize <= 0) {

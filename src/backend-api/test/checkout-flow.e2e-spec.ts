@@ -24,10 +24,17 @@ describe('Checkout flow and invariants (e2e)', () => {
   let prisma: PrismaClient;
   let inventoryService: InventoryService;
   const ticketTypeIds: string[] = [];
+  const userIds: string[] = [];
   const concertIds: string[] = [];
-
+  const organizationId = randomUUID();
   beforeAll(async () => {
     prisma = new PrismaClient();
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: 'Checkout E2E Test Organization',
+      },
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -92,7 +99,22 @@ describe('Checkout flow and invariants (e2e)', () => {
         },
       });
     }
+    await prisma.concert.deleteMany({
+      where: {
+        id: { in: concertIds },
+      },
+    });
 
+    await prisma.organization.deleteMany({
+      where: {
+        id: organizationId,
+      },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        id: { in: userIds },
+      },
+    });
     await app.close();
     await prisma.$disconnect();
   });
@@ -106,7 +128,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 4,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
     const idempotencyKey = randomUUID();
     const body = {
       ticketTypeId: testTicketType.id,
@@ -147,7 +169,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 5,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -208,7 +230,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 3,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -264,7 +286,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 2,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -314,7 +336,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 2,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -399,7 +421,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 2,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const attempts = await Promise.all(
       Array.from({ length: 3 }, () =>
@@ -414,7 +436,9 @@ describe('Checkout flow and invariants (e2e)', () => {
       ),
     );
 
-    const successCount = attempts.filter((response) => response.status === 201).length;
+    const successCount = attempts.filter(
+      (response) => response.status === 201,
+    ).length;
     expect(successCount).toBe(2);
 
     const quota = await prisma.userTicketQuota.findUnique({
@@ -438,12 +462,14 @@ describe('Checkout flow and invariants (e2e)', () => {
       capacity: 1,
       perUserLimit: 1,
     });
-
+    const testUserIds = await Promise.all(
+      Array.from({ length: 5 }, () => createTestUser()),
+    );
     const attempts = await Promise.all(
-      Array.from({ length: 5 }, () =>
+      testUserIds.map((userId) =>
         request(app.getHttpServer())
           .post('/reservations')
-          .set('x-user-id', randomUUID())
+          .set('x-user-id', userId)
           .send({
             ticketTypeId: testTicketType.id,
             quantity: 1,
@@ -452,7 +478,9 @@ describe('Checkout flow and invariants (e2e)', () => {
       ),
     );
 
-    const successCount = attempts.filter((response) => response.status === 201).length;
+    const successCount = attempts.filter(
+      (response) => response.status === 201,
+    ).length;
     expect(successCount).toBe(1);
 
     const inventory = await prisma.inventoryCounter.findUnique({
@@ -461,7 +489,9 @@ describe('Checkout flow and invariants (e2e)', () => {
       },
     });
 
-    expect((inventory?.reservedCount ?? 0) + (inventory?.soldCount ?? 0)).toBeLessThanOrEqual(1);
+    expect(
+      (inventory?.reservedCount ?? 0) + (inventory?.soldCount ?? 0),
+    ).toBeLessThanOrEqual(1);
   });
 
   it('returns renderable opaque QR token for newly issued ticket', async () => {
@@ -473,7 +503,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 2,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -524,7 +554,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       perUserLimit: 2,
     });
 
-    const userId = randomUUID();
+    const userId = await createTestUser();
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
@@ -573,8 +603,12 @@ describe('Checkout flow and invariants (e2e)', () => {
       }),
     ]);
 
-    const [reservationAfterFirstRun, orderAfterFirstRun, inventoryAfterFirstRun, quotaAfterFirstRun] =
-      afterFirstRun;
+    const [
+      reservationAfterFirstRun,
+      orderAfterFirstRun,
+      inventoryAfterFirstRun,
+      quotaAfterFirstRun,
+    ] = afterFirstRun;
 
     expect(reservationAfterFirstRun.status).toBe('expired');
     expect(orderAfterFirstRun.status).toBe('expired');
@@ -586,32 +620,42 @@ describe('Checkout flow and invariants (e2e)', () => {
     const secondRun = await inventoryService.expireReservationsBatch();
     expect(secondRun.expiredCount).toBeGreaterThanOrEqual(0);
 
-    const [reservationAfterSecondRun, orderAfterSecondRun, inventoryAfterSecondRun, quotaAfterSecondRun] =
-      await Promise.all([
-        prisma.reservation.findUniqueOrThrow({
-          where: { id: reservationRes.body.id },
-        }),
-        prisma.order.findUniqueOrThrow({
-          where: { id: orderRes.body.id },
-        }),
-        prisma.inventoryCounter.findUniqueOrThrow({
-          where: { ticketTypeId: testTicketType.id },
-        }),
-        prisma.userTicketQuota.findUniqueOrThrow({
-          where: {
-            userId_ticketTypeId: {
-              userId,
-              ticketTypeId: testTicketType.id,
-            },
+    const [
+      reservationAfterSecondRun,
+      orderAfterSecondRun,
+      inventoryAfterSecondRun,
+      quotaAfterSecondRun,
+    ] = await Promise.all([
+      prisma.reservation.findUniqueOrThrow({
+        where: { id: reservationRes.body.id },
+      }),
+      prisma.order.findUniqueOrThrow({
+        where: { id: orderRes.body.id },
+      }),
+      prisma.inventoryCounter.findUniqueOrThrow({
+        where: { ticketTypeId: testTicketType.id },
+      }),
+      prisma.userTicketQuota.findUniqueOrThrow({
+        where: {
+          userId_ticketTypeId: {
+            userId,
+            ticketTypeId: testTicketType.id,
           },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     expect(reservationAfterSecondRun.status).toBe('expired');
     expect(orderAfterSecondRun.status).toBe('expired');
-    expect(inventoryAfterSecondRun.reservedCount).toBe(inventoryAfterFirstRun.reservedCount);
-    expect(inventoryAfterSecondRun.soldCount).toBe(inventoryAfterFirstRun.soldCount);
-    expect(quotaAfterSecondRun.reservedCount).toBe(quotaAfterFirstRun.reservedCount);
+    expect(inventoryAfterSecondRun.reservedCount).toBe(
+      inventoryAfterFirstRun.reservedCount,
+    );
+    expect(inventoryAfterSecondRun.soldCount).toBe(
+      inventoryAfterFirstRun.soldCount,
+    );
+    expect(quotaAfterSecondRun.reservedCount).toBe(
+      quotaAfterFirstRun.reservedCount,
+    );
     expect(quotaAfterSecondRun.paidCount).toBe(quotaAfterFirstRun.paidCount);
   });
 
@@ -628,7 +672,7 @@ describe('Checkout flow and invariants (e2e)', () => {
         perUserLimit: 2,
       });
 
-      const userId = randomUUID();
+      const userId = await createTestUser();
 
       const reservationRes = await request(app.getHttpServer())
         .post('/reservations')
@@ -664,7 +708,10 @@ describe('Checkout flow and invariants (e2e)', () => {
 
       const validSignatureRes = await request(app.getHttpServer())
         .post('/payments/webhook')
-        .set('x-webhook-signature', createWebhookSignature('test-secret', payload))
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature('test-secret', payload),
+        )
         .send(payload);
 
       expect(validSignatureRes.status).toBe(201);
@@ -676,13 +723,46 @@ describe('Checkout flow and invariants (e2e)', () => {
       }
     }
   });
+  async function createTestUser() {
+    const userId = randomUUID();
 
-  async function createTestTicketType(input: Omit<TestTicketType, 'id' | 'concertId'>) {
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: `checkout-${userId}@test.local`,
+        role: 'audience',
+        passwordHash: 'e2e-test-password-hash',
+        status: 'active',
+      },
+    });
+
+    userIds.push(userId);
+
+    return userId;
+  }
+  async function createTestTicketType(
+    input: Omit<TestTicketType, 'id' | 'concertId'>,
+  ) {
     const id = randomUUID();
     const concertId = randomUUID();
     ticketTypeIds.push(id);
     concertIds.push(concertId);
-
+    // Phải tạo concert trước vì ticket_types.concert_id
+    // là khóa ngoại tham chiếu đến concerts.id
+    await prisma.concert.create({
+      data: {
+        id: concertId,
+        organizationId,
+        title: `Test Concert ${input.name}`,
+        venue: 'E2E Test Venue',
+        artistName: 'E2E Test Artist',
+        description: 'Concert used for checkout E2E test',
+        startAt: new Date('2026-12-01T12:00:00.000Z'),
+        status: 'published',
+        seatingMapObjectKey: `test/${concertId}/seating-map.json`,
+        publishedArtistBio: 'E2E test artist biography',
+      },
+    });
     await prisma.ticketType.create({
       data: {
         id,

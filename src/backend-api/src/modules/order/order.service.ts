@@ -26,10 +26,11 @@ export class OrderService {
         throw error;
       }
 
-      const duplicateOrder = await this.orderRepository.findOrderByIdempotencyKey(
-        userId,
-        dto.idempotencyKey,
-      );
+      const duplicateOrder =
+        await this.orderRepository.findOrderByIdempotencyKey(
+          userId,
+          dto.idempotencyKey,
+        );
 
       if (!duplicateOrder) {
         throw error;
@@ -41,7 +42,10 @@ export class OrderService {
   }
 
   async getOrder(userId: string, orderId: string) {
-    const order = await this.orderRepository.findOrderByIdForUser(userId, orderId);
+    const order = await this.orderRepository.findOrderByIdForUser(
+      userId,
+      orderId,
+    );
 
     if (!order) {
       throw new DomainError('Order was not found', 'order_not_found', 404);
@@ -56,7 +60,10 @@ export class OrderService {
   ): void {
     const reservationIds = order.items.map((item) => item.reservationId);
 
-    if (reservationIds.length !== 1 || reservationIds[0] !== dto.reservationId) {
+    if (
+      reservationIds.length !== 1 ||
+      reservationIds[0] !== dto.reservationId
+    ) {
       throw new DomainError(
         'Idempotency key was already used with a different order payload',
         'duplicate_request_conflict',
@@ -124,7 +131,9 @@ export class OrderService {
       })),
       ticketSummary: {
         count: order.tickets.length,
-        issuedCount: order.tickets.filter((ticket) => ticket.status === 'issued').length,
+        issuedCount: order.tickets.filter(
+          (ticket) => ticket.status === 'issued',
+        ).length,
       },
       tickets: order.tickets.map((ticket) => ({
         id: ticket.id,

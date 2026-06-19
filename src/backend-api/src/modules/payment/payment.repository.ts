@@ -34,19 +34,29 @@ export class PaymentRepository {
       const context = await this.loadOrderPaymentContext(tx, orderId, 'mock');
 
       if (context.order.userId !== userId) {
-        throw new DomainError('Order does not belong to the current user', 'order_forbidden', 403);
+        throw new DomainError(
+          'Order does not belong to the current user',
+          'order_forbidden',
+          403,
+        );
       }
 
       return this.confirmPaymentSuccess(tx, context, {
-        providerTxnId: context.payment.providerTxnId ?? `mock-${context.payment.id}`,
-        payloadHash: context.payment.payloadHash ?? `mock-success:${context.order.id}`,
+        providerTxnId:
+          context.payment.providerTxnId ?? `mock-${context.payment.id}`,
+        payloadHash:
+          context.payment.payloadHash ?? `mock-success:${context.order.id}`,
       });
     });
   }
 
   async processWebhook(command: WebhookCommand) {
     return this.prisma.$transaction(async (tx) => {
-      const context = await this.loadOrderPaymentContext(tx, command.orderId, command.provider);
+      const context = await this.loadOrderPaymentContext(
+        tx,
+        command.orderId,
+        command.provider,
+      );
 
       const isPayloadReplay =
         context.payment.payloadHash === command.payloadHash &&
@@ -105,12 +115,20 @@ export class PaymentRepository {
 
     const payment = order.payments.find((item) => item.provider === provider);
     if (!payment) {
-      throw new DomainError('Payment record was not found for this order', 'payment_not_found', 404);
+      throw new DomainError(
+        'Payment record was not found for this order',
+        'payment_not_found',
+        404,
+      );
     }
 
     const reservation = order.reservations[0];
     if (!reservation) {
-      throw new DomainError('Reservation linked to this order was not found', 'reservation_not_found', 404);
+      throw new DomainError(
+        'Reservation linked to this order was not found',
+        'reservation_not_found',
+        404,
+      );
     }
 
     return { order, payment, reservation };
@@ -123,7 +141,10 @@ export class PaymentRepository {
   ) {
     const { order, payment, reservation } = context;
 
-    if (payment.status === PaymentStatus.succeeded && order.status === OrderStatus.issued) {
+    if (
+      payment.status === PaymentStatus.succeeded &&
+      order.status === OrderStatus.issued
+    ) {
       return this.toRepositoryResult(
         this.toPaymentResponse(
           order.id,
@@ -139,7 +160,10 @@ export class PaymentRepository {
       );
     }
 
-    if (payment.status === PaymentStatus.succeeded && order.status === OrderStatus.refund_required) {
+    if (
+      payment.status === PaymentStatus.succeeded &&
+      order.status === OrderStatus.refund_required
+    ) {
       return this.toRepositoryResult(
         this.toPaymentResponse(
           order.id,
@@ -156,9 +180,14 @@ export class PaymentRepository {
     }
 
     if (payment.status === PaymentStatus.failed) {
-      throw new DomainError('Payment is already marked as failed', 'payment_transition_invalid', 409, {
-        currentStatus: payment.status,
-      });
+      throw new DomainError(
+        'Payment is already marked as failed',
+        'payment_transition_invalid',
+        409,
+        {
+          currentStatus: payment.status,
+        },
+      );
     }
 
     let paymentUpdate = payment;
@@ -176,7 +205,11 @@ export class PaymentRepository {
           },
         });
 
-        await this.releaseExpiredReservationIfStillHeld(tx, reservation, order.userId);
+        await this.releaseExpiredReservationIfStillHeld(
+          tx,
+          reservation,
+          order.userId,
+        );
 
         await tx.order.update({
           where: {
@@ -203,9 +236,14 @@ export class PaymentRepository {
       }
 
       if (order.status !== OrderStatus.pending_payment) {
-        throw new DomainError('Order is not in payable state', 'order_not_payable', 409, {
-          status: order.status,
-        });
+        throw new DomainError(
+          'Order is not in payable state',
+          'order_not_payable',
+          409,
+          {
+            status: order.status,
+          },
+        );
       }
 
       if (reservation.status !== ReservationStatus.active) {
@@ -275,13 +313,25 @@ export class PaymentRepository {
           },
         },
       });
-    } else if (order.status !== OrderStatus.paid && order.status !== OrderStatus.issued) {
-      throw new DomainError('Order is in an inconsistent state for ticket issuance', 'order_state_inconsistent', 409, {
-        status: order.status,
-      });
+    } else if (
+      order.status !== OrderStatus.paid &&
+      order.status !== OrderStatus.issued
+    ) {
+      throw new DomainError(
+        'Order is in an inconsistent state for ticket issuance',
+        'order_state_inconsistent',
+        409,
+        {
+          status: order.status,
+        },
+      );
     }
 
-    const issuance = await this.ticketIssuanceService.issueTicketsForOrder(tx, order.id, order.userId);
+    const issuance = await this.ticketIssuanceService.issueTicketsForOrder(
+      tx,
+      order.id,
+      order.userId,
+    );
 
     return this.toRepositoryResult(
       this.toPaymentResponse(
@@ -305,13 +355,24 @@ export class PaymentRepository {
   ) {
     const { order, payment, reservation } = context;
 
-    if (payment.status === PaymentStatus.succeeded || order.status === OrderStatus.paid) {
-      throw new DomainError('Cannot move a succeeded payment back to failed', 'payment_transition_invalid', 409, {
-        currentStatus: payment.status,
-      });
+    if (
+      payment.status === PaymentStatus.succeeded ||
+      order.status === OrderStatus.paid
+    ) {
+      throw new DomainError(
+        'Cannot move a succeeded payment back to failed',
+        'payment_transition_invalid',
+        409,
+        {
+          currentStatus: payment.status,
+        },
+      );
     }
 
-    if (payment.status === PaymentStatus.failed && payment.payloadHash === command.payloadHash) {
+    if (
+      payment.status === PaymentStatus.failed &&
+      payment.payloadHash === command.payloadHash
+    ) {
       return this.toRepositoryResult(
         this.toPaymentResponse(
           order.id,
@@ -362,7 +423,10 @@ export class PaymentRepository {
     );
   }
 
-  private async countIssuedTickets(tx: Prisma.TransactionClient, orderId: string): Promise<number> {
+  private async countIssuedTickets(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<number> {
     return tx.ticket.count({
       where: {
         orderId,

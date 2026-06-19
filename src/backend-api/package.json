@@ -4,6 +4,7 @@
   "description": "",
   "author": "",
   "private": true,
+  "packageManager": "pnpm@11.8.0",
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
@@ -26,7 +27,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "seed": "ts-node prisma/seed.ts",
+    "check:phase1": "ts-node scripts/check-phase1.ts"
   },
   "dependencies": {
     "@nestjs/config": "^4.0.2",
@@ -66,9 +71,6 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
   "jest": {
     "moduleFileExtensions": [
       "js",
@@ -85,5 +87,8 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }

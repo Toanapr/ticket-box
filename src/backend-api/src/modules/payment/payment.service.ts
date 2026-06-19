@@ -22,7 +22,10 @@ export class PaymentService {
         userId,
       }),
     );
-    const result = await this.paymentRepository.confirmMockPayment(userId, dto.orderId);
+    const result = await this.paymentRepository.confirmMockPayment(
+      userId,
+      dto.orderId,
+    );
     await this.notifyIssuedTicketsIfNeeded(result);
     this.logger.log(
       formatStructuredLog('payment_mock_success_completed', {

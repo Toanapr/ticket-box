@@ -1,6 +1,9 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
-export function createWebhookSignature(secret: string, payload: unknown): string {
+export function createWebhookSignature(
+  secret: string,
+  payload: unknown,
+): string {
   const content = toCanonicalJson(payload);
   return createHmac('sha256', secret).update(content).digest('hex');
 }
@@ -35,7 +38,7 @@ function sortRecursively(value: unknown): unknown {
   }
 
   if (value && typeof value === 'object') {
-    return Object.keys(value as Record<string, unknown>)
+    return Object.keys(value)
       .sort()
       .reduce<Record<string, unknown>>((result, key) => {
         result[key] = sortRecursively((value as Record<string, unknown>)[key]);

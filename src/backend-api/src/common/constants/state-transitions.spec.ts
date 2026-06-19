@@ -28,8 +28,12 @@ describe('state transition maps', () => {
 
   it('keeps refund_required as terminal order state', () => {
     expect(orderTransitions[OrderStatus.REFUND_REQUIRED]).toEqual([]);
-    expect(orderTransitions[OrderStatus.PENDING_PAYMENT]).toContain(OrderStatus.EXPIRED);
-    expect(orderTransitions[OrderStatus.PENDING_PAYMENT]).toContain(OrderStatus.ISSUED);
+    expect(orderTransitions[OrderStatus.PENDING_PAYMENT]).toContain(
+      OrderStatus.EXPIRED,
+    );
+    expect(orderTransitions[OrderStatus.PENDING_PAYMENT]).toContain(
+      OrderStatus.ISSUED,
+    );
   });
 
   it('allows issued ticket to move only to revoked or checked_in', () => {

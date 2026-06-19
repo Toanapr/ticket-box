@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 
 class WebhookPayloadDto {
   @IsOptional()

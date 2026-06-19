@@ -7,7 +7,10 @@ export class TicketService {
   constructor(private readonly ticketRepository: TicketRepository) {}
 
   async getTicket(userId: string, ticketId: string) {
-    const ticket = await this.ticketRepository.findTicketByIdForUser(userId, ticketId);
+    const ticket = await this.ticketRepository.findTicketByIdForUser(
+      userId,
+      ticketId,
+    );
 
     if (!ticket) {
       throw new DomainError('Ticket was not found', 'ticket_not_found', 404);

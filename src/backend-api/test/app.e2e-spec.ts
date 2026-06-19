@@ -9,6 +9,11 @@ describe('BackendApi (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
+    process.env.DATABASE_URL ??=
+      'postgresql://ticketbox:ticketbox@localhost:5432/ticketbox?schema=public';
+    process.env.JWT_SECRET ??= 'test-secret';
+    process.env.SKIP_PRISMA_CONNECT = 'true';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -18,12 +23,9 @@ describe('BackendApi (e2e)', () => {
   });
 
   it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect({
-        status: 'ok',
-      });
+    return request(app.getHttpServer()).get('/health').expect(200).expect({
+      status: 'ok',
+    });
   });
 
   it('returns correlation id header on requests', async () => {

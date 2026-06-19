@@ -1,4 +1,7 @@
-import { createWebhookSignature, verifyWebhookSignature } from './webhook-signature.util';
+import {
+  createWebhookSignature,
+  verifyWebhookSignature,
+} from './webhook-signature.util';
 
 describe('webhook signature utils', () => {
   it('generates stable signature regardless of object key order', () => {

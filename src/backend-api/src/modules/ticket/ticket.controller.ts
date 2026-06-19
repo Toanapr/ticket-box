@@ -1,4 +1,10 @@
-import { BadRequestException, Controller, Get, Headers, Param } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Headers,
+  Param,
+} from '@nestjs/common';
 import { TicketService } from './ticket.service';
 
 @Controller('tickets')

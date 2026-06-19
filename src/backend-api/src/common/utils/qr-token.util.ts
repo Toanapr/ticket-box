@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'crypto';
 
-export function buildQrToken(orderId: string, orderItemId: string, sequenceNo: number): string {
+export function buildQrToken(
+  orderId: string,
+  orderItemId: string,
+  sequenceNo: number,
+): string {
   return `${orderId}:${orderItemId}:${sequenceNo}:${randomUUID()}`;
 }
 

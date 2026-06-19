@@ -1,4 +1,9 @@
-import { OrderStatus, Prisma, Reservation, ReservationStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  Prisma,
+  Reservation,
+  ReservationStatus,
+} from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { DomainError } from '../../common/errors/domain-error';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -134,11 +139,19 @@ export class InventoryRepository {
       });
 
       if (!ticketType) {
-        throw new DomainError('Ticket type was not found', 'ticket_type_not_found', 404);
+        throw new DomainError(
+          'Ticket type was not found',
+          'ticket_type_not_found',
+          404,
+        );
       }
 
       if (ticketType.saleStartAt > now || ticketType.saleEndAt < now) {
-        throw new DomainError('Sale window is not active', 'sale_window_inactive', 409);
+        throw new DomainError(
+          'Sale window is not active',
+          'sale_window_inactive',
+          409,
+        );
       }
 
       const lockedInventoryRows = await tx.$queryRaw<
@@ -150,19 +163,23 @@ export class InventoryRepository {
         }>
       >(Prisma.sql`
         SELECT
-          "ticketTypeId",
-          "totalCapacity",
-          "reservedCount",
-          "soldCount"
-        FROM "InventoryCounter"
-        WHERE "ticketTypeId" = ${dto.ticketTypeId}::uuid
+        "ticket_type_id" AS "ticketTypeId",
+        "total_capacity" AS "totalCapacity",
+        "reserved_count" AS "reservedCount",
+        "sold_count" AS "soldCount"
+        FROM "inventory_counters"
+        WHERE "ticket_type_id" = ${dto.ticketTypeId}::uuid
         FOR UPDATE
       `);
 
       const lockedInventory = lockedInventoryRows[0];
 
       if (!lockedInventory) {
-        throw new DomainError('Inventory counter was not found', 'inventory_not_found', 404);
+        throw new DomainError(
+          'Inventory counter was not found',
+          'inventory_not_found',
+          404,
+        );
       }
 
       await tx.userTicketQuota.upsert({
@@ -190,24 +207,30 @@ export class InventoryRepository {
         }>
       >(Prisma.sql`
         SELECT
-          "userId",
-          "ticketTypeId",
-          "reservedCount",
-          "paidCount"
-        FROM "UserTicketQuota"
-        WHERE "userId" = ${userId}::uuid
-          AND "ticketTypeId" = ${dto.ticketTypeId}::uuid
+        "user_id" AS "userId",
+        "ticket_type_id" AS "ticketTypeId",
+        "reserved_count" AS "reservedCount",
+        "paid_count" AS "paidCount"
+        FROM "user_ticket_quotas"
+        WHERE "user_id" = ${userId}::uuid
+          AND "ticket_type_id" = ${dto.ticketTypeId}::uuid
         FOR UPDATE
       `);
 
       const lockedQuota = lockedQuotaRows[0];
 
       if (!lockedQuota) {
-        throw new DomainError('User quota ledger was not found', 'quota_not_found', 500);
+        throw new DomainError(
+          'User quota ledger was not found',
+          'quota_not_found',
+          500,
+        );
       }
 
       const availableQuantity =
-        lockedInventory.totalCapacity - lockedInventory.reservedCount - lockedInventory.soldCount;
+        lockedInventory.totalCapacity -
+        lockedInventory.reservedCount -
+        lockedInventory.soldCount;
 
       if (availableQuantity < dto.quantity) {
         throw new DomainError('Not enough tickets available', 'sold_out', 409, {
@@ -215,12 +238,18 @@ export class InventoryRepository {
         });
       }
 
-      const projectedQuota = lockedQuota.paidCount + lockedQuota.reservedCount + dto.quantity;
+      const projectedQuota =
+        lockedQuota.paidCount + lockedQuota.reservedCount + dto.quantity;
 
       if (projectedQuota > ticketType.perUserLimit) {
-        throw new DomainError('Per-user ticket limit exceeded', 'quota_exceeded', 409, {
-          perUserLimit: ticketType.perUserLimit,
-        });
+        throw new DomainError(
+          'Per-user ticket limit exceeded',
+          'quota_exceeded',
+          409,
+          {
+            perUserLimit: ticketType.perUserLimit,
+          },
+        );
       }
 
       const reservation = await tx.reservation.create({

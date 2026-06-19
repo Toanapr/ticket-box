@@ -4,10 +4,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
-describe('AppController (e2e)', () => {
+describe('Phase 1 API contract (e2e)', () => {
   let app: INestApplication<App>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     process.env.DATABASE_URL ??=
       'postgresql://ticketbox:ticketbox@localhost:5432/ticketbox?schema=public';
     process.env.JWT_SECRET ??= 'test-secret';
@@ -21,14 +21,14 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  it('rejects admin writes without a bearer token', async () => {
+    await request(app.getHttpServer())
+      .post('/admin/concerts')
+      .send({})
+      .expect(401);
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
   });
 });

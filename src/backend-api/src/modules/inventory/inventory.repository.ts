@@ -163,12 +163,12 @@ export class InventoryRepository {
         }>
       >(Prisma.sql`
         SELECT
-          "ticketTypeId",
-          "totalCapacity",
-          "reservedCount",
-          "soldCount"
-        FROM "InventoryCounter"
-        WHERE "ticketTypeId" = ${dto.ticketTypeId}::uuid
+        "ticket_type_id" AS "ticketTypeId",
+        "total_capacity" AS "totalCapacity",
+        "reserved_count" AS "reservedCount",
+        "sold_count" AS "soldCount"
+        FROM "inventory_counters"
+        WHERE "ticket_type_id" = ${dto.ticketTypeId}::uuid
         FOR UPDATE
       `);
 
@@ -207,13 +207,13 @@ export class InventoryRepository {
         }>
       >(Prisma.sql`
         SELECT
-          "userId",
-          "ticketTypeId",
-          "reservedCount",
-          "paidCount"
-        FROM "UserTicketQuota"
-        WHERE "userId" = ${userId}::uuid
-          AND "ticketTypeId" = ${dto.ticketTypeId}::uuid
+        "user_id" AS "userId",
+        "ticket_type_id" AS "ticketTypeId",
+        "reserved_count" AS "reservedCount",
+        "paid_count" AS "paidCount"
+        FROM "user_ticket_quotas"
+        WHERE "user_id" = ${userId}::uuid
+          AND "ticket_type_id" = ${dto.ticketTypeId}::uuid
         FOR UPDATE
       `);
 

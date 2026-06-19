@@ -1,0 +1,741 @@
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaClient } from '@prisma/client';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { randomUUID } from 'crypto';
+import { AppModule } from './../src/app.module';
+import { setupApp } from './../src/app.setup';
+import { createWebhookSignature } from './../src/common/utils/webhook-signature.util';
+import { InventoryService } from './../src/modules/inventory/inventory.service';
+
+type TestTicketType = {
+  id: string;
+  concertId: string;
+  name: string;
+  zoneCode: string;
+  price: string;
+  capacity: number;
+  perUserLimit: number;
+};
+
+describe('Checkout flow and invariants (e2e)', () => {
+  let app: INestApplication<App>;
+  let prisma: PrismaClient;
+  let inventoryService: InventoryService;
+  const ticketTypeIds: string[] = [];
+  const concertIds: string[] = [];
+
+  beforeAll(async () => {
+    prisma = new PrismaClient();
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = setupApp(moduleFixture.createNestApplication());
+    await app.init();
+    inventoryService = app.get(InventoryService);
+  });
+
+  afterAll(async () => {
+    if (ticketTypeIds.length > 0) {
+      const orderItems = await prisma.orderItem.findMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+        select: {
+          orderId: true,
+        },
+      });
+
+      const orderIds = [...new Set(orderItems.map((item) => item.orderId))];
+
+      await prisma.ticket.deleteMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+      });
+      await prisma.payment.deleteMany({
+        where: {
+          orderId: { in: orderIds },
+        },
+      });
+      await prisma.orderItem.deleteMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+      });
+      await prisma.reservation.deleteMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+      });
+      await prisma.userTicketQuota.deleteMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+      });
+      await prisma.order.deleteMany({
+        where: {
+          id: { in: orderIds },
+        },
+      });
+      await prisma.inventoryCounter.deleteMany({
+        where: {
+          ticketTypeId: { in: ticketTypeIds },
+        },
+      });
+      await prisma.ticketType.deleteMany({
+        where: {
+          id: { in: ticketTypeIds },
+        },
+      });
+    }
+
+    await app.close();
+    await prisma.$disconnect();
+  });
+
+  it('keeps reservation idempotent for duplicate requests', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Idempotency GA',
+      zoneCode: 'IDEMP',
+      price: '100000.00',
+      capacity: 50,
+      perUserLimit: 4,
+    });
+
+    const userId = randomUUID();
+    const idempotencyKey = randomUUID();
+    const body = {
+      ticketTypeId: testTicketType.id,
+      quantity: 2,
+      idempotencyKey,
+    };
+
+    const first = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send(body);
+
+    const second = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send(body);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(second.body.id).toBe(first.body.id);
+
+    const reservations = await prisma.reservation.findMany({
+      where: {
+        userId,
+        ticketTypeId: testTicketType.id,
+      },
+    });
+
+    expect(reservations).toHaveLength(1);
+  });
+
+  it('completes reservation -> order -> mock success -> issued tickets', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Full Flow CAT',
+      zoneCode: 'FLOW',
+      price: '250000.00',
+      capacity: 20,
+      perUserLimit: 5,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 2,
+        idempotencyKey: randomUUID(),
+      });
+
+    expect(reservationRes.status).toBe(201);
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    expect(orderRes.status).toBe(201);
+    expect(orderRes.body.status).toBe('pending_payment');
+
+    const paymentRes = await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('x-user-id', userId)
+      .send({
+        orderId: orderRes.body.id,
+      });
+
+    expect(paymentRes.status).toBe(201);
+    expect(paymentRes.body.orderStatus).toBe('issued');
+    expect(paymentRes.body.paymentStatus).toBe('succeeded');
+    expect(paymentRes.body.reservationStatus).toBe('confirmed');
+    expect(paymentRes.body.issuedTicketCount).toBe(2);
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderRes.body.id },
+      include: {
+        payments: true,
+        reservations: true,
+        tickets: true,
+      },
+    });
+
+    expect(order?.status).toBe('issued');
+    expect(order?.payments[0]?.status).toBe('succeeded');
+    expect(order?.reservations[0]?.status).toBe('confirmed');
+    expect(order?.tickets).toHaveLength(2);
+  });
+
+  it('does not create duplicate tickets on webhook replay', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Webhook Replay',
+      zoneCode: 'WHRP',
+      price: '300000.00',
+      capacity: 10,
+      perUserLimit: 3,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    const providerTxnId = `txn-${randomUUID()}`;
+    const webhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'mock',
+      providerTxnId,
+      status: 'succeeded',
+      payload: { eventType: 'payment.succeeded' },
+    };
+
+    const first = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send(webhookBody);
+
+    const second = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send(webhookBody);
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(second.body.paymentId).toBe(first.body.paymentId);
+
+    const tickets = await prisma.ticket.findMany({
+      where: { orderId: orderRes.body.id },
+    });
+
+    expect(tickets).toHaveLength(1);
+  });
+
+  it('marks order as failed for failed payment webhook without issuing tickets', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Failed Payment',
+      zoneCode: 'FAIL',
+      price: '210000.00',
+      capacity: 8,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    const failedWebhook = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send({
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'failed',
+        payload: { eventType: 'payment.failed' },
+      });
+
+    expect(failedWebhook.status).toBe(201);
+    expect(failedWebhook.body.orderStatus).toBe('failed');
+    expect(failedWebhook.body.paymentStatus).toBe('failed');
+    expect(failedWebhook.body.issuedTicketCount).toBe(0);
+
+    const tickets = await prisma.ticket.findMany({
+      where: { orderId: orderRes.body.id },
+    });
+
+    expect(tickets).toHaveLength(0);
+  });
+
+  it('moves late payment success to refund_required and does not issue tickets', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Late Success',
+      zoneCode: 'LATE',
+      price: '190000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await prisma.reservation.update({
+      where: { id: reservationRes.body.id },
+      data: {
+        status: 'expired',
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    await prisma.inventoryCounter.update({
+      where: { ticketTypeId: testTicketType.id },
+      data: {
+        reservedCount: { decrement: 1 },
+      },
+    });
+
+    await prisma.userTicketQuota.update({
+      where: {
+        userId_ticketTypeId: {
+          userId,
+          ticketTypeId: testTicketType.id,
+        },
+      },
+      data: {
+        reservedCount: { decrement: 1 },
+      },
+    });
+
+    await prisma.order.update({
+      where: { id: orderRes.body.id },
+      data: {
+        status: 'expired',
+      },
+    });
+
+    const webhookRes = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .send({
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'succeeded',
+        payload: { eventType: 'payment.succeeded' },
+      });
+
+    expect(webhookRes.status).toBe(201);
+    expect(webhookRes.body.orderStatus).toBe('refund_required');
+    expect(webhookRes.body.paymentStatus).toBe('succeeded');
+    expect(webhookRes.body.reservationStatus).toBe('expired');
+    expect(webhookRes.body.issuedTicketCount).toBe(0);
+
+    const tickets = await prisma.ticket.findMany({
+      where: { orderId: orderRes.body.id },
+    });
+
+    expect(tickets).toHaveLength(0);
+  });
+
+  it('does not let one user exceed quota with parallel requests', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Quota Guard',
+      zoneCode: 'QG',
+      price: '120000.00',
+      capacity: 50,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const attempts = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        request(app.getHttpServer())
+          .post('/reservations')
+          .set('x-user-id', userId)
+          .send({
+            ticketTypeId: testTicketType.id,
+            quantity: 1,
+            idempotencyKey: randomUUID(),
+          }),
+      ),
+    );
+
+    const successCount = attempts.filter(
+      (response) => response.status === 201,
+    ).length;
+    expect(successCount).toBe(2);
+
+    const quota = await prisma.userTicketQuota.findUnique({
+      where: {
+        userId_ticketTypeId: {
+          userId,
+          ticketTypeId: testTicketType.id,
+        },
+      },
+    });
+
+    expect(quota?.reservedCount ?? 0).toBeLessThanOrEqual(2);
+    expect(quota?.paidCount ?? 0).toBe(0);
+  });
+
+  it('does not oversell the last available ticket under concurrent requests', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Last Ticket Contention',
+      zoneCode: 'LAST1',
+      price: '500000.00',
+      capacity: 1,
+      perUserLimit: 1,
+    });
+
+    const attempts = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        request(app.getHttpServer())
+          .post('/reservations')
+          .set('x-user-id', randomUUID())
+          .send({
+            ticketTypeId: testTicketType.id,
+            quantity: 1,
+            idempotencyKey: randomUUID(),
+          }),
+      ),
+    );
+
+    const successCount = attempts.filter(
+      (response) => response.status === 201,
+    ).length;
+    expect(successCount).toBe(1);
+
+    const inventory = await prisma.inventoryCounter.findUnique({
+      where: {
+        ticketTypeId: testTicketType.id,
+      },
+    });
+
+    expect(
+      (inventory?.reservedCount ?? 0) + (inventory?.soldCount ?? 0),
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it('returns renderable opaque QR token for newly issued ticket', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Renderable QR',
+      zoneCode: 'QR1',
+      price: '175000.00',
+      capacity: 4,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('x-user-id', userId)
+      .send({
+        orderId: orderRes.body.id,
+      });
+
+    const ticket = await prisma.ticket.findFirstOrThrow({
+      where: { orderId: orderRes.body.id },
+      orderBy: { sequenceNo: 'asc' },
+    });
+
+    const ticketRes = await request(app.getHttpServer())
+      .get(`/tickets/${ticket.id}`)
+      .set('x-user-id', userId);
+
+    expect(ticketRes.status).toBe(200);
+    expect(ticketRes.body.qrCode.mode).toBe('opaque_token');
+    expect(ticketRes.body.qrCode.renderable).toBe(true);
+    expect(typeof ticketRes.body.qrCode.value).toBe('string');
+    expect(ticketRes.body.qrCode.value.length).toBeGreaterThan(10);
+  });
+
+  it('expires reservation batch safely when worker reruns', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Expiry Rerun Safe',
+      zoneCode: 'EXP1',
+      price: '165000.00',
+      capacity: 3,
+      perUserLimit: 2,
+    });
+
+    const userId = randomUUID();
+
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+      });
+
+    await prisma.reservation.update({
+      where: { id: reservationRes.body.id },
+      data: {
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+
+    const firstRun = await inventoryService.expireReservationsBatch();
+    expect(firstRun.expiredCount).toBeGreaterThanOrEqual(1);
+
+    const afterFirstRun = await Promise.all([
+      prisma.reservation.findUniqueOrThrow({
+        where: { id: reservationRes.body.id },
+      }),
+      prisma.order.findUniqueOrThrow({
+        where: { id: orderRes.body.id },
+      }),
+      prisma.inventoryCounter.findUniqueOrThrow({
+        where: { ticketTypeId: testTicketType.id },
+      }),
+      prisma.userTicketQuota.findUniqueOrThrow({
+        where: {
+          userId_ticketTypeId: {
+            userId,
+            ticketTypeId: testTicketType.id,
+          },
+        },
+      }),
+    ]);
+
+    const [
+      reservationAfterFirstRun,
+      orderAfterFirstRun,
+      inventoryAfterFirstRun,
+      quotaAfterFirstRun,
+    ] = afterFirstRun;
+
+    expect(reservationAfterFirstRun.status).toBe('expired');
+    expect(orderAfterFirstRun.status).toBe('expired');
+    expect(inventoryAfterFirstRun.reservedCount).toBe(0);
+    expect(inventoryAfterFirstRun.soldCount).toBe(0);
+    expect(quotaAfterFirstRun.reservedCount).toBe(0);
+    expect(quotaAfterFirstRun.paidCount).toBe(0);
+
+    const secondRun = await inventoryService.expireReservationsBatch();
+    expect(secondRun.expiredCount).toBeGreaterThanOrEqual(0);
+
+    const [
+      reservationAfterSecondRun,
+      orderAfterSecondRun,
+      inventoryAfterSecondRun,
+      quotaAfterSecondRun,
+    ] = await Promise.all([
+      prisma.reservation.findUniqueOrThrow({
+        where: { id: reservationRes.body.id },
+      }),
+      prisma.order.findUniqueOrThrow({
+        where: { id: orderRes.body.id },
+      }),
+      prisma.inventoryCounter.findUniqueOrThrow({
+        where: { ticketTypeId: testTicketType.id },
+      }),
+      prisma.userTicketQuota.findUniqueOrThrow({
+        where: {
+          userId_ticketTypeId: {
+            userId,
+            ticketTypeId: testTicketType.id,
+          },
+        },
+      }),
+    ]);
+
+    expect(reservationAfterSecondRun.status).toBe('expired');
+    expect(orderAfterSecondRun.status).toBe('expired');
+    expect(inventoryAfterSecondRun.reservedCount).toBe(
+      inventoryAfterFirstRun.reservedCount,
+    );
+    expect(inventoryAfterSecondRun.soldCount).toBe(
+      inventoryAfterFirstRun.soldCount,
+    );
+    expect(quotaAfterSecondRun.reservedCount).toBe(
+      quotaAfterFirstRun.reservedCount,
+    );
+    expect(quotaAfterSecondRun.paidCount).toBe(quotaAfterFirstRun.paidCount);
+  });
+
+  it('rejects webhook with invalid signature when signing secret is configured', async () => {
+    const previousSecret = process.env.WEBHOOK_SIGNING_SECRET;
+    process.env.WEBHOOK_SIGNING_SECRET = 'test-secret';
+
+    try {
+      const testTicketType = await createTestTicketType({
+        name: 'Signed Webhook',
+        zoneCode: 'SIG1',
+        price: '155000.00',
+        capacity: 4,
+        perUserLimit: 2,
+      });
+
+      const userId = randomUUID();
+
+      const reservationRes = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('x-user-id', userId)
+        .send({
+          ticketTypeId: testTicketType.id,
+          quantity: 1,
+          idempotencyKey: randomUUID(),
+        });
+
+      const orderRes = await request(app.getHttpServer())
+        .post('/orders')
+        .set('x-user-id', userId)
+        .send({
+          reservationId: reservationRes.body.id,
+          idempotencyKey: randomUUID(),
+        });
+
+      const payload = {
+        orderId: orderRes.body.id,
+        provider: 'mock',
+        providerTxnId: `txn-${randomUUID()}`,
+        status: 'succeeded',
+        payload: { eventType: 'payment.succeeded' },
+      } as const;
+
+      const invalidSignatureRes = await request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set('x-webhook-signature', 'invalid-signature')
+        .send(payload);
+
+      expect(invalidSignatureRes.status).toBe(401);
+
+      const validSignatureRes = await request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature('test-secret', payload),
+        )
+        .send(payload);
+
+      expect(validSignatureRes.status).toBe(201);
+    } finally {
+      if (previousSecret === undefined) {
+        delete process.env.WEBHOOK_SIGNING_SECRET;
+      } else {
+        process.env.WEBHOOK_SIGNING_SECRET = previousSecret;
+      }
+    }
+  });
+
+  async function createTestTicketType(
+    input: Omit<TestTicketType, 'id' | 'concertId'>,
+  ) {
+    const id = randomUUID();
+    const concertId = randomUUID();
+    ticketTypeIds.push(id);
+    concertIds.push(concertId);
+
+    await prisma.ticketType.create({
+      data: {
+        id,
+        concertId,
+        zoneCode: input.zoneCode,
+        name: input.name,
+        price: input.price,
+        capacity: input.capacity,
+        perUserLimit: input.perUserLimit,
+        saleStartAt: new Date('2026-01-01T00:00:00.000Z'),
+        saleEndAt: new Date('2027-01-01T00:00:00.000Z'),
+      },
+    });
+
+    await prisma.inventoryCounter.create({
+      data: {
+        ticketTypeId: id,
+        totalCapacity: input.capacity,
+        reservedCount: 0,
+        soldCount: 0,
+        version: 0,
+      },
+    });
+
+    return {
+      id,
+      concertId,
+      ...input,
+    };
+  }
+});

@@ -18,7 +18,6 @@ export class PrismaService
     if (process.env.SKIP_PRISMA_CONNECT === 'true') {
       return;
     }
-
     await this.$disconnect();
   }
 }

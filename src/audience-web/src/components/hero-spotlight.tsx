@@ -66,14 +66,6 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
 
         {spotlightConcerts.length > 1 ? (
           <div className="mt-8 flex flex-wrap items-center gap-3" aria-label="Điều khiển concert nổi bật">
-            <button
-              type="button"
-              onClick={() => moveSpotlight("previous")}
-              className="grid h-11 w-11 place-items-center rounded border border-black/10 bg-white text-ticket-obsidian transition hover:border-ticket-green hover:text-ticket-green"
-              aria-label="Concert nổi bật trước"
-            >
-              <ArrowRightIcon className="h-5 w-5 rotate-180" />
-            </button>
             <div className="flex items-center gap-2">
               {spotlightConcerts.map((item, index) => (
                 <button
@@ -88,14 +80,6 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
                 />
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => moveSpotlight("next")}
-              className="grid h-11 w-11 place-items-center rounded border border-black/10 bg-white text-ticket-obsidian transition hover:border-ticket-green hover:text-ticket-green"
-              aria-label="Concert nổi bật tiếp theo"
-            >
-              <ArrowRightIcon className="h-5 w-5" />
-            </button>
           </div>
         ) : null}
       </div>

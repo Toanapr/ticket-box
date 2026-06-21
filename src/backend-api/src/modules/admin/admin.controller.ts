@@ -11,7 +11,7 @@ import { CurrentUser } from '../auth/current-user';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminService } from './admin.service';
-import type { ConcertBody, TicketTypeBody } from './admin.dto';
+import type { ConcertBody, TicketTypeBody } from './dto/admin.dto';
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('organizer')

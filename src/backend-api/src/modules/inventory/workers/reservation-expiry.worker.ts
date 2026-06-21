@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
-import { formatStructuredLog } from '../common/logging/structured-log.util';
-import { InventoryService } from '../modules/inventory/inventory.service';
+import { formatStructuredLog } from '../../../common/logging/structured-log.util';
+import { InventoryService } from '../inventory.service';
 
 @Injectable()
 export class ReservationExpiryWorker {

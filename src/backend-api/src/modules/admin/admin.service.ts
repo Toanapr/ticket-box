@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CurrentUser } from '../auth/current-user';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   ConcertBody,
   optionalConcertStatus,
@@ -21,7 +21,7 @@ import {
   parsePrice,
   requireString,
   TicketTypeBody,
-} from './admin.dto';
+} from './dto/admin.dto';
 
 @Injectable()
 export class AdminService {

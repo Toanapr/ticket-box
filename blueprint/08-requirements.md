@@ -6,8 +6,8 @@
 
 | Chức năng | Mô tả | Ghi chú thiết kế |
 |---|---|---|
-| Xem danh sách concert | Hiển thị concert sắp diễn ra, nghệ sĩ, địa điểm, thời gian, trạng thái mở bán. | Cache tại edge/Redis, invalidation khi admin cập nhật. |
-| Xem chi tiết concert | Hiển thị mô tả, artist bio, sơ đồ khu vực, loại vé, giá vé, thời điểm mở bán. | Tách nội dung tĩnh khỏi inventory động. |
+| Xem danh sách concert | Hiển thị concert sắp diễn ra, nghệ sĩ, địa điểm, thời gian, trạng thái mở bán. | Backend chỉ trả concert có `status = published` và `start_at >= current_time`; cache tại edge/Redis, invalidation khi admin cập nhật. |
+| Xem chi tiết concert | Hiển thị mô tả, artist bio, sơ đồ khu vực, loại vé, giá vé, thời điểm mở bán. | Backend chỉ trả concert có `status = published`; concert không tồn tại hoặc không ở trạng thái `published` trả `404 Not Found`; tách nội dung tĩnh khỏi inventory động. |
 | Xem sơ đồ chỗ ngồi/khu vực vé | SVG tương tác theo GA, SVIP, VIP, CAT1, CAT2. | SVG lưu object storage, metadata khu vé lấy từ API. |
 | Xem số vé còn lại | Hiển thị số vé còn lại theo khu gần realtime. | Không yêu cầu tuyệt đối realtime từng vé; checkout vẫn kiểm tra DB. |
 | Mua vé | Chọn loại vé, số lượng, submit order. | Backend kiểm tra quota, sale window, inventory, anti-bot token. |
@@ -21,7 +21,8 @@
 | Chức năng | Mô tả | Ghi chú thiết kế |
 |---|---|---|
 | Tạo concert | Nhập tên, mô tả, nghệ sĩ, địa điểm, thời gian, trạng thái publish. | Chỉ role organizer/admin. |
-| Cấu hình loại vé | Tên vé, giá, số lượng, khu vực, thời điểm mở bán. | Sau khi mở bán cần hạn chế sửa số lượng hoặc giá tùy policy. |
+| Cấu hình loại vé | Tên vé, giá, số lượng, khu vực, thời điểm mở bán. | Sau khi mở bán cần hạn chế sửa số lượng hoặc giá. Chỉ organizer/admin; khi tạo ticket type, backend phải tạo inventory counter tương ứng theo `04-database-design.md`.|
+| Cập nhật loại vé | Cập nhật thông tin loại vé trước khi bắt đầu mở bán. | Trong Phase 1, không cho phép sửa `capacity`, `price`, `per_user_limit`, `zone_code`, `sale_start_at` hoặc `sale_end_at` sau khi thời điểm mở bán bắt đầu. Nếu vi phạm, API trả `409 Conflict`. |
 | Cấu hình giới hạn vé mỗi tài khoản | Ví dụ SVIP tối đa 2 vé/user, CAT1 tối đa 4 vé/user. | Enforce ở backend bằng quota ledger trong cùng transaction reservation. |
 | Cập nhật concert | Sửa thông tin, hình ảnh, sơ đồ, nội dung hiển thị. | Invalidate cache sau thay đổi. |
 | Hủy concert | Chuyển trạng thái canceled, dừng bán, trigger refund/notification flow. | Cần workflow riêng vì liên quan payment/refund. |

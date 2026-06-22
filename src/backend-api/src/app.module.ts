@@ -3,10 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { resolve } from 'node:path';
 
-import { AdminModule } from './admin/admin.module';
-import { AuthModule } from './auth/auth.module';
 import { AppConfigModule } from './config/config.module';
-import { ConcertsModule } from './concerts/concerts.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ConcertsModule } from './modules/concert/concerts.module';
 
 import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';

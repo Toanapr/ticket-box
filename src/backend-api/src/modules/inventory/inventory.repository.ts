@@ -40,6 +40,7 @@ export class InventoryRepository {
 
       let expiredCount = 0;
       let expiredOrderCount = 0;
+      const expiredTicketTypeIds = new Set<string>();
 
       for (const reservation of expiredReservations) {
         const updatedReservation = await tx.reservation.updateMany({
@@ -57,6 +58,7 @@ export class InventoryRepository {
         }
 
         expiredCount += 1;
+        expiredTicketTypeIds.add(reservation.ticketTypeId);
 
         await tx.inventoryCounter.update({
           where: {
@@ -102,6 +104,7 @@ export class InventoryRepository {
         scannedCount: expiredReservations.length,
         expiredCount,
         expiredOrderCount,
+        expiredTicketTypeIds: [...expiredTicketTypeIds],
       };
     });
   }

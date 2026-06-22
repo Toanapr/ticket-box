@@ -21,6 +21,29 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## TicketBox backend
+
+The backend uses PostgreSQL through Prisma for source-of-truth data and Redis for Phase 2 cache/rate-limit protection.
+
+### Cache and rate limit configuration
+
+Start Redis with the backend compose file before running the API locally:
+
+```bash
+docker compose up -d redis
+```
+
+Relevant environment variables are listed in `.env.example`:
+
+- `REDIS_URL`: Redis connection URL, for example `redis://localhost:6379/0`.
+- `PUBLIC_CONCERT_CACHE_TTL_SECONDS`: TTL for public concert list/detail cache.
+- `INVENTORY_SUMMARY_CACHE_TTL_SECONDS`: short TTL for display-only ticket availability summaries.
+- `CACHE_TTL_JITTER_RATIO`: spreads cache expirations to reduce stampedes.
+- `CACHE_MISS_QUERY_BUDGET`: limits concurrent DB loads when public cache misses happen.
+
+Public `GET /concerts` and `GET /concerts/:id` use cache-aside reads. Ticket availability summaries are cached for display only; reservation and payment flows still read and update PostgreSQL inside transactions. Admin concert/ticket-type updates, reservation changes, expiry cleanup, and payment success invalidate affected cache keys.
+
+Rate-limited endpoints return `429` with `Retry-After`. Rejections are logged with the request correlation id. If Redis is unavailable, the guard falls back to a bounded in-memory counter so reservation throttling remains active instead of failing open.
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

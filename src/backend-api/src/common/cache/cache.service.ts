@@ -95,6 +95,20 @@ export class CacheService {
     }
   }
 
+  async ttl(key: string): Promise<number | null> {
+    try {
+      return await this.redisService.ttl(key);
+    } catch (error) {
+      this.logger.warn(
+        formatStructuredLog('cache_ttl_failed', {
+          key,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return null;
+    }
+  }
+
   async getOrLoad<T>(
     key: string,
     ttlSeconds: number,

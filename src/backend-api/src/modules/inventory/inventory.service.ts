@@ -81,10 +81,18 @@ export class InventoryService {
   }
 
   async expireReservationsBatch() {
-    return this.inventoryRepository.expireReservations(
+    const result = await this.inventoryRepository.expireReservations(
       this.getReservationExpiryBatchSize(),
       new Date(),
     );
+
+    await Promise.all(
+      result.expiredTicketTypeIds.map((ticketTypeId) =>
+        this.cacheInvalidationService.invalidateTicketType(ticketTypeId),
+      ),
+    );
+
+    return result;
   }
 
   private ensureDuplicatePayloadMatches(

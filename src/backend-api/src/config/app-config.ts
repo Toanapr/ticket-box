@@ -17,7 +17,7 @@ function loadEnvironmentFile() {
     return;
   }
 
-  const envPath = resolve(process.cwd(), '.env');
+  const envPath = resolve(__dirname, '..', '..', '.env');
   if (existsSync(envPath)) {
     process.loadEnvFile(envPath);
   }

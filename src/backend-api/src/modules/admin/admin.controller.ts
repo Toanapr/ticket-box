@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -18,6 +19,21 @@ import type { ConcertBody, TicketTypeBody } from './dto/admin.dto';
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  @Get('concerts')
+  listConcerts(@CurrentUser() user: CurrentUser) {
+    return this.adminService.listConcerts(user);
+  }
+
+  @Get('concerts/:id')
+  getConcert(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
+    return this.adminService.getConcert(user, id);
+  }
+
+  @Get('notifications')
+  listNotifications(@CurrentUser() user: CurrentUser) {
+    return this.adminService.listNotificationRecords(user);
+  }
 
   @Post('concerts')
   createConcert(@CurrentUser() user: CurrentUser, @Body() body: ConcertBody) {

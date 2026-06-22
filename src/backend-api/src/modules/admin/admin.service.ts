@@ -26,6 +26,50 @@ import {
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+  async listConcerts(user: CurrentUser) {
+    const organizationId = this.requireOrganizerOrganization(user);
+
+    return this.prisma.concert.findMany({
+      where: { organizationId },
+      include: {
+        ticketTypes: {
+          include: { inventory: true },
+          orderBy: { price: 'asc' },
+        },
+      },
+      orderBy: { startAt: 'desc' },
+    });
+  }
+
+  async getConcert(user: CurrentUser, id: string) {
+    const concert = await this.prisma.concert.findUnique({
+      where: { id },
+      include: {
+        ticketTypes: {
+          include: { inventory: true },
+          orderBy: { price: 'asc' },
+        },
+      },
+    });
+
+    if (!concert) {
+      throw new NotFoundException('Concert not found');
+    }
+
+    this.assertOrganizerOwnsConcert(user, concert.organizationId);
+
+    return concert;
+  }
+
+  async listNotificationRecords(user: CurrentUser) {
+    const organizationId = this.requireOrganizerOrganization(user);
+
+    return this.prisma.notificationRecord.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
 
   async createConcert(user: CurrentUser, body: ConcertBody) {
     const organizationId = this.requireOrganizerOrganization(user);

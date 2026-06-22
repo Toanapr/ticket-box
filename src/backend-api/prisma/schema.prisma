@@ -28,10 +28,11 @@ enum ConcertStatus {
 }
 
 model Organization {
-  id       String    @id @default(uuid()) @db.Uuid
-  name     String
-  users    User[]
-  concerts Concert[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String
+  users               User[]
+  concerts            Concert[]
+  notificationRecords NotificationRecord[]
 
   @@map("organizations")
 }
@@ -231,4 +232,33 @@ model UserTicketQuota {
   @@id([userId, ticketTypeId])
   @@index([ticketTypeId])
   @@map("user_ticket_quotas")
+}
+
+enum NotificationStatus {
+  sent
+  failed
+}
+
+enum NotificationChannel {
+  in_app
+  email_mock
+}
+
+model NotificationRecord {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  eventType      String              @map("event_type")
+  orderId        String              @map("order_id") @db.Uuid
+  ownerUserId    String              @map("owner_user_id") @db.Uuid
+  ticketCount    Int                 @map("ticket_count")
+  channel        NotificationChannel
+  status         NotificationStatus
+  message        String
+  error          String?
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([orderId])
+  @@map("notification_records")
 }

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CacheInvalidationService } from '../../common/cache/cache-invalidation.service';
 import { DomainError } from '../../common/errors/domain-error';
 import { formatStructuredLog } from '../../common/logging/structured-log.util';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -10,6 +11,7 @@ export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
   constructor(
+    private readonly cacheInvalidationService: CacheInvalidationService,
     private readonly configService: ConfigService,
     private readonly inventoryRepository: InventoryRepository,
   ) {}
@@ -38,6 +40,9 @@ export class InventoryService {
         userId,
         dto,
         this.getReservationTtlMinutes(),
+      );
+      await this.cacheInvalidationService.invalidateTicketType(
+        reservation.ticketTypeId,
       );
       this.logger.log(
         formatStructuredLog('reservation_created', {

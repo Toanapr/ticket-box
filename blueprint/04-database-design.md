@@ -51,7 +51,15 @@ erDiagram
 | `organization_id` | UUID nullable | Ban tổ chức/scanner thuộc organization nào. |
 | `email` | text unique | Đăng nhập và thông báo. |
 | `role` | enum | `audience`, `organizer`, `scanner`, `system_admin`. |
+| `password_hash` | text | Mật khẩu đã hash; không lưu mật khẩu gốc. |
 | `status` | enum | active/disabled. |
+
+### `organizations`
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | UUID | Primary key. |
+| `name` | text | Tên đơn vị tổ chức. |
 
 ### `concerts`
 
@@ -61,6 +69,8 @@ erDiagram
 | `organization_id` | UUID | Chủ sở hữu concert. |
 | `title` | text | Tên concert. |
 | `venue` | text | Địa điểm. |
+| `artist_name` | text | Tên nghệ sĩ hoặc tên nhóm biểu diễn. |
+| `description` | text nullable | Nội dung mô tả concert. |
 | `start_at` | timestamptz | Thời gian diễn. |
 | `status` | enum | draft/published/canceled. |
 | `seating_map_object_key` | text | SVG trong object storage. |
@@ -89,11 +99,26 @@ erDiagram
 | `sold_count` | int | Vé đã thanh toán/phát hành. |
 | `version` | int | Optimistic locking nếu cần. |
 
-Invariant bắt buộc:
+Mỗi ticket type phải có đúng một row `inventory_counters`.
 
-```text
-sold_count + active_reserved_count <= total_capacity
-paid_user_ticket_count + active_reserved_user_ticket_count <= configured_user_limit
+Khi tạo ticket type, backend phải tạo `ticket_types` và `inventory_counters` trong cùng một database transaction.
+
+Khi thay đổi capacity, `ticket_types.capacity` và
+`inventory_counters.total_capacity` phải được cập nhật trong cùng một database transaction.
+
+Giá trị inventory ban đầu:
+inventory_counters.total_capacity = ticket_types.capacity
+inventory_counters.reserved_count = 0
+inventory_counters.sold_count = 0
+
+Invariant bắt buộc:
+```
+inventory_counters.total_capacity = ticket_types.capacity
+
+inventory_counters.sold_count + inventory_counters.reserved_count <= inventory_counters.total_capacity
+
+user_ticket_quotas.reserved_count + user_ticket_quotas.paid_count <= ticket_types.per_user_limit
+
 one successful payment confirmation issues ticket exactly once
 one ticket can have at most one accepted check-in
 ```

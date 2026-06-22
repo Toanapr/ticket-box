@@ -1,82 +1,84 @@
-export type ConcertStatus = "draft" | "published";
+export type ConcertStatus = "draft" | "published" | "canceled";
 
 export type TicketType = {
   id: string;
   concertId: string;
   zoneCode: string;
-  price: number;
+  name: string;
+  price: number | string;
   capacity: number;
-  saleStartsAt: string;
-  saleEndsAt: string;
+  saleStartAt: string;
+  saleEndAt: string;
   perUserLimit: number;
-  createdAt: string;
-  updatedAt: string;
+  availableCount?: number;
 };
 
 export type Concert = {
   id: string;
   title: string;
   venue: string;
-  startsAt: string;
+  artistName: string;
+  description?: string | null;
+  startAt: string;
   status: ConcertStatus;
+  seatingMapObjectKey: string;
+  publishedArtistBio: string;
   ticketTypes: TicketType[];
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type NotificationRecord = {
   id: string;
   eventType: "TicketIssued";
-  ticketId: string;
   orderId: string;
-  concertId: string;
+  ownerUserId: string;
+  ticketCount: number;
   channel: "in_app" | "email_mock";
   status: "sent" | "failed";
   message: string;
-  error?: string;
+  error?: string | null;
   createdAt: string;
 };
 
 export type ConcertPayload = {
   title: string;
   venue: string;
-  startsAt: string;
+  artistName: string;
+  description?: string | null;
+  startAt: string;
   status: ConcertStatus;
+  seatingMapObjectKey: string;
+  publishedArtistBio: string;
 };
 
 export type TicketTypePayload = {
   zoneCode: string;
-  price: number;
+  name: string;
+  price: number | string;
   capacity: number;
-  saleStartsAt: string;
-  saleEndsAt: string;
+  saleStartAt: string;
+  saleEndAt: string;
   perUserLimit: number;
 };
 
-export const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3001";
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const headers = new Headers(init?.headers);
 
-const adminHeaders = {
-  "x-user-role": process.env.NEXT_PUBLIC_ADMIN_ROLE ?? "organizer",
-  "x-organization-id": process.env.NEXT_PUBLIC_ORGANIZATION_ID ?? "org-demo",
-};
+  headers.set("Content-Type", "application/json");
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const isAdminPath = path.startsWith("/admin");
-
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await fetch(`/api/backend${path}`, {
     ...init,
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(isAdminPath ? adminHeaders : {}),
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(body?.message ?? `API request failed with ${response.status}`);
+    throw new Error(
+      body?.message ?? `API request failed with ${response.status}`,
+    );
   }
 
   return response.json() as Promise<T>;

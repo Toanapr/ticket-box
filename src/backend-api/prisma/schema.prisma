@@ -3,54 +3,262 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  audience
+  organizer
+  scanner
+  system_admin
+  service_account
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum ConcertStatus {
+  draft
+  published
+  canceled
+}
+
+model Organization {
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String
+  users               User[]
+  concerts            Concert[]
+  notificationRecords NotificationRecord[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String?           @map("organization_id") @db.Uuid
+  email          String            @unique
+  role           UserRole
+  passwordHash   String            @map("password_hash")
+  status         UserStatus        @default(active)
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  quotas         UserTicketQuota[]
+
+  @@index([organizationId])
+  @@map("users")
 }
 
 model Concert {
-  id             String       @id
-  organizationId String
-  title          String
-  venue          String
-  startsAt       DateTime
-  status         String
-  ticketTypes    TicketType[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                  String        @id @default(uuid()) @db.Uuid
+  organizationId      String        @map("organization_id") @db.Uuid
+  title               String
+  venue               String
+  artistName          String        @map("artist_name")
+  description         String?
+  startAt             DateTime      @map("start_at") @db.Timestamptz(6)
+  status              ConcertStatus @default(draft)
+  seatingMapObjectKey String        @map("seating_map_object_key")
+  publishedArtistBio  String        @map("published_artist_bio")
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  ticketTypes         TicketType[]
 
+  @@index([status, startAt])
   @@index([organizationId])
-  @@index([status])
+  @@map("concerts")
+}
+
+enum ReservationStatus {
+  active
+  confirmed
+  released
+  expired
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  issued
+  failed
+  expired
+  refund_required
+}
+
+enum PaymentStatus {
+  created
+  pending
+  succeeded
+  failed
+}
+
+enum TicketStatus {
+  issued
+  revoked
+  checked_in
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  ticketTypeId   String            @db.Uuid
+  quantity       Int
+  orderId        String?           @db.Uuid
+  status         ReservationStatus
+  expiresAt      DateTime          @db.Timestamptz(6)
+  idempotencyKey String
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+  ticketType     TicketType        @relation(fields: [ticketTypeId], references: [id])
+  order          Order?            @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, expiresAt])
+}
+
+model Order {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @db.Uuid
+  status         OrderStatus
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  idempotencyKey String
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+  reservations   Reservation[]
+  items          OrderItem[]
+  payments       Payment[]
+  tickets        Ticket[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id             String     @id @default(uuid()) @db.Uuid
+  orderId        String     @db.Uuid
+  reservationId  String     @db.Uuid
+  ticketTypeId   String     @db.Uuid
+  quantity       Int
+  unitPrice      Decimal    @db.Decimal(12, 2)
+  subtotalAmount Decimal    @db.Decimal(12, 2)
+  status         String
+  order          Order      @relation(fields: [orderId], references: [id])
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id])
+  tickets        Ticket[]
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  orderId       String        @db.Uuid
+  provider      String
+  providerTxnId String?
+  status        PaymentStatus
+  payloadHash   String?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  order         Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId, status])
+}
+
+model Ticket {
+  id           String       @id @default(uuid()) @db.Uuid
+  orderId      String       @db.Uuid
+  orderItemId  String       @db.Uuid
+  ticketTypeId String       @db.Uuid
+  ownerUserId  String       @db.Uuid
+  qrToken      String?
+  qrTokenHash  String
+  sequenceNo   Int
+  status       TicketStatus
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(6)
+  order        Order        @relation(fields: [orderId], references: [id])
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id])
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@unique([orderItemId, sequenceNo])
+  @@unique([qrToken])
+  @@unique([qrTokenHash])
 }
 
 model TicketType {
-  id           String   @id
-  concertId    String
-  zoneCode     String
-  price        Int
+  id           String   @id @default(uuid()) @db.Uuid
+  concertId    String   @map("concert_id") @db.Uuid
+  zoneCode     String   @map("zone_code")
+  name         String
+  price        Decimal  @db.Decimal(12, 2)
   capacity     Int
-  saleStartsAt DateTime
-  saleEndsAt   DateTime
-  perUserLimit Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  concert      Concert  @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  perUserLimit Int      @map("per_user_limit")
+  saleStartAt  DateTime @map("sale_start_at") @db.Timestamptz(6)
+  saleEndAt    DateTime @map("sale_end_at") @db.Timestamptz(6)
+
+  // Relations
+  concert      Concert           @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  inventory    InventoryCounter?
+  quotas       UserTicketQuota[]
+  reservations Reservation[]
+  orderItems   OrderItem[]
+  tickets      Ticket[]
 
   @@index([concertId])
+  @@map("ticket_types")
+}
+
+model InventoryCounter {
+  ticketTypeId  String @id @map("ticket_type_id") @db.Uuid
+  totalCapacity Int    @map("total_capacity")
+  reservedCount Int    @default(0) @map("reserved_count")
+  soldCount     Int    @default(0) @map("sold_count")
+  version       Int    @default(0)
+
+  // Relations
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_counters")
+}
+
+model UserTicketQuota {
+  userId        String @map("user_id") @db.Uuid
+  ticketTypeId  String @map("ticket_type_id") @db.Uuid
+  reservedCount Int    @default(0) @map("reserved_count")
+  paidCount     Int    @default(0) @map("paid_count")
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketTypeId])
+  @@index([ticketTypeId])
+  @@map("user_ticket_quotas")
+}
+
+enum NotificationStatus {
+  sent
+  failed
+}
+
+enum NotificationChannel {
+  in_app
+  email_mock
 }
 
 model NotificationRecord {
-  id        String   @id
-  eventType String
-  ticketId  String
-  orderId   String
-  concertId String
-  channel   String
-  status    String
-  message   String
-  error     String?
-  createdAt DateTime @default(now())
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  eventType      String              @map("event_type")
+  orderId        String              @map("order_id") @db.Uuid
+  ownerUserId    String              @map("owner_user_id") @db.Uuid
+  ticketCount    Int                 @map("ticket_count")
+  channel        NotificationChannel
+  status         NotificationStatus
+  message        String
+  error          String?
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([eventType])
-  @@index([ticketId])
-  @@index([concertId])
+  @@index([organizationId, createdAt])
+  @@index([orderId])
+  @@map("notification_records")
 }

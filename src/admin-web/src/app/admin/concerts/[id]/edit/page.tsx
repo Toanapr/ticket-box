@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConcertForm } from "@/components/concert-form";
-import { apiFetch, Concert } from "@/lib/api";
+import { Concert } from "@/lib/api";
+import { serverApiFetch } from "@/lib/server-api";
 
 type EditConcertPageProps = {
   params: Promise<{
@@ -9,9 +10,13 @@ type EditConcertPageProps = {
   }>;
 };
 
-export default async function EditConcertPage({ params }: EditConcertPageProps) {
+export default async function EditConcertPage({
+  params,
+}: EditConcertPageProps) {
   const { id } = await params;
-  const concert = await apiFetch<Concert>(`/admin/concerts/${id}`).catch(() => null);
+  const concert = await serverApiFetch<Concert>(`/admin/concerts/${id}`).catch(
+    () => null,
+  );
 
   if (!concert) {
     notFound();
@@ -20,7 +25,10 @@ export default async function EditConcertPage({ params }: EditConcertPageProps) 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link href="/admin/concerts" className="text-sm font-medium text-emerald-700">
+        <Link
+          href="/admin/concerts"
+          className="text-sm font-medium text-emerald-700"
+        >
           Back to concerts
         </Link>
         <h1 className="mt-3 text-2xl font-bold text-slate-950">Edit concert</h1>

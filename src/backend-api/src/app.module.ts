@@ -1,12 +1,45 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { NotificationService } from './notification.service';
-import { PrismaService } from './prisma.service';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { resolve } from 'node:path';
+
+import { AdminModule } from './admin/admin.module';
+import { AuthModule } from './auth/auth.module';
+import { AppConfigModule } from './config/config.module';
+import { ConcertsModule } from './concerts/concerts.module';
+
+import { HealthModule } from './modules/health/health.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { OrderModule } from './modules/order/order.module';
+import { PaymentModule } from './modules/payment/payment.module';
+import { TicketModule } from './modules/ticket/ticket.module';
+
+import { PrismaModule } from './prisma/prisma.module';
+
+const backendEnvFilePath = resolve(__dirname, '..', '.env');
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService, NotificationService, PrismaService],
+  imports: [
+    // Cấu hình hệ thống
+    ConfigModule.forRoot({
+      envFilePath: backendEnvFilePath,
+      isGlobal: true,
+    }),
+    ScheduleModule.forRoot(),
+    AppConfigModule,
+    PrismaModule,
+
+    // Feature Modules
+    AuthModule,
+    ConcertsModule,
+    AdminModule,
+    HealthModule,
+    InventoryModule,
+    OrderModule,
+    PaymentModule,
+    TicketModule,
+  ],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}

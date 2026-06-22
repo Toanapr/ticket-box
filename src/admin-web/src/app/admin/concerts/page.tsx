@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { apiFetch, Concert } from "@/lib/api";
+import { Concert } from "@/lib/api";
+import { serverApiFetch } from "@/lib/server-api";
 import { formatDateTime } from "@/lib/format";
 
 async function getConcerts() {
   try {
-    return await apiFetch<Concert[]>("/admin/concerts");
+    return await serverApiFetch<Concert[]>("/admin/concerts");
   } catch {
     return [];
   }
@@ -45,17 +46,21 @@ export default async function ConcertsPage() {
           <tbody className="divide-y divide-slate-200">
             {concerts.map((concert) => (
               <tr key={concert.id}>
-                <td className="px-4 py-3 font-medium text-slate-950">{concert.title}</td>
+                <td className="px-4 py-3 font-medium text-slate-950">
+                  {concert.title}
+                </td>
                 <td className="px-4 py-3 text-slate-700">{concert.venue}</td>
                 <td className="px-4 py-3 text-slate-700">
-                  {formatDateTime(concert.startsAt)}
+                  {formatDateTime(concert.startAt)}
                 </td>
                 <td className="px-4 py-3">
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700">
                     {concert.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{concert.ticketTypes.length}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {concert.ticketTypes.length}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
                     <Link

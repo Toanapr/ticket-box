@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
 
 export default function AdminLayout({
   children,
@@ -9,7 +10,10 @@ export default function AdminLayout({
     <div className="min-h-screen bg-slate-100">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link href="/admin/concerts" className="text-lg font-bold text-slate-950">
+          <Link
+            href="/admin/concerts"
+            className="text-lg font-bold text-slate-950"
+          >
             TicketBox Admin
           </Link>
           <nav className="flex items-center gap-2 text-sm font-medium text-slate-600">
@@ -25,6 +29,7 @@ export default function AdminLayout({
             >
               Notifications
             </Link>
+            <LogoutButton />
           </nav>
         </div>
       </header>

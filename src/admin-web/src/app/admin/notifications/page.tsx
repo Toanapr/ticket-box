@@ -1,9 +1,10 @@
-import { apiFetch, NotificationRecord } from "@/lib/api";
+import { NotificationRecord } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { serverApiFetch } from "@/lib/server-api";
 
 async function getNotifications() {
   try {
-    return await apiFetch<NotificationRecord[]>("/admin/notifications");
+    return await serverApiFetch<NotificationRecord[]>("/admin/notifications");
   } catch {
     return [];
   }
@@ -29,7 +30,8 @@ export default async function NotificationsPage() {
               <th className="px-4 py-3">Event</th>
               <th className="px-4 py-3">Channel</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Ticket</th>
+              <th className="px-4 py-3">Order</th>
+              <th className="px-4 py-3">Tickets</th>
               <th className="px-4 py-3">Message</th>
             </tr>
           </thead>
@@ -42,13 +44,20 @@ export default async function NotificationsPage() {
                 <td className="px-4 py-3 font-medium text-slate-950">
                   {notification.eventType}
                 </td>
-                <td className="px-4 py-3 text-slate-700">{notification.channel}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {notification.channel}
+                </td>
                 <td className="px-4 py-3">
                   <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700">
                     {notification.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{notification.ticketId}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {notification.orderId}
+                </td>
+                <td className="px-4 py-3 text-slate-700">
+                  {notification.ticketCount}
+                </td>
                 <td className="px-4 py-3 text-slate-700">
                   {notification.error ?? notification.message}
                 </td>

@@ -10,7 +10,9 @@ type TicketTypesManagerProps = {
 };
 
 export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
-  const [editingTicketType, setEditingTicketType] = useState<TicketType | null>(null);
+  const [editingTicketType, setEditingTicketType] = useState<TicketType | null>(
+    null,
+  );
 
   return (
     <div className="space-y-6">
@@ -48,14 +50,18 @@ export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
                 <td className="px-4 py-3 text-slate-700">
                   {formatCurrency(ticketType.price)} VND
                 </td>
-                <td className="px-4 py-3 text-slate-700">{ticketType.capacity}</td>
                 <td className="px-4 py-3 text-slate-700">
-                  {formatDateTime(ticketType.saleStartsAt)}
+                  {ticketType.capacity}
                 </td>
                 <td className="px-4 py-3 text-slate-700">
-                  {formatDateTime(ticketType.saleEndsAt)}
+                  {formatDateTime(ticketType.saleStartAt)}
                 </td>
-                <td className="px-4 py-3 text-slate-700">{ticketType.perUserLimit}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {formatDateTime(ticketType.saleEndAt)}
+                </td>
+                <td className="px-4 py-3 text-slate-700">
+                  {ticketType.perUserLimit}
+                </td>
                 <td className="px-4 py-3">
                   <button
                     type="button"

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TicketTypesManager } from "@/components/ticket-types-manager";
-import { apiFetch, Concert } from "@/lib/api";
+import { Concert } from "@/lib/api";
+import { serverApiFetch } from "@/lib/server-api";
 
 type TicketTypesPageProps = {
   params: Promise<{
@@ -9,9 +10,13 @@ type TicketTypesPageProps = {
   }>;
 };
 
-export default async function TicketTypesPage({ params }: TicketTypesPageProps) {
+export default async function TicketTypesPage({
+  params,
+}: TicketTypesPageProps) {
   const { id } = await params;
-  const concert = await apiFetch<Concert>(`/admin/concerts/${id}`).catch(() => null);
+  const concert = await serverApiFetch<Concert>(`/admin/concerts/${id}`).catch(
+    () => null,
+  );
 
   if (!concert) {
     notFound();
@@ -20,7 +25,10 @@ export default async function TicketTypesPage({ params }: TicketTypesPageProps) 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/concerts" className="text-sm font-medium text-emerald-700">
+        <Link
+          href="/admin/concerts"
+          className="text-sm font-medium text-emerald-700"
+        >
           Back to concerts
         </Link>
         <h1 className="mt-3 text-2xl font-bold text-slate-950">Ticket types</h1>

@@ -17,8 +17,14 @@ export function formatDateTime(value: string): string {
   return `${month} ${day}, ${year}, ${hours12}:${minutes} ${period}`;
 }
 
-export function formatCurrency(value: number): string {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+export function formatCurrency(value: number | string): string {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return String(value);
+  }
+
+  return String(numericValue).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

@@ -13,7 +13,9 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(concert?.title ?? "");
   const [venue, setVenue] = useState(concert?.venue ?? "");
-  const [startsAt, setStartsAt] = useState(toDateTimeLocalValue(concert?.startsAt));
+  const [startAt, setStartAt] = useState(
+    toDateTimeLocalValue(concert?.startAt),
+  );
   const [status, setStatus] = useState<ConcertPayload["status"]>(
     concert?.status ?? "draft",
   );
@@ -24,7 +26,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     event.preventDefault();
     setError("");
 
-    if (!title.trim() || !venue.trim() || !startsAt) {
+    if (!title.trim() || !venue.trim() || !startAt) {
       setError("Title, venue, and start time are required.");
       return;
     }
@@ -32,12 +34,13 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     setIsSaving(true);
 
     try {
-      const payload: ConcertPayload = {
+      const payload = buildConcertPayload({
         title,
         venue,
-        startsAt,
+        startAt,
         status,
-      };
+        concert,
+      });
 
       if (mode === "create") {
         await apiFetch<Concert>("/admin/concerts", {
@@ -54,7 +57,9 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
       router.push("/admin/concerts");
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save concert.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to save concert.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -86,8 +91,8 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         <span className="text-sm font-medium text-slate-700">Start time</span>
         <input
           type="datetime-local"
-          value={startsAt}
-          onChange={(event) => setStartsAt(event.target.value)}
+          value={startAt}
+          onChange={(event) => setStartAt(event.target.value)}
           className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
           required
         />
@@ -104,20 +109,62 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         >
           <option value="draft">Draft</option>
           <option value="published">Published</option>
+          <option value="canceled">Canceled</option>
         </select>
       </label>
 
-      {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+      {error ? (
+        <p className="text-sm font-medium text-red-700">{error}</p>
+      ) : null}
 
       <button
         type="submit"
         disabled={isSaving}
         className="h-11 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
       >
-        {isSaving ? "Saving..." : mode === "create" ? "Create concert" : "Save concert"}
+        {isSaving
+          ? "Saving..."
+          : mode === "create"
+            ? "Create concert"
+            : "Save concert"}
       </button>
     </form>
   );
+}
+
+function buildConcertPayload(input: {
+  title: string;
+  venue: string;
+  startAt: string;
+  status: ConcertPayload["status"];
+  concert?: Concert;
+}): ConcertPayload {
+  const title = input.title.trim();
+  const venue = input.venue.trim();
+  const fallbackObjectKey = `seating-maps/${slugify(title)}.svg`;
+
+  return {
+    title,
+    venue,
+    artistName: input.concert?.artistName ?? title,
+    description: input.concert?.description ?? null,
+    startAt: input.startAt,
+    status: input.status,
+    seatingMapObjectKey:
+      input.concert?.seatingMapObjectKey ?? fallbackObjectKey,
+    publishedArtistBio:
+      input.concert?.publishedArtistBio ?? `${title} live at ${venue}.`,
+  };
+}
+
+function slugify(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return slug || "concert";
 }
 
 function toDateTimeLocalValue(value?: string) {

@@ -6,8 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { CurrentUser } from '../auth/current-user';
+import { CacheInvalidationService } from '../../common/cache/cache-invalidation.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CurrentUser } from '../auth/current-user';
 import {
   ConcertBody,
   optionalConcertStatus,
@@ -25,7 +26,11 @@ import {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly cacheInvalidationService: CacheInvalidationService,
+    private readonly prisma: PrismaService,
+  ) {}
+
   async listConcerts(user: CurrentUser) {
     const organizationId = this.requireOrganizerOrganization(user);
 
@@ -74,7 +79,7 @@ export class AdminService {
   async createConcert(user: CurrentUser, body: ConcertBody) {
     const organizationId = this.requireOrganizerOrganization(user);
 
-    return this.prisma.concert.create({
+    const concert = await this.prisma.concert.create({
       data: {
         organizationId,
         title: requireString(body.title, 'title'),
@@ -94,6 +99,10 @@ export class AdminService {
         ),
       },
     });
+
+    await this.cacheInvalidationService.invalidateConcert(concert.id);
+
+    return concert;
   }
 
   async updateConcert(user: CurrentUser, id: string, body: ConcertBody) {
@@ -128,10 +137,14 @@ export class AdminService {
       data.publishedArtistBio = publishedArtistBio;
     }
 
-    return this.prisma.concert.update({
+    const concert = await this.prisma.concert.update({
       where: { id: existing.id },
       data,
     });
+
+    await this.cacheInvalidationService.invalidateConcert(concert.id);
+
+    return concert;
   }
 
   async createTicketType(
@@ -149,8 +162,8 @@ export class AdminService {
 
     const capacity = parsePositiveInt(body.capacity, 'capacity');
 
-    return this.prisma.$transaction(async (tx) => {
-      const ticketType = await tx.ticketType.create({
+    const ticketType = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.ticketType.create({
         data: {
           concertId,
           zoneCode: requireString(body.zoneCode, 'zoneCode'),
@@ -165,15 +178,22 @@ export class AdminService {
 
       await tx.inventoryCounter.create({
         data: {
-          ticketTypeId: ticketType.id,
+          ticketTypeId: created.id,
           totalCapacity: capacity,
           reservedCount: 0,
           soldCount: 0,
         },
       });
 
-      return ticketType;
+      return created;
     });
+
+    await this.cacheInvalidationService.invalidateTicketType(
+      ticketType.id,
+      concertId,
+    );
+
+    return ticketType;
   }
 
   async updateTicketType(user: CurrentUser, id: string, body: TicketTypeBody) {
@@ -236,8 +256,8 @@ export class AdminService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.ticketType.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.ticketType.update({
         where: { id },
         data: {
           zoneCode: optionalString(body.zoneCode, 'zoneCode'),
@@ -262,8 +282,15 @@ export class AdminService {
         });
       }
 
-      return updated;
+      return item;
     });
+
+    await this.cacheInvalidationService.invalidateTicketType(
+      updated.id,
+      ticketType.concertId,
+    );
+
+    return updated;
   }
 
   private async findOwnedConcert(user: CurrentUser, concertId: string) {

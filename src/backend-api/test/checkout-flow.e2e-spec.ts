@@ -8,6 +8,8 @@ import { AppModule } from './../src/app.module';
 import { setupApp } from './../src/app.setup';
 import { createWebhookSignature } from './../src/common/utils/webhook-signature.util';
 import { InventoryService } from './../src/modules/inventory/inventory.service';
+import { PaymentReconciliationService } from './../src/modules/payment/payment-reconciliation.service';
+import { RedisService } from './../src/common/cache/redis.service';
 
 type TestTicketType = {
   id: string;
@@ -23,11 +25,18 @@ describe('Checkout flow and invariants (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaClient;
   let inventoryService: InventoryService;
+  let reconciliationService: PaymentReconciliationService;
   const ticketTypeIds: string[] = [];
   const userIds: string[] = [];
   const concertIds: string[] = [];
   const organizationId = randomUUID();
+  const webhookSecret = 'checkout-e2e-webhook-secret';
+  const previousWebhookSecret = process.env.WEBHOOK_SIGNING_SECRET;
+  const previousRedisUrl = process.env.REDIS_URL;
   beforeAll(async () => {
+    process.env.PAYMENT_PROVIDER_TIMEOUT_MS = '50';
+    process.env.WEBHOOK_SIGNING_SECRET = webhookSecret;
+    process.env.REDIS_URL = 'redis://localhost:6379/15';
     prisma = new PrismaClient();
     await prisma.organization.create({
       data: {
@@ -43,6 +52,14 @@ describe('Checkout flow and invariants (e2e)', () => {
     app = setupApp(moduleFixture.createNestApplication());
     await app.init();
     inventoryService = app.get(InventoryService);
+    reconciliationService = app.get(PaymentReconciliationService);
+    const redis = app.get(RedisService);
+    try {
+      const rateLimitKeys = await redis.keys('rate:*');
+      await redis.del(...rateLimitKeys);
+    } catch {
+      // Redis is optional in tests; the guard falls back to fresh local counters.
+    }
   });
 
   afterAll(async () => {
@@ -57,6 +74,13 @@ describe('Checkout flow and invariants (e2e)', () => {
       });
 
       const orderIds = [...new Set(orderItems.map((item) => item.orderId))];
+
+      await prisma.paymentProviderEvent.deleteMany({
+        where: { orderId: { in: orderIds } },
+      });
+      await prisma.idempotencyRecord.deleteMany({
+        where: { userId: { in: userIds } },
+      });
 
       await prisma.ticket.deleteMany({
         where: {
@@ -117,6 +141,16 @@ describe('Checkout flow and invariants (e2e)', () => {
     });
     await app.close();
     await prisma.$disconnect();
+    if (previousWebhookSecret === undefined) {
+      delete process.env.WEBHOOK_SIGNING_SECRET;
+    } else {
+      process.env.WEBHOOK_SIGNING_SECRET = previousWebhookSecret;
+    }
+    if (previousRedisUrl === undefined) {
+      delete process.env.REDIS_URL;
+    } else {
+      process.env.REDIS_URL = previousRedisUrl;
+    }
   });
 
   it('keeps reservation idempotent for duplicate requests', async () => {
@@ -221,6 +255,165 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(order?.tickets).toHaveLength(2);
   });
 
+  it('creates one provider intent and replays the durable response', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Intent Replay',
+      zoneCode: 'IREP',
+      price: '220000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const reservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const order = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservation.body.id,
+        idempotencyKey: randomUUID(),
+      });
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.body.id },
+    });
+    const key = randomUUID();
+
+    const first = await request(app.getHttpServer())
+      .post(`/payments/${payment.id}/intent`)
+      .set('x-user-id', userId)
+      .set('Idempotency-Key', key);
+    const replay = await request(app.getHttpServer())
+      .post(`/payments/${payment.id}/intent`)
+      .set('x-user-id', userId)
+      .set('Idempotency-Key', key);
+
+    expect(first.status).toBe(201);
+    expect(first.body.status).toBe('pending');
+    expect(replay.status).toBe(200);
+    expect(replay.body.checkoutUrl).toBe(first.body.checkoutUrl);
+    expect(
+      await prisma.payment.count({ where: { orderId: order.body.id } }),
+    ).toBe(1);
+    expect(
+      await prisma.idempotencyRecord.count({ where: { userId, key } }),
+    ).toBe(1);
+  });
+
+  it('moves an ambiguous timeout to reconciliation without breaking public reads', async () => {
+    process.env.MOCK_PAYMENT_MODE = 'timeout';
+    try {
+      const testTicketType = await createTestTicketType({
+        name: 'Provider Timeout',
+        zoneCode: 'PTO',
+        price: '230000.00',
+        capacity: 5,
+        perUserLimit: 2,
+      });
+      const userId = await createTestUser();
+      const reservation = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('x-user-id', userId)
+        .send({
+          ticketTypeId: testTicketType.id,
+          quantity: 1,
+          idempotencyKey: randomUUID(),
+        });
+      const order = await request(app.getHttpServer())
+        .post('/orders')
+        .set('x-user-id', userId)
+        .send({
+          reservationId: reservation.body.id,
+          idempotencyKey: randomUUID(),
+        });
+      const payment = await prisma.payment.findFirstOrThrow({
+        where: { orderId: order.body.id },
+      });
+
+      const [intent, publicRead] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/payments/${payment.id}/intent`)
+          .set('x-user-id', userId)
+          .set('Idempotency-Key', randomUUID()),
+        request(app.getHttpServer()).get(
+          `/concerts/${testTicketType.concertId}`,
+        ),
+      ]);
+
+      expect(intent.status).toBe(202);
+      expect(intent.body.status).toBe('pending_reconciliation');
+      expect(intent.body.degraded).toBe(true);
+      expect(publicRead.status).toBe(200);
+      const persisted = await prisma.payment.findUniqueOrThrow({
+        where: { id: payment.id },
+      });
+      expect(persisted.status).toBe('pending_reconciliation');
+      expect(persisted.reconciliationAfter).not.toBeNull();
+    } finally {
+      delete process.env.MOCK_PAYMENT_MODE;
+    }
+  });
+
+  it('recovers a lost webhook through idempotent reconciliation', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Lost Webhook',
+      zoneCode: 'LWH',
+      price: '240000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const reservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('x-user-id', userId)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const order = await request(app.getHttpServer())
+      .post('/orders')
+      .set('x-user-id', userId)
+      .send({
+        reservationId: reservation.body.id,
+        idempotencyKey: randomUUID(),
+      });
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.body.id },
+    });
+    await request(app.getHttpServer())
+      .post(`/payments/${payment.id}/intent`)
+      .set('x-user-id', userId)
+      .set('Idempotency-Key', randomUUID());
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: { reconciliationAfter: new Date(Date.now() - 1000) },
+    });
+
+    process.env.MOCK_PAYMENT_QUERY_STATUS = 'succeeded';
+    try {
+      const first = await reconciliationService.runBatch();
+      const second = await reconciliationService.runBatch();
+      expect(first.processed).toBeGreaterThanOrEqual(1);
+      expect(second.processed).toBe(0);
+    } finally {
+      delete process.env.MOCK_PAYMENT_QUERY_STATUS;
+    }
+
+    const persistedOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.body.id },
+      include: { payments: true, tickets: true },
+    });
+    expect(persistedOrder.status).toBe('issued');
+    expect(persistedOrder.payments[0]?.status).toBe('succeeded');
+    expect(persistedOrder.tickets).toHaveLength(1);
+  });
+
   it('does not create duplicate tickets on webhook replay', async () => {
     const testTicketType = await createTestTicketType({
       name: 'Webhook Replay',
@@ -258,13 +451,22 @@ describe('Checkout flow and invariants (e2e)', () => {
       payload: { eventType: 'payment.succeeded' },
     };
 
-    const first = await request(app.getHttpServer())
-      .post('/payments/webhook')
-      .send(webhookBody);
-
-    const second = await request(app.getHttpServer())
-      .post('/payments/webhook')
-      .send(webhookBody);
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature(webhookSecret, webhookBody),
+        )
+        .send(webhookBody),
+      request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature(webhookSecret, webhookBody),
+        )
+        .send(webhookBody),
+    ]);
 
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
@@ -275,6 +477,14 @@ describe('Checkout flow and invariants (e2e)', () => {
     });
 
     expect(tickets).toHaveLength(1);
+    expect(
+      await prisma.paymentProviderEvent.count({
+        where: {
+          provider: 'mock',
+          providerEventId: `${providerTxnId}:succeeded`,
+        },
+      }),
+    ).toBe(1);
   });
 
   it('marks order as failed for failed payment webhook without issuing tickets', async () => {
@@ -305,15 +515,20 @@ describe('Checkout flow and invariants (e2e)', () => {
         idempotencyKey: randomUUID(),
       });
 
+    const failedWebhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'mock',
+      providerTxnId: `txn-${randomUUID()}`,
+      status: 'failed' as const,
+      payload: { eventType: 'payment.failed' },
+    };
     const failedWebhook = await request(app.getHttpServer())
       .post('/payments/webhook')
-      .send({
-        orderId: orderRes.body.id,
-        provider: 'mock',
-        providerTxnId: `txn-${randomUUID()}`,
-        status: 'failed',
-        payload: { eventType: 'payment.failed' },
-      });
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, failedWebhookBody),
+      )
+      .send(failedWebhookBody);
 
     expect(failedWebhook.status).toBe(201);
     expect(failedWebhook.body.orderStatus).toBe('failed');
@@ -389,15 +604,20 @@ describe('Checkout flow and invariants (e2e)', () => {
       },
     });
 
+    const lateWebhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'mock',
+      providerTxnId: `txn-${randomUUID()}`,
+      status: 'succeeded' as const,
+      payload: { eventType: 'payment.succeeded' },
+    };
     const webhookRes = await request(app.getHttpServer())
       .post('/payments/webhook')
-      .send({
-        orderId: orderRes.body.id,
-        provider: 'mock',
-        providerTxnId: `txn-${randomUUID()}`,
-        status: 'succeeded',
-        payload: { eventType: 'payment.succeeded' },
-      });
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, lateWebhookBody),
+      )
+      .send(lateWebhookBody);
 
     expect(webhookRes.status).toBe(201);
     expect(webhookRes.body.orderStatus).toBe('refund_required');

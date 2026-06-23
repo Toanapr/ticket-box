@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CacheInvalidationService } from '../../common/cache/cache-invalidation.service';
 import { createStableHash } from '../../common/utils/hash.util';
 import { formatStructuredLog } from '../../common/logging/structured-log.util';
+import { PrismaService } from '../../prisma/prisma.service';
 import { TicketIssuanceService } from '../ticket/ticket-issuance.service';
 import { MockPaymentSuccessDto } from './dto/mock-payment-success.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
@@ -11,7 +13,9 @@ export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(
+    private readonly cacheInvalidationService: CacheInvalidationService,
     private readonly paymentRepository: PaymentRepository,
+    private readonly prisma: PrismaService,
     private readonly ticketIssuanceService: TicketIssuanceService,
   ) {}
 
@@ -26,6 +30,7 @@ export class PaymentService {
       userId,
       dto.orderId,
     );
+    await this.invalidateInventorySummaryForOrder(result.response.orderId);
     await this.notifyIssuedTicketsIfNeeded(result);
     this.logger.log(
       formatStructuredLog('payment_mock_success_completed', {
@@ -45,6 +50,8 @@ export class PaymentService {
       providerTxnId: dto.providerTxnId,
       status: dto.status,
       payload: dto.payload ?? null,
+      providerEventId: dto.providerEventId ?? null,
+      eventTimestamp: dto.eventTimestamp ?? null,
     });
 
     const result = await this.paymentRepository.processWebhook({
@@ -53,8 +60,11 @@ export class PaymentService {
       providerTxnId: dto.providerTxnId,
       status: dto.status,
       payloadHash,
+      providerEventId:
+        dto.providerEventId ?? `${dto.providerTxnId}:${dto.status}`,
     });
 
+    await this.invalidateInventorySummaryForOrder(result.response.orderId);
     await this.notifyIssuedTicketsIfNeeded(result);
     this.logger.log(
       formatStructuredLog('payment_webhook_processed', {
@@ -68,6 +78,59 @@ export class PaymentService {
       }),
     );
     return result.response;
+  }
+
+  private async invalidateInventorySummaryForOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        reservations: {
+          select: {
+            ticketTypeId: true,
+            ticketType: {
+              select: {
+                concertId: true,
+              },
+            },
+          },
+        },
+        items: {
+          select: {
+            ticketTypeId: true,
+            ticketType: {
+              select: {
+                concertId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return;
+    }
+
+    const affected = [
+      ...order.reservations.map((item) => ({
+        ticketTypeId: item.ticketTypeId,
+        concertId: item.ticketType.concertId,
+      })),
+      ...order.items.map((item) => ({
+        ticketTypeId: item.ticketTypeId,
+        concertId: item.ticketType.concertId,
+      })),
+    ];
+    const unique = new Map(affected.map((item) => [item.ticketTypeId, item]));
+
+    await Promise.all(
+      [...unique.values()].map((item) =>
+        this.cacheInvalidationService.invalidateTicketType(
+          item.ticketTypeId,
+          item.concertId,
+        ),
+      ),
+    );
   }
 
   private async notifyIssuedTicketsIfNeeded(result: {

@@ -139,6 +139,7 @@ export class OrderRepository {
           orderId: order.id,
           provider: 'mock',
           status: PaymentStatus.created,
+          providerIdempotencyKey: `payment:${order.id}:mock`,
         },
       });
 

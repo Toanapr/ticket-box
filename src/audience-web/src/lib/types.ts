@@ -34,7 +34,7 @@ export interface ConcertSummary {
   startsAt: string;
   status: ConcertStatus;
   description: string;
-  posterPath: string;
+  posterPath?: string;
 }
 
 export interface ConcertDetail extends ConcertSummary {

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
@@ -9,6 +8,7 @@ import { AlertIcon, CreditCardIcon } from "./icons";
 import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
 import { formatCurrency, formatDateTime, makeIdempotencyKey, serviceFee, shortVenue } from "@/lib/format";
 import type { BuyerInfo, ConcertDetail, PaymentMethod, ReservationErrorCode } from "@/lib/types";
+import { ConcertPoster } from "./concert-poster";
 
 type MockFailure = ReservationErrorCode | "NORMAL";
 
@@ -168,7 +168,7 @@ export function CheckoutClient({
         <h2 className="font-display text-xl font-black">Tóm tắt đơn hàng</h2>
         <div className="mt-5 flex gap-4 border-b border-black/10 pb-5">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded border border-black/10">
-            <Image src={concert.posterPath} alt={`${concert.title} poster`} fill sizes="80px" className="object-cover" />
+            <ConcertPoster src={concert.posterPath} title={concert.title} sizes="80px" compact />
           </div>
           <div>
             <div className="font-black leading-tight">{concert.title}</div>

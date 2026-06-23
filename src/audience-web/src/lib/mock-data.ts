@@ -3,14 +3,6 @@ import type { ConcertDetail } from "./types";
 const saleStartsAt = "2026-06-01T00:00:00+07:00";
 const saleEndsAt = "2026-12-31T23:59:59+07:00";
 
-export const zoneColors: Record<string, string> = {
-  svip: "#7c3aed",
-  vip: "#2563eb",
-  cat1: "#00b159",
-  cat2: "#d97706",
-  ga: "#64748b",
-};
-
 export const mockConcerts: ConcertDetail[] = [
   {
     id: "say-hi-2026",

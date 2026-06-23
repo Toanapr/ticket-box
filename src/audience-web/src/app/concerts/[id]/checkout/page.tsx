@@ -21,6 +21,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
     concert.ticketTypes.find((item) => item.id === query?.ticketType) ??
     concert.ticketTypes.find((item) => item.availableApprox > 0) ??
     concert.ticketTypes[0];
+  if (!ticketType) notFound();
 
   return (
     <PageShell>

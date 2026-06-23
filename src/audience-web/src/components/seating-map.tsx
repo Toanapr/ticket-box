@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { zoneColors } from "@/lib/mock-data";
-import type { ConcertDetail } from "@/lib/types";
+import { ticketZoneColors } from "@/lib/ticket-zone-styles";
+import type { ConcertDetail, TicketType } from "@/lib/types";
 
 export function SeatingMap({
   concert,
@@ -41,7 +41,7 @@ export function SeatingMap({
               type.id === selectedTicketTypeId ? "border-ticket-green bg-ticket-green/10" : "border-black/10 hover:border-ticket-obsidian"
             }`}
           >
-            <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: zoneColors[type.zone] }} />
+            <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: ticketZoneColors[type.zone] }} />
             {type.name}
           </Link>
         ))}
@@ -58,19 +58,19 @@ function ZoneShape({
   soldOut,
 }: {
   href: string;
-  zone: string;
+  zone: TicketType["zone"];
   label: string;
   selected: boolean;
   soldOut: boolean;
 }): React.ReactElement {
-  const pathByZone: Record<string, string> = {
+  const pathByZone: Record<TicketType["zone"], string> = {
     svip: "M120 60 L280 60 L290 110 L110 110 Z",
     vip: "M105 120 L295 120 L310 180 L90 180 Z",
     cat1: "M20 60 L95 110 L80 230 L10 180 Z",
     cat2: "M305 110 L380 60 L390 180 L320 230 Z",
     ga: "M85 190 L315 190 L330 260 L70 260 Z",
   };
-  const textByZone: Record<string, { x: number; y: number }> = {
+  const textByZone: Record<TicketType["zone"], { x: number; y: number }> = {
     svip: { x: 200, y: 90 },
     vip: { x: 200, y: 155 },
     cat1: { x: 50, y: 140 },
@@ -82,7 +82,7 @@ function ZoneShape({
     <Link href={href} scroll={false} aria-label={`Chọn khu ${label}`}>
       <path
         d={pathByZone[zone]}
-        fill={zoneColors[zone]}
+        fill={ticketZoneColors[zone]}
         opacity={soldOut ? 0.22 : selected ? 0.95 : 0.62}
         stroke={selected ? "#0d1118" : "transparent"}
         strokeWidth={selected ? 4 : 0}

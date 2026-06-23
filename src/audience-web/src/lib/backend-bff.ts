@@ -6,7 +6,7 @@ import type { AuthResponse, AuthUser } from "./auth-types";
 export const authCookieName = "ticketbox_access_token";
 
 export function getBackendBaseUrl(): string {
-  const configured = process.env.BACKEND_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL;
+  const configured = process.env.BACKEND_API_BASE_URL;
   if (!configured) throw new Error("BACKEND_API_BASE_URL is not configured");
   return configured.replace(/\/$/, "");
 }

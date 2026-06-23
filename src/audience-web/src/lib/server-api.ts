@@ -1,48 +1,79 @@
-import { findConcert, mockConcerts } from "./mock-data";
+import "server-only";
+
+import { normalizeConcertDetail, normalizeConcertList } from "./concert-api-adapter";
+import { getBackendBaseUrl } from "./backend-bff";
 import type { ConcertDetail, ConcertSummary } from "./types";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const requestTimeoutMs = 8_000;
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!apiBaseUrl) {
-    throw new Error("No API base URL configured");
+export type ConcertApiErrorKind = "configuration" | "rate-limit" | "timeout" | "upstream" | "contract";
+
+export class ConcertApiError extends Error {
+  constructor(
+    readonly kind: ConcertApiErrorKind,
+    message: string,
+    readonly status?: number,
+    readonly retryAfter?: string,
+  ) {
+    super(message);
+    this.name = "ConcertApiError";
   }
-
-  const response = await fetch(`${apiBaseUrl}${path}`, init);
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
-  }
-
-  return response.json() as Promise<T>;
 }
 
 export async function getConcerts(): Promise<ConcertSummary[]> {
-  if (apiBaseUrl) {
-    // TODO(Person 1 contract): normalize backend field names when GET /concerts is finalized.
-    return fetchJson<ConcertSummary[]>("/concerts", {
-      next: { revalidate: 30 },
-    });
+  const payload = await fetchConcertJson("/concerts", 30);
+  try {
+    return normalizeConcertList(payload);
+  } catch {
+    throw new ConcertApiError("contract", "Concert list response does not match the expected contract");
   }
-
-  return mockConcerts.map((concert) => ({
-    id: concert.id,
-    title: concert.title,
-    artists: concert.artists,
-    venue: concert.venue,
-    startsAt: concert.startsAt,
-    status: concert.status,
-    description: concert.description,
-    posterPath: concert.posterPath,
-  }));
 }
 
 export async function getConcertById(id: string): Promise<ConcertDetail | null> {
-  if (apiBaseUrl) {
-    // TODO(Person 1 contract): include inventory summary TTL metadata when GET /concerts/:id is finalized.
-    return fetchJson<ConcertDetail>(`/concerts/${id}`, {
-      next: { revalidate: 15 },
-    });
+  const payload = await fetchConcertJson(`/concerts/${encodeURIComponent(id)}`, 15, true);
+  if (payload === null) return null;
+
+  try {
+    return normalizeConcertDetail(payload);
+  } catch {
+    throw new ConcertApiError("contract", "Concert detail response does not match the expected contract");
+  }
+}
+
+async function fetchConcertJson(path: string, revalidate: number, allowNotFound = false): Promise<unknown | null> {
+  let baseUrl: string;
+  try {
+    baseUrl = getBackendBaseUrl();
+  } catch {
+    throw new ConcertApiError("configuration", "Concert API is not configured");
   }
 
-  return findConcert(id) ?? null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      signal: controller.signal,
+      next: { revalidate },
+    });
+
+    if (allowNotFound && response.status === 404) return null;
+    if (!response.ok) {
+      const retryAfter = response.headers.get("retry-after") ?? undefined;
+      const kind: ConcertApiErrorKind = response.status === 429 ? "rate-limit" : "upstream";
+      throw new ConcertApiError(kind, `Concert API request failed with status ${response.status}`, response.status, retryAfter);
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      throw new ConcertApiError("contract", "Concert API returned invalid JSON", response.status);
+    }
+  } catch (error) {
+    if (error instanceof ConcertApiError) throw error;
+    if (controller.signal.aborted) throw new ConcertApiError("timeout", "Concert API request timed out");
+    throw new ConcertApiError("upstream", "Concert API is unavailable");
+  } finally {
+    clearTimeout(timeout);
+  }
 }

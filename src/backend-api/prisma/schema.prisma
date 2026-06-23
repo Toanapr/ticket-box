@@ -89,8 +89,22 @@ enum OrderStatus {
 enum PaymentStatus {
   created
   pending
+  pending_reconciliation
   succeeded
   failed
+  expired
+}
+
+enum IdempotencyStatus {
+  processing
+  succeeded
+  failed_final
+}
+
+enum PaymentProviderEventStatus {
+  processing
+  processed
+  rejected
 }
 
 enum TicketStatus {
@@ -149,17 +163,68 @@ model OrderItem {
 }
 
 model Payment {
-  id            String        @id @default(uuid()) @db.Uuid
-  orderId       String        @db.Uuid
-  provider      String
-  providerTxnId String?
-  status        PaymentStatus
-  payloadHash   String?
-  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
-  order         Order         @relation(fields: [orderId], references: [id])
+  id                     String        @id @default(uuid()) @db.Uuid
+  orderId                String        @db.Uuid
+  provider               String
+  providerTxnId          String?
+  providerIntentId       String?
+  providerIdempotencyKey String        @unique
+  checkoutUrl            String?
+  status                 PaymentStatus
+  payloadHash            String?
+  uncertainSince         DateTime?     @db.Timestamptz(6)
+  reconciliationAfter    DateTime?     @db.Timestamptz(6)
+  reconciliationAttempts Int           @default(0)
+  leaseOwner             String?
+  leaseExpiresAt         DateTime?     @db.Timestamptz(6)
+  lastProviderError      String?
+  lastProviderAttemptAt  DateTime?     @db.Timestamptz(6)
+  createdAt              DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime      @updatedAt @db.Timestamptz(6)
+  order                  Order         @relation(fields: [orderId], references: [id])
 
+  @@unique([orderId, provider])
+  @@unique([provider, providerTxnId])
   @@index([orderId, status])
+  @@index([status, reconciliationAfter])
+}
+
+model IdempotencyRecord {
+  id                 String            @id @default(uuid()) @db.Uuid
+  userId             String            @db.Uuid
+  endpoint           String
+  key                String
+  requestHash        String
+  status             IdempotencyStatus
+  resourceId         String?           @db.Uuid
+  responseStatus     Int?
+  responseBody       Json?
+  processingOwner    String?
+  processingUntil    DateTime?         @db.Timestamptz(6)
+  providerDispatched Boolean           @default(false)
+  retainUntil        DateTime          @db.Timestamptz(6)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, endpoint, key])
+  @@index([status, processingUntil])
+}
+
+model PaymentProviderEvent {
+  id              String                     @id @default(uuid()) @db.Uuid
+  provider        String
+  providerEventId String
+  providerTxnId   String
+  orderId         String                     @db.Uuid
+  payloadHash     String
+  status          PaymentProviderEventStatus
+  responseBody    Json?
+  errorCode       String?
+  receivedAt      DateTime                   @default(now()) @db.Timestamptz(6)
+  processedAt     DateTime?                  @db.Timestamptz(6)
+
+  @@unique([provider, providerEventId])
+  @@index([orderId, receivedAt])
 }
 
 model Ticket {

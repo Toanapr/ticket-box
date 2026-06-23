@@ -19,11 +19,19 @@ describe('state transition maps', () => {
   it('allows only forward payment transitions', () => {
     expect(paymentTransitions[PaymentStatus.CREATED]).toEqual([
       PaymentStatus.PENDING,
+      PaymentStatus.PENDING_RECONCILIATION,
       PaymentStatus.SUCCEEDED,
       PaymentStatus.FAILED,
+      PaymentStatus.EXPIRED,
+    ]);
+    expect(paymentTransitions[PaymentStatus.PENDING_RECONCILIATION]).toEqual([
+      PaymentStatus.SUCCEEDED,
+      PaymentStatus.FAILED,
+      PaymentStatus.EXPIRED,
     ]);
     expect(paymentTransitions[PaymentStatus.SUCCEEDED]).toEqual([]);
     expect(paymentTransitions[PaymentStatus.FAILED]).toEqual([]);
+    expect(paymentTransitions[PaymentStatus.EXPIRED]).toEqual([]);
   });
 
   it('keeps refund_required as terminal order state', () => {

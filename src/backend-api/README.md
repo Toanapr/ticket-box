@@ -44,6 +44,16 @@ Relevant environment variables are listed in `.env.example`:
 Public `GET /concerts` and `GET /concerts/:id` use cache-aside reads. Ticket availability summaries are cached for display only; reservation and payment flows still read and update PostgreSQL inside transactions. Admin concert/ticket-type updates, reservation changes, expiry cleanup, and payment success invalidate affected cache keys.
 
 Rate-limited endpoints return `429` with `Retry-After`. Rejections are logged with the request correlation id. If Redis is unavailable, the guard falls back to a bounded in-memory counter so reservation throttling remains active instead of failing open.
+
+### Payment resilience
+
+Create the provider intent with `POST /payments/:paymentId/intent`, authenticated by `x-user-id` and a durable `Idempotency-Key`. A successful mock call returns the same checkout URL on replay. An ambiguous timeout returns `202` with `status: pending_reconciliation`; an open circuit returns `503`, `degraded: true`, and `Retry-After`. Never create another intent for an uncertain payment.
+
+Payment statuses are `created`, `pending`, `pending_reconciliation`, `succeeded`, `failed`, and `expired`. Order remains `pending_payment` while payment outcome is uncertain. Only a verified webhook or reconciliation result finalizes payment and issues tickets.
+
+`WEBHOOK_SIGNING_SECRET` is required outside test mode. Webhook events are durably deduplicated by provider and event id; payload hashes are retained for audit. Reconciliation claims due rows with a database lease, calls the provider outside database transactions, and uses the same transactional finalization path as webhook handling.
+
+Operational logs include `payment_provider_call`, `payment_circuit_transition`, `payment_pending_reconciliation`, `payment_reconciliation_batch`, and `payment_reconciliation_result`. They contain order/payment correlation and pending age, but no webhook secret or raw payload.
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

@@ -1,14 +1,14 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Headers,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { RateLimit } from '../../common/cache/rate-limit.decorator';
+import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { InventoryService } from './inventory.service';
 
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('audience')
 @Controller('reservations')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
@@ -20,26 +20,9 @@ export class InventoryController {
     { scope: 'device', limit: 20, windowSeconds: 60 },
   ])
   async createReservation(
-    @Headers('x-user-id') userId: string | undefined,
+    @CurrentUser() user: CurrentUser,
     @Body() dto: CreateReservationDto,
   ) {
-    return this.inventoryService.createReservation(
-      this.requireUserId(userId),
-      dto,
-    );
-  }
-
-  private requireUserId(userId: string | undefined): string {
-    const uuidV4Pattern =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (!userId || !uuidV4Pattern.test(userId)) {
-      throw new BadRequestException({
-        error: 'invalid_user_id',
-        message: 'x-user-id header must be a valid UUID v4',
-      });
-    }
-
-    return userId;
+    return this.inventoryService.createReservation(user.sub, dto);
   }
 }

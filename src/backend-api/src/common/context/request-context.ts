@@ -21,4 +21,11 @@ export const RequestContext = {
   getCorrelationId(): string | undefined {
     return storage.getStore()?.correlationId;
   },
+
+  setUserId(userId: string): void {
+    const store = storage.getStore();
+    if (store) {
+      store.userId = userId;
+    }
+  },
 };

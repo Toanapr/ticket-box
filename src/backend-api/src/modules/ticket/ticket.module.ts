@@ -4,8 +4,10 @@ import { TicketIssuanceService } from './ticket-issuance.service';
 import { TicketNotificationPublisher } from './ticket-notification.publisher';
 import { TicketRepository } from './ticket.repository';
 import { TicketService } from './ticket.service';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
+  imports: [AuthModule],
   controllers: [TicketController],
   providers: [
     TicketService,

@@ -14,8 +14,6 @@ export function setupApp(app: INestApplication): INestApplication {
       typeof headerValue === 'string' && headerValue.trim().length > 0
         ? headerValue
         : randomUUID();
-    const userIdHeader = req.headers['x-user-id'];
-    const userId = typeof userIdHeader === 'string' ? userIdHeader : null;
     const startedAt = Date.now();
 
     res.setHeader('x-correlation-id', correlationId);
@@ -34,7 +32,7 @@ export function setupApp(app: INestApplication): INestApplication {
         correlationId,
         method: req.method,
         path: req.originalUrl ?? req.url,
-        userId,
+        userId: null,
       },
       () => {
         logger.log(formatStructuredLog('request_started'));

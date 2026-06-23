@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from './jwt.service';
+import { RequestContext } from '../../common/context/request-context';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -21,9 +22,9 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Bearer token is required');
     }
 
-    request.user = this.jwtService.verify(
-      authorization.slice('Bearer '.length),
-    );
+    const user = this.jwtService.verify(authorization.slice('Bearer '.length));
+    request.user = user;
+    RequestContext.setUserId(user.sub);
     return true;
   }
 }

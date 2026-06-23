@@ -11,9 +11,10 @@ import { ResilientPaymentProvider } from './resilience/resilient-payment-provide
 import { PaymentReconciliationService } from './payment-reconciliation.service';
 import { PaymentIntentService } from './payment-intent.service';
 import { PaymentReconciliationWorker } from './workers/payment-reconciliation.worker';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TicketModule],
+  imports: [AuthModule, TicketModule],
   controllers: [PaymentController],
   providers: [
     PaymentService,

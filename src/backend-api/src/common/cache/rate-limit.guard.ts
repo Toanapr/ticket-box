@@ -16,6 +16,7 @@ import {
   RateLimitRule,
   RateLimitScope,
 } from './rate-limit.constants';
+import { JwtService } from '../../modules/auth/jwt.service';
 
 type LocalCounter = {
   count: number;
@@ -30,6 +31,7 @@ export class RateLimitGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly cacheService: CacheService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -133,11 +135,16 @@ export class RateLimitGuard implements CanActivate {
     }
 
     if (scope === 'user') {
-      const userHeader = request.headers['x-user-id'];
-      return (
-        request.user?.sub ??
-        (Array.isArray(userHeader) ? userHeader[0] : userHeader)
-      );
+      if (request.user?.sub) {
+        return request.user.sub;
+      }
+
+      const authorization = request.headers.authorization;
+      if (!authorization?.startsWith('Bearer ')) {
+        return undefined;
+      }
+
+      return this.jwtService.verify(authorization.slice('Bearer '.length)).sub;
     }
 
     const deviceHeader =

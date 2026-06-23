@@ -50,6 +50,8 @@ export class PaymentService {
       providerTxnId: dto.providerTxnId,
       status: dto.status,
       payload: dto.payload ?? null,
+      providerEventId: dto.providerEventId ?? null,
+      eventTimestamp: dto.eventTimestamp ?? null,
     });
 
     const result = await this.paymentRepository.processWebhook({
@@ -58,6 +60,8 @@ export class PaymentService {
       providerTxnId: dto.providerTxnId,
       status: dto.status,
       payloadHash,
+      providerEventId:
+        dto.providerEventId ?? `${dto.providerTxnId}:${dto.status}`,
     });
 
     await this.invalidateInventorySummaryForOrder(result.response.orderId);

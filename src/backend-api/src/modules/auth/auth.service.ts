@@ -12,7 +12,10 @@ import { hashPassword, verifyPassword } from './password';
 
 const DUMMY_PASSWORD_HASH = `scrypt:${'0'.repeat(32)}:${'0'.repeat(128)}`;
 
-type AuthenticatedUser = Pick<User, 'id' | 'email' | 'role' | 'organizationId'>;
+type AuthenticatedUser = Pick<
+  User,
+  'id' | 'email' | 'fullName' | 'role' | 'organizationId'
+>;
 
 @Injectable()
 export class AuthService {
@@ -30,6 +33,7 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: {
           email,
+          fullName: dto.fullName.trim(),
           passwordHash,
           role: 'audience',
           status: 'active',
@@ -63,13 +67,19 @@ export class AuthService {
     return this.createAuthResponse(user);
   }
 
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('User is not active');
+    }
+
+    return this.toPublicUser(user);
+  }
+
   private createAuthResponse(user: AuthenticatedUser) {
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
+      user: this.toPublicUser(user),
       accessToken: this.jwtService.sign({
         sub: user.id,
         email: user.email,
@@ -77,6 +87,15 @@ export class AuthService {
         organizationId: user.organizationId,
       }),
       tokenType: 'Bearer',
+    };
+  }
+
+  private toPublicUser(user: AuthenticatedUser) {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
     };
   }
 

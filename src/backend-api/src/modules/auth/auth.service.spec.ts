@@ -8,6 +8,7 @@ import { hashPassword } from './password';
 interface CreateUserArgs {
   data: {
     email: string;
+    fullName: string;
     passwordHash: string;
     role: 'audience';
     status: 'active';
@@ -36,6 +37,7 @@ describe('AuthService', () => {
     userCreate.mockResolvedValue({
       id: 'user-id',
       email: 'audience@example.com',
+      fullName: 'Audience User',
       role: 'audience',
       status: 'active',
       organizationId: null,
@@ -43,6 +45,7 @@ describe('AuthService', () => {
     });
 
     const result = await service.registerAudience({
+      fullName: ' Audience User ',
       email: ' Audience@Example.com ',
       password: 'Audience123!',
     });
@@ -54,6 +57,7 @@ describe('AuthService', () => {
     const createdData = createCalls[0][0].data;
     expect(createdData).toMatchObject({
       email: 'audience@example.com',
+      fullName: 'Audience User',
       role: 'audience',
       status: 'active',
       organizationId: null,
@@ -63,6 +67,7 @@ describe('AuthService', () => {
       user: {
         id: 'user-id',
         email: 'audience@example.com',
+        fullName: 'Audience User',
         role: 'audience',
       },
       accessToken: 'signed-token',
@@ -80,6 +85,7 @@ describe('AuthService', () => {
 
     await expect(
       service.registerAudience({
+        fullName: 'Audience User',
         email: 'audience@example.com',
         password: 'Audience123!',
       }),
@@ -90,6 +96,7 @@ describe('AuthService', () => {
     userFindUnique.mockResolvedValue({
       id: 'user-id',
       email: 'audience@example.com',
+      fullName: 'Audience User',
       passwordHash: await hashPassword('Audience123!'),
       role: 'audience',
       status: 'active',
@@ -103,6 +110,25 @@ describe('AuthService', () => {
 
     expect(result.accessToken).toBe('signed-token');
     expect(result.user.role).toBe('audience');
+  });
+
+  it('returns the active current user profile', async () => {
+    userFindUnique.mockResolvedValue({
+      id: 'user-id',
+      email: 'audience@example.com',
+      fullName: 'Audience User',
+      passwordHash: 'stored-password-hash',
+      role: 'audience',
+      status: 'active',
+      organizationId: null,
+    });
+
+    await expect(service.getCurrentUser('user-id')).resolves.toEqual({
+      id: 'user-id',
+      email: 'audience@example.com',
+      fullName: 'Audience User',
+      role: 'audience',
+    });
   });
 
   it('rejects invalid credentials', async () => {

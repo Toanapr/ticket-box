@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
+import { useAuth } from "./auth-provider";
 import { CreditCardIcon, TicketIcon, UsersIcon } from "./icons";
 import { AccountPanel, EmptyState, Metric, OrderCard, ProfileRow, TicketCard } from "./user-account-cards";
-import { getAuthStorageVersion, getCurrentUser, subscribeToAuthStorage } from "@/lib/auth-client";
 import { formatCurrency } from "@/lib/format";
 import {
   getFallbackUserAccountSnapshot,
@@ -17,13 +17,14 @@ const boughtStatuses = new Set(["PAID", "TICKET_ISSUED"]);
 
 export function UserAccountClient(): React.ReactElement {
   const storageVersion = useSyncExternalStore(subscribeToUserAccountStorage, getUserAccountStorageVersion, () => "__server__");
-  const authVersion = useSyncExternalStore(subscribeToAuthStorage, getAuthStorageVersion, () => "__server__");
+  const { user: authUser } = useAuth();
   const snapshot = useMemo(
     () => (storageVersion === "__server__" ? getFallbackUserAccountSnapshot() : getUserAccountSnapshot()),
     [storageVersion],
   );
-  const authUser = useMemo(() => (authVersion === "__server__" ? null : getCurrentUser()), [authVersion]);
-  const profile = authUser ?? snapshot.profile;
+  const profile = authUser
+    ? { fullName: authUser.fullName?.trim() || authUser.email, email: authUser.email }
+    : { fullName: snapshot.profile.fullName, email: snapshot.profile.email };
 
   const pendingOrders = useMemo(
     () => snapshot?.orders.filter((order) => pendingStatuses.has(order.status)) ?? [],
@@ -46,8 +47,7 @@ export function UserAccountClient(): React.ReactElement {
           <h1 className="mt-4 font-display text-3xl font-black tracking-tight md:text-4xl">{profile.fullName}</h1>
           <div className="mt-5 grid gap-3 text-sm text-slate-600">
             <ProfileRow label="Email" value={profile.email} />
-            <ProfileRow label="Số điện thoại" value={profile.phone} />
-            <ProfileRow label="Trạng thái" value={authUser ? "Đã đăng nhập" : "Khách"} />
+            <ProfileRow label="Trạng thái" value="Đã đăng nhập" />
           </div>
         </div>
 

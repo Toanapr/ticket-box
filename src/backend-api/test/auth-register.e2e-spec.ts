@@ -4,10 +4,12 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthController } from '../src/modules/auth/auth.controller';
 import { AuthService } from '../src/modules/auth/auth.service';
+import { JwtService } from '../src/modules/auth/jwt.service';
 
 describe('Audience registration contract (e2e)', () => {
   let app: INestApplication<App>;
   const registerAudience = jest.fn();
+  const getCurrentUser = jest.fn();
 
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
@@ -18,6 +20,18 @@ describe('Audience registration contract (e2e)', () => {
           useValue: {
             registerAudience,
             login: jest.fn(),
+            getCurrentUser,
+          },
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            verify: jest.fn().mockReturnValue({
+              sub: 'user-id',
+              email: 'audience@example.com',
+              role: 'audience',
+              organizationId: null,
+            }),
           },
         },
       ],
@@ -43,6 +57,7 @@ describe('Audience registration contract (e2e)', () => {
       user: {
         id: 'user-id',
         email: 'audience@example.com',
+        fullName: 'Audience User',
         role: 'audience',
       },
       accessToken: 'signed-token',
@@ -52,6 +67,7 @@ describe('Audience registration contract (e2e)', () => {
     await request(app.getHttpServer())
       .post('/auth/register')
       .send({
+        fullName: 'Audience User',
         email: 'audience@example.com',
         password: 'Audience123!',
       })
@@ -60,6 +76,7 @@ describe('Audience registration contract (e2e)', () => {
         user: {
           id: 'user-id',
           email: 'audience@example.com',
+          fullName: 'Audience User',
           role: 'audience',
         },
         accessToken: 'signed-token',
@@ -77,6 +94,28 @@ describe('Audience registration contract (e2e)', () => {
       .expect(400);
 
     expect(registerAudience).not.toHaveBeenCalled();
+  });
+
+  it('returns the current user for a valid bearer token', async () => {
+    getCurrentUser.mockResolvedValue({
+      id: 'user-id',
+      email: 'audience@example.com',
+      fullName: 'Audience User',
+      role: 'audience',
+    });
+
+    await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', 'Bearer signed-token')
+      .expect(200)
+      .expect({
+        id: 'user-id',
+        email: 'audience@example.com',
+        fullName: 'Audience User',
+        role: 'audience',
+      });
+
+    expect(getCurrentUser).toHaveBeenCalledWith('user-id');
   });
 
   afterAll(async () => {

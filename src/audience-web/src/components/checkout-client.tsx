@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
+import { useAuth } from "./auth-provider";
 import { AlertIcon, CreditCardIcon } from "./icons";
 import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
 import { formatCurrency, formatDateTime, makeIdempotencyKey, serviceFee, shortVenue } from "@/lib/format";
@@ -27,12 +28,13 @@ export function CheckoutClient({
   ticketTypeId: string;
 }): React.ReactElement {
   const router = useRouter();
+  const { user } = useAuth();
   const ticketType = concert.ticketTypes.find((item) => item.id === ticketTypeId) ?? concert.ticketTypes[0];
   const [quantity, setQuantity] = useState(1);
   const [buyer, setBuyer] = useState<BuyerInfo>({
-    fullName: "Nguyễn Văn Khán Giả",
-    phone: "0912345678",
-    email: "audience@ticketbox.vn",
+    fullName: user?.fullName?.trim() || "",
+    phone: "",
+    email: user?.email ?? "",
   });
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("VNPAY");
   const [mockFailure, setMockFailure] = useState<MockFailure>("NORMAL");

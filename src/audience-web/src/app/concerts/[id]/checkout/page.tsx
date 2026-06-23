@@ -3,6 +3,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CheckoutClient } from "@/components/checkout-client";
 import { PageShell } from "@/components/site-shell";
 import { getConcertById } from "@/lib/server-api";
+import { requireAuthUser } from "@/lib/require-auth-user";
 
 interface CheckoutPageProps {
   params: Promise<{ id: string }>;
@@ -12,6 +13,7 @@ interface CheckoutPageProps {
 export default async function CheckoutPage({ params, searchParams }: CheckoutPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;
+  await requireAuthUser(`/concerts/${id}/checkout${query?.ticketType ? `?ticketType=${encodeURIComponent(query.ticketType)}` : ""}`);
   const concert = await getConcertById(id);
   if (!concert) notFound();
 

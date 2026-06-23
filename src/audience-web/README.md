@@ -1,5 +1,11 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Backend and authentication
+
+Copy `.env.example` to `.env.local` and set `BACKEND_API_BASE_URL` to the Nest API URL. Audience login and registration go through same-origin Next.js route handlers; the backend JWT is stored only in an HttpOnly cookie. Reservation, order, payment, and ticket calls are proxied through the authenticated BFF allowlist.
+
+Run the backend Prisma migration before using registration so the nullable `users.full_name` column exists.
+
 ## Getting Started
 
 First, run the development server:

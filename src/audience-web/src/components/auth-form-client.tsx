@@ -3,44 +3,50 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { CheckIcon, CreditCardIcon, TicketIcon, UsersIcon } from "./icons";
+import { useAuth } from "./auth-provider";
+import { CheckIcon, TicketIcon, UsersIcon } from "./icons";
 import { loginUser, registerUser } from "@/lib/auth-client";
 
 type AuthMode = "login" | "register";
 
 interface AuthFormClientProps {
   mode: AuthMode;
+  nextPath?: string;
 }
 
 const fieldClass =
   "mt-2 min-h-12 w-full rounded border border-black/10 bg-ticket-alabaster px-4 text-base font-bold outline-none transition focus:border-ticket-green focus:bg-white";
 
-export function AuthFormClient({ mode }: AuthFormClientProps): React.ReactElement {
+export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps): React.ReactElement {
   const router = useRouter();
+  const { setUser } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const isRegister = mode === "register";
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setWorking(true);
 
     const data = new FormData(event.currentTarget);
     const result = isRegister
-      ? registerUser({
+      ? await registerUser({
           fullName: String(data.get("fullName") ?? ""),
-          phone: String(data.get("phone") ?? ""),
           email: String(data.get("email") ?? ""),
           password: String(data.get("password") ?? ""),
         })
-      : loginUser({
+      : await loginUser({
           email: String(data.get("email") ?? ""),
           password: String(data.get("password") ?? ""),
         });
 
     setMessage(result.message);
     setWorking(false);
-    if (result.ok) router.push("/user");
+    if (result.ok && result.user) {
+      setUser(result.user);
+      router.push(nextPath);
+      router.refresh();
+    }
   }
 
   return (
@@ -61,10 +67,7 @@ export function AuthFormClient({ mode }: AuthFormClientProps): React.ReactElemen
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-5">
           {isRegister ? (
-            <>
-              <AuthField label="Họ và tên" name="fullName" autoComplete="name" required />
-              <AuthField label="Số điện thoại" name="phone" type="tel" autoComplete="tel" required />
-            </>
+            <AuthField label="Họ và tên" name="fullName" autoComplete="name" minLength={2} maxLength={120} required />
           ) : null}
           <AuthField label="Email" name="email" type="email" autoComplete="email" required />
           <AuthField
@@ -72,7 +75,7 @@ export function AuthFormClient({ mode }: AuthFormClientProps): React.ReactElemen
             name="password"
             type="password"
             autoComplete={isRegister ? "new-password" : "current-password"}
-            minLength={6}
+            minLength={8}
             required
           />
 
@@ -93,7 +96,10 @@ export function AuthFormClient({ mode }: AuthFormClientProps): React.ReactElemen
 
         <p className="mt-6 text-sm font-bold text-slate-600">
           {isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"}{" "}
-          <Link href={isRegister ? "/login" : "/register"} className="text-ticket-green underline-offset-4 hover:underline">
+          <Link
+            href={`${isRegister ? "/login" : "/register"}${nextPath !== "/user" ? `?next=${encodeURIComponent(nextPath)}` : ""}`}
+            className="text-ticket-green underline-offset-4 hover:underline"
+          >
             {isRegister ? "Đăng nhập" : "Đăng ký"}
           </Link>
         </p>
@@ -107,14 +113,8 @@ export function AuthFormClient({ mode }: AuthFormClientProps): React.ReactElemen
           <AuthBenefit text="Mở nhanh e-ticket đã phát hành." />
           <AuthBenefit text="Dùng lại thông tin mua vé ở lần checkout sau." />
         </div>
-        <div className="mt-8 rounded border border-white/10 bg-white/5 p-4">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-ticket-green">
-            <CreditCardIcon className="h-4 w-4" />
-            Demo local
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            Dữ liệu đăng nhập hiện được lưu trong trình duyệt để phục vụ demo UI. Khi có backend auth, phần này sẽ đổi sang API/session thật.
-          </p>
+        <div className="mt-8 rounded border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300">
+          Phiên đăng nhập được bảo vệ bằng cookie HttpOnly và tự hết hạn theo access token.
         </div>
       </aside>
     </section>

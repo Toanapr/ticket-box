@@ -2,8 +2,9 @@ import { validate } from 'class-validator';
 import { RegisterAudienceDto } from './register-audience.dto';
 
 describe('RegisterAudienceDto', () => {
-  it('accepts a valid email and password', async () => {
+  it('accepts a valid full name, email and password', async () => {
     const dto = Object.assign(new RegisterAudienceDto(), {
+      fullName: 'Audience User',
       email: 'audience@example.com',
       password: 'Audience123!',
     });
@@ -11,7 +12,7 @@ describe('RegisterAudienceDto', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
-  it('rejects an invalid email and a short password', async () => {
+  it('rejects a missing full name, invalid email and short password', async () => {
     const dto = Object.assign(new RegisterAudienceDto(), {
       email: 'invalid-email',
       password: 'short',
@@ -20,7 +21,7 @@ describe('RegisterAudienceDto', () => {
     const errors = await validate(dto);
 
     expect(errors.map((error) => error.property)).toEqual(
-      expect.arrayContaining(['email', 'password']),
+      expect.arrayContaining(['fullName', 'email', 'password']),
     );
   });
 });

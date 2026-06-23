@@ -23,6 +23,16 @@
 
 ## TicketBox backend
 
+### Audience authentication
+
+`POST /auth/register` accepts `fullName`, `email`, and `password`. `POST /auth/login` returns the same user shape plus a Bearer access token. Authenticated clients can resolve the current active profile with `GET /auth/me`.
+
+Apply pending Prisma migrations after pulling schema changes:
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
 The backend uses PostgreSQL through Prisma for source-of-truth data and Redis for Phase 2 cache/rate-limit protection.
 
 ### Cache and rate limit configuration

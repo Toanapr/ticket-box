@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useState } from "react";
+import { useAuth } from "./auth-provider";
 import { CreditCardIcon, TicketIcon } from "./icons";
-import { getCurrentUser, logoutUser, subscribeToAuthStorage, getAuthStorageVersion } from "@/lib/auth-client";
+import { logoutUser } from "@/lib/auth-client";
 
 export function LogoutClient(): React.ReactElement {
   const router = useRouter();
-  const authVersion = useSyncExternalStore(subscribeToAuthStorage, getAuthStorageVersion, () => "__server__");
-  const user = authVersion === "__server__" ? null : getCurrentUser();
+  const { user, setUser } = useAuth();
+  const [working, setWorking] = useState(false);
 
-  function handleLogout(): void {
-    logoutUser();
+  async function handleLogout(): Promise<void> {
+    setWorking(true);
+    await logoutUser();
+    setUser(null);
     router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -30,10 +34,11 @@ export function LogoutClient(): React.ReactElement {
         <button
           type="button"
           onClick={handleLogout}
+          disabled={working}
           className="flex min-h-12 items-center justify-center gap-2 rounded bg-ticket-obsidian px-4 text-sm font-black uppercase tracking-wide text-white"
         >
           <CreditCardIcon className="h-5 w-5" />
-          Đăng xuất
+          {working ? "Đang đăng xuất..." : "Đăng xuất"}
         </button>
         <Link href="/user" className="flex min-h-12 items-center justify-center rounded border border-black/10 px-4 text-sm font-black uppercase tracking-wide">
           Quay lại tài khoản

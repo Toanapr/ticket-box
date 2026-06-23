@@ -1,6 +1,7 @@
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { PageShell } from "@/components/site-shell";
 import { TicketClient } from "@/components/ticket-client";
+import { requireAuthUser } from "@/lib/require-auth-user";
 
 interface TicketPageProps {
   params: Promise<{ id: string }>;
@@ -8,6 +9,7 @@ interface TicketPageProps {
 
 export default async function TicketPage({ params }: TicketPageProps): Promise<React.ReactElement> {
   const { id } = await params;
+  await requireAuthUser(`/tickets/${id}`);
 
   return (
     <PageShell>

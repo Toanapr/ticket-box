@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckIcon, CreditCardIcon, QrIcon } from "./icons";
 import { MockQr } from "./mock-qr";
-import { getOrder, markPaymentFailed, mockPaymentSuccess } from "@/lib/client-api";
+import { getOrder, mockPaymentSuccess } from "@/lib/client-api";
 import { formatCurrency } from "@/lib/format";
 import { findConcert } from "@/lib/mock-data";
 import type { OrderRecord } from "@/lib/types";
@@ -34,13 +34,6 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
   async function confirmPayment(): Promise<void> {
     setWorking(true);
     const nextOrder = await mockPaymentSuccess(orderId);
-    setOrder(nextOrder);
-    setWorking(false);
-  }
-
-  async function failPayment(): Promise<void> {
-    setWorking(true);
-    const nextOrder = await markPaymentFailed(orderId);
     setOrder(nextOrder);
     setWorking(false);
   }
@@ -120,14 +113,6 @@ export function OrderStatusClient({ orderId }: { orderId: string }): React.React
               className="min-h-12 rounded bg-ticket-green px-4 text-sm font-black uppercase tracking-wide text-white disabled:opacity-60"
             >
               Mock payment success
-            </button>
-            <button
-              type="button"
-              onClick={failPayment}
-              disabled={working}
-              className="min-h-12 rounded border border-black/10 px-4 text-sm font-black uppercase tracking-wide disabled:opacity-60"
-            >
-              Mock payment failure
             </button>
           </div>
         )}

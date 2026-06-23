@@ -4,9 +4,11 @@ import { CacheService } from './cache.service';
 import { CacheInvalidationService } from './cache-invalidation.service';
 import { RateLimitGuard } from './rate-limit.guard';
 import { RedisService } from './redis.service';
+import { AuthModule } from '../../modules/auth/auth.module';
 
 @Global()
 @Module({
+  imports: [AuthModule],
   providers: [
     RedisService,
     CacheService,

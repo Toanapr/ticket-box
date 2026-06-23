@@ -8,6 +8,7 @@ import {
   Res,
   UnauthorizedException,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +17,10 @@ import { MockPaymentSuccessDto } from './dto/mock-payment-success.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { PaymentService } from './payment.service';
 import { PaymentIntentService } from './payment-intent.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 
 @Controller('payments')
 export class PaymentController {
@@ -27,9 +32,11 @@ export class PaymentController {
 
   @Post(':paymentId/intent')
   @HttpCode(201)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('audience')
   async createIntent(
     @Param('paymentId') paymentId: string,
-    @Headers('x-user-id') userId: string | undefined,
+    @CurrentUser() user: CurrentUser,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -40,7 +47,7 @@ export class PaymentController {
       });
     }
     const result = await this.paymentIntentService.create(
-      this.requireUserId(userId),
+      user.sub,
       paymentId,
       idempotencyKey,
     );
@@ -51,11 +58,13 @@ export class PaymentController {
   }
 
   @Post('mock-success')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('audience')
   async mockSuccess(
-    @Headers('x-user-id') userId: string | undefined,
+    @CurrentUser() user: CurrentUser,
     @Body() dto: MockPaymentSuccessDto,
   ) {
-    return this.paymentService.mockSuccess(this.requireUserId(userId), dto);
+    return this.paymentService.mockSuccess(user.sub, dto);
   }
 
   @Post('webhook')
@@ -65,20 +74,6 @@ export class PaymentController {
   ) {
     this.verifySignatureIfConfigured(signature, dto);
     return this.paymentService.processWebhook(dto);
-  }
-
-  private requireUserId(userId: string | undefined): string {
-    const uuidV4Pattern =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (!userId || !uuidV4Pattern.test(userId)) {
-      throw new BadRequestException({
-        error: 'invalid_user_id',
-        message: 'x-user-id header must be a valid UUID v4',
-      });
-    }
-
-    return userId;
   }
 
   private verifySignatureIfConfigured(

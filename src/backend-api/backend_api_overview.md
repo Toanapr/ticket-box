@@ -9,12 +9,14 @@ reserve -> create order -> mock payment success/webhook -> issue ticket QR
 ```
 
 Mục tiêu chính:
+
 - không oversell
 - không vượt quota theo user
 - không issue ticket trùng
 - chịu được retry, replay, và request song song
 
 Code chính nằm tại:
+
 - [backend-api](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api)
 
 ## 2. Tech Stack
@@ -29,6 +31,7 @@ Code chính nằm tại:
 ### Inventory
 
 Phụ trách:
+
 - `POST /reservations`
 - kiểm tra sale window
 - kiểm tra available quantity
@@ -37,6 +40,7 @@ Phụ trách:
 - release hold khi hết hạn
 
 Files:
+
 - [inventory.controller.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/inventory/inventory.controller.ts)
 - [inventory.service.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/inventory/inventory.service.ts)
 - [inventory.repository.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/inventory/inventory.repository.ts)
@@ -45,11 +49,13 @@ Files:
 ### Order
 
 Phụ trách:
+
 - `POST /orders`
 - tạo order từ reservation hợp lệ
 - chống duplicate request
 
 Files:
+
 - [order.controller.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/order/order.controller.ts)
 - [order.service.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/order/order.service.ts)
 - [order.repository.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/order/order.repository.ts)
@@ -57,6 +63,7 @@ Files:
 ### Payment
 
 Phụ trách:
+
 - `POST /payments/mock-success`
 - `POST /payments/webhook`
 - payment replay handling
@@ -64,6 +71,7 @@ Phụ trách:
 - shared payment confirmation logic
 
 Files:
+
 - [payment.controller.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/payment/payment.controller.ts)
 - [payment.service.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/payment/payment.service.ts)
 - [payment.repository.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/payment/payment.repository.ts)
@@ -71,12 +79,14 @@ Files:
 ### Ticket
 
 Phụ trách:
+
 - issue ticket sau payment success
 - đọc ticket cho frontend
 - QR token và QR token hash
 - post-commit notification abstraction
 
 Files:
+
 - [ticket.controller.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/ticket/ticket.controller.ts)
 - [ticket.service.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/ticket/ticket.service.ts)
 - [ticket.repository.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/modules/ticket/ticket.repository.ts)
@@ -89,13 +99,19 @@ Files:
 
 Tạo reservation tạm thời.
 
+Authentication:
+
+- `Authorization: Bearer <access-token>` with role `audience`
+- user identity comes from the signed token `sub` claim
+
 Input:
-- `x-user-id`
+
 - `ticketTypeId`
 - `quantity`
 - `idempotencyKey`
 
 Behavior:
+
 - lock inventory row bằng `FOR UPDATE`
 - lock quota row bằng `FOR UPDATE`
 - reject nếu sale chưa mở/đã đóng
@@ -109,6 +125,7 @@ Behavior:
 Tạo order từ reservation.
 
 Behavior:
+
 - reservation phải thuộc user hiện tại
 - reservation phải còn `active`
 - reservation chưa được link vào order khác
@@ -121,6 +138,7 @@ Behavior:
 Dùng cho local/demo flow.
 
 Behavior:
+
 - xác nhận payment thành công
 - đi qua cùng logic với webhook success
 - confirm reservation
@@ -133,6 +151,7 @@ Behavior:
 Webhook mock cho payment result.
 
 Behavior:
+
 - optional signature verification qua `x-webhook-signature`
 - hash payload để audit/dedupe
 - replay-safe theo provider transaction và payload hash
@@ -165,6 +184,7 @@ Cho frontend lấy ticket và QR payload render được.
 ### Late Success
 
 Nếu payment success đến sau khi reservation hết hạn:
+
 - không issue ticket
 - order chuyển `refund_required`
 - payment vẫn giữ `succeeded`
@@ -205,20 +225,25 @@ Nếu payment success đến sau khi reservation hết hạn:
 - `checked_in`
 
 Transition map:
+
 - [state-transitions.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/common/constants/state-transitions.ts)
 
 ## 7. Database and Migration
 
 Schema:
+
 - [schema.prisma](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/prisma/schema.prisma)
 
 Baseline migration:
+
 - [migration.sql](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/prisma/migrations/0_init/migration.sql)
 
 Migration runbook:
+
 - [MIGRATIONS.md](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/prisma/MIGRATIONS.md)
 
 Important DB guarantees:
+
 - unique reservation idempotency key theo `(userId, idempotencyKey)`
 - unique order idempotency key theo `(userId, idempotencyKey)`
 - unique ticket theo `(orderItemId, sequenceNo)`
@@ -229,9 +254,11 @@ Important DB guarantees:
 ## 8. Config
 
 Env example:
+
 - [.env.example](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/.env.example)
 
 Các biến chính:
+
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `RESERVATION_TTL_MINUTES`
@@ -243,12 +270,14 @@ Các biến chính:
 ## 9. Logging and Correlation ID
 
 Đã có:
+
 - request correlation id qua header `x-correlation-id`
 - response trả lại `x-correlation-id`
 - structured log cho request/payment/reservation/worker
 - error response có `correlationId`
 
 Files:
+
 - [app.setup.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/app.setup.ts)
 - [request-context.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/common/context/request-context.ts)
 - [structured-log.util.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/src/common/logging/structured-log.util.ts)
@@ -269,6 +298,7 @@ Files:
 - [checkout-flow.e2e-spec.ts](/D:/VisualStudio/SoftwareDesignProj/ticket-box/src/backend-api/test/checkout-flow.e2e-spec.ts)
 
 Đã verify:
+
 - reservation idempotency
 - full checkout flow
 - webhook replay safety
@@ -284,6 +314,7 @@ Files:
 ## 11. Current Completion Status
 
 Đã hoàn thành theo issue Phase 1:
+
 - reservation flow
 - order flow
 - payment flow
@@ -294,4 +325,5 @@ Files:
 - logging/correlation id hardening
 
 Follow-up nhỏ ngoài scope issue:
+
 - Prisma vẫn cảnh báo seed config cũ trong `package.json` sẽ deprecated ở Prisma 7

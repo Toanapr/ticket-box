@@ -10,6 +10,7 @@ import { createWebhookSignature } from './../src/common/utils/webhook-signature.
 import { InventoryService } from './../src/modules/inventory/inventory.service';
 import { PaymentReconciliationService } from './../src/modules/payment/payment-reconciliation.service';
 import { RedisService } from './../src/common/cache/redis.service';
+import { JwtService } from './../src/modules/auth/jwt.service';
 
 type TestTicketType = {
   id: string;
@@ -26,6 +27,7 @@ describe('Checkout flow and invariants (e2e)', () => {
   let prisma: PrismaClient;
   let inventoryService: InventoryService;
   let reconciliationService: PaymentReconciliationService;
+  let jwtService: JwtService;
   const ticketTypeIds: string[] = [];
   const userIds: string[] = [];
   const concertIds: string[] = [];
@@ -53,6 +55,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     await app.init();
     inventoryService = app.get(InventoryService);
     reconciliationService = app.get(PaymentReconciliationService);
+    jwtService = app.get(JwtService);
     const redis = app.get(RedisService);
     try {
       const rateLimitKeys = await redis.keys('rate:*');
@@ -172,12 +175,12 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const first = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send(body);
 
     const second = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send(body);
 
     expect(first.status).toBe(201);
@@ -207,7 +210,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 2,
@@ -218,7 +221,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -229,7 +232,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const paymentRes = await request(app.getHttpServer())
       .post('/payments/mock-success')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         orderId: orderRes.body.id,
       });
@@ -266,7 +269,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     const userId = await createTestUser();
     const reservation = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -274,7 +277,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       });
     const order = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservation.body.id,
         idempotencyKey: randomUUID(),
@@ -286,11 +289,11 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const first = await request(app.getHttpServer())
       .post(`/payments/${payment.id}/intent`)
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .set('Idempotency-Key', key);
     const replay = await request(app.getHttpServer())
       .post(`/payments/${payment.id}/intent`)
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .set('Idempotency-Key', key);
 
     expect(first.status).toBe(201);
@@ -318,7 +321,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       const userId = await createTestUser();
       const reservation = await request(app.getHttpServer())
         .post('/reservations')
-        .set('x-user-id', userId)
+        .set('Authorization', bearerToken(userId))
         .send({
           ticketTypeId: testTicketType.id,
           quantity: 1,
@@ -326,7 +329,7 @@ describe('Checkout flow and invariants (e2e)', () => {
         });
       const order = await request(app.getHttpServer())
         .post('/orders')
-        .set('x-user-id', userId)
+        .set('Authorization', bearerToken(userId))
         .send({
           reservationId: reservation.body.id,
           idempotencyKey: randomUUID(),
@@ -338,7 +341,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       const [intent, publicRead] = await Promise.all([
         request(app.getHttpServer())
           .post(`/payments/${payment.id}/intent`)
-          .set('x-user-id', userId)
+          .set('Authorization', bearerToken(userId))
           .set('Idempotency-Key', randomUUID()),
         request(app.getHttpServer()).get(
           `/concerts/${testTicketType.concertId}`,
@@ -370,7 +373,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     const userId = await createTestUser();
     const reservation = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -378,7 +381,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       });
     const order = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservation.body.id,
         idempotencyKey: randomUUID(),
@@ -388,7 +391,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     });
     await request(app.getHttpServer())
       .post(`/payments/${payment.id}/intent`)
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .set('Idempotency-Key', randomUUID());
     await prisma.payment.update({
       where: { id: payment.id },
@@ -427,7 +430,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -436,7 +439,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -500,7 +503,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -509,7 +512,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -555,7 +558,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -564,7 +567,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -647,7 +650,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       Array.from({ length: 3 }, () =>
         request(app.getHttpServer())
           .post('/reservations')
-          .set('x-user-id', userId)
+          .set('Authorization', bearerToken(userId))
           .send({
             ticketTypeId: testTicketType.id,
             quantity: 1,
@@ -689,7 +692,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       testUserIds.map((userId) =>
         request(app.getHttpServer())
           .post('/reservations')
-          .set('x-user-id', userId)
+          .set('Authorization', bearerToken(userId))
           .send({
             ticketTypeId: testTicketType.id,
             quantity: 1,
@@ -727,7 +730,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -736,7 +739,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -744,7 +747,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/payments/mock-success')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         orderId: orderRes.body.id,
       });
@@ -756,7 +759,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const ticketRes = await request(app.getHttpServer())
       .get(`/tickets/${ticket.id}`)
-      .set('x-user-id', userId);
+      .set('Authorization', bearerToken(userId));
 
     expect(ticketRes.status).toBe(200);
     expect(ticketRes.body.qrCode.mode).toBe('opaque_token');
@@ -778,7 +781,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const reservationRes = await request(app.getHttpServer())
       .post('/reservations')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -787,7 +790,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     const orderRes = await request(app.getHttpServer())
       .post('/orders')
-      .set('x-user-id', userId)
+      .set('Authorization', bearerToken(userId))
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
@@ -896,7 +899,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
       const reservationRes = await request(app.getHttpServer())
         .post('/reservations')
-        .set('x-user-id', userId)
+        .set('Authorization', bearerToken(userId))
         .send({
           ticketTypeId: testTicketType.id,
           quantity: 1,
@@ -905,7 +908,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
       const orderRes = await request(app.getHttpServer())
         .post('/orders')
-        .set('x-user-id', userId)
+        .set('Authorization', bearerToken(userId))
         .send({
           reservationId: reservationRes.body.id,
           idempotencyKey: randomUUID(),
@@ -959,6 +962,15 @@ describe('Checkout flow and invariants (e2e)', () => {
     userIds.push(userId);
 
     return userId;
+  }
+
+  function bearerToken(userId: string): string {
+    return `Bearer ${jwtService.sign({
+      sub: userId,
+      email: `checkout-${userId}@test.local`,
+      role: 'audience',
+      organizationId: null,
+    })}`;
   }
   async function createTestTicketType(
     input: Omit<TestTicketType, 'id' | 'concertId'>,

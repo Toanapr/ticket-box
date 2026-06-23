@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { resolve } from 'node:path';
 
 import { CacheModule } from './common/cache/cache.module';
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AppConfigModule } from './config/config.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -29,6 +30,7 @@ const backendEnvFilePath = resolve(__dirname, '..', '.env');
     ScheduleModule.forRoot(),
     AppConfigModule,
     CacheModule,
+    IdempotencyModule,
     PrismaModule,
 
     // Feature Modules

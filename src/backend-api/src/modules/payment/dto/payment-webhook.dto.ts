@@ -23,6 +23,14 @@ export class PaymentWebhookDto {
 
   @IsOptional()
   @IsString()
+  providerEventId?: string;
+
+  @IsOptional()
+  @IsString()
+  eventTimestamp?: string;
+
+  @IsOptional()
+  @IsString()
   provider?: string;
 
   @IsIn(['succeeded', 'failed'])

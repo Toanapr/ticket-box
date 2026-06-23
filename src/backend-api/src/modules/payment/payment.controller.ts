@@ -3,21 +3,52 @@ import {
   Body,
   Controller,
   Headers,
+  HttpCode,
+  Param,
+  Res,
   UnauthorizedException,
   Post,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { verifyWebhookSignature } from '../../common/utils/webhook-signature.util';
 import { MockPaymentSuccessDto } from './dto/mock-payment-success.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { PaymentService } from './payment.service';
+import { PaymentIntentService } from './payment-intent.service';
 
 @Controller('payments')
 export class PaymentController {
   constructor(
     private readonly configService: ConfigService,
     private readonly paymentService: PaymentService,
+    private readonly paymentIntentService: PaymentIntentService,
   ) {}
+
+  @Post(':paymentId/intent')
+  @HttpCode(201)
+  async createIntent(
+    @Param('paymentId') paymentId: string,
+    @Headers('x-user-id') userId: string | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({
+        error: 'idempotency_key_required',
+        message: 'Idempotency-Key header is required',
+      });
+    }
+    const result = await this.paymentIntentService.create(
+      this.requireUserId(userId),
+      paymentId,
+      idempotencyKey,
+    );
+    response.status(result.httpStatus);
+    if (result.retryAfterSeconds)
+      response.setHeader('Retry-After', result.retryAfterSeconds);
+    return result.body;
+  }
 
   @Post('mock-success')
   async mockSuccess(
@@ -58,8 +89,15 @@ export class PaymentController {
       process.env.WEBHOOK_SIGNING_SECRET ??
       this.configService.get<string>('WEBHOOK_SIGNING_SECRET');
 
-    if (!secret) {
+    if (!secret && process.env.NODE_ENV === 'test') {
       return;
+    }
+
+    if (!secret) {
+      throw new UnauthorizedException({
+        error: 'webhook_signing_not_configured',
+        message: 'Webhook signing is not configured',
+      });
     }
 
     if (!verifyWebhookSignature(secret, payload, signature)) {

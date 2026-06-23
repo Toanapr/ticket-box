@@ -34,12 +34,25 @@ export const orderTransitions: Record<OrderStatus, OrderStatus[]> = {
 export const paymentTransitions: Record<PaymentStatus, PaymentStatus[]> = {
   [PaymentStatus.CREATED]: [
     PaymentStatus.PENDING,
+    PaymentStatus.PENDING_RECONCILIATION,
     PaymentStatus.SUCCEEDED,
     PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
   ],
-  [PaymentStatus.PENDING]: [PaymentStatus.SUCCEEDED, PaymentStatus.FAILED],
+  [PaymentStatus.PENDING]: [
+    PaymentStatus.PENDING_RECONCILIATION,
+    PaymentStatus.SUCCEEDED,
+    PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
+  ],
+  [PaymentStatus.PENDING_RECONCILIATION]: [
+    PaymentStatus.SUCCEEDED,
+    PaymentStatus.FAILED,
+    PaymentStatus.EXPIRED,
+  ],
   [PaymentStatus.SUCCEEDED]: [],
   [PaymentStatus.FAILED]: [],
+  [PaymentStatus.EXPIRED]: [],
 };
 
 export const ticketTransitions: Record<TicketStatus, TicketStatus[]> = {

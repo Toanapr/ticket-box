@@ -20,6 +20,7 @@ type WebhookCommand = {
   providerTxnId: string;
   status: 'succeeded' | 'failed';
   payloadHash: string;
+  providerEventId: string;
 };
 
 @Injectable()
@@ -52,6 +53,51 @@ export class PaymentRepository {
 
   async processWebhook(command: WebhookCommand) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext(${`${command.provider}:${command.providerEventId}`})
+        ) IS NULL AS "locked"
+      `;
+      const existingEvent = await tx.paymentProviderEvent.findUnique({
+        where: {
+          provider_providerEventId: {
+            provider: command.provider,
+            providerEventId: command.providerEventId,
+          },
+        },
+      });
+      if (existingEvent && existingEvent.payloadHash !== command.payloadHash) {
+        throw new DomainError(
+          'Provider event id was replayed with different payload',
+          'provider_event_conflict',
+          409,
+        );
+      }
+
+      await tx.$queryRaw`
+        SELECT "id" FROM "Order"
+        WHERE "id" = ${command.orderId}::uuid
+        FOR UPDATE
+      `;
+      await tx.$queryRaw`
+        SELECT "id" FROM "Payment"
+        WHERE "orderId" = ${command.orderId}::uuid
+          AND "provider" = ${command.provider}
+        FOR UPDATE
+      `;
+
+      const event =
+        existingEvent ??
+        (await tx.paymentProviderEvent.create({
+          data: {
+            provider: command.provider,
+            providerEventId: command.providerEventId,
+            providerTxnId: command.providerTxnId,
+            orderId: command.orderId,
+            payloadHash: command.payloadHash,
+            status: 'processing',
+          },
+        }));
       const context = await this.loadOrderPaymentContext(
         tx,
         command.orderId,
@@ -63,7 +109,7 @@ export class PaymentRepository {
         context.payment.providerTxnId === command.providerTxnId;
 
       if (isPayloadReplay) {
-        return this.toRepositoryResult(
+        const replay = this.toRepositoryResult(
           this.toPaymentResponse(
             context.order.id,
             context.order.status,
@@ -76,16 +122,37 @@ export class PaymentRepository {
           context.order.userId,
           false,
         );
+        await this.finishProviderEvent(tx, event.id, replay.response);
+        return replay;
       }
 
       if (command.status === 'failed') {
-        return this.markPaymentFailed(tx, context, command);
+        const result = await this.markPaymentFailed(tx, context, command);
+        await this.finishProviderEvent(tx, event.id, result.response);
+        return result;
       }
 
-      return this.confirmPaymentSuccess(tx, context, {
+      const result = await this.confirmPaymentSuccess(tx, context, {
         providerTxnId: command.providerTxnId,
         payloadHash: command.payloadHash,
       });
+      await this.finishProviderEvent(tx, event.id, result.response);
+      return result;
+    });
+  }
+
+  private async finishProviderEvent(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    response: Record<string, unknown>,
+  ) {
+    await tx.paymentProviderEvent.update({
+      where: { id: eventId },
+      data: {
+        status: 'processed',
+        responseBody: response as Prisma.InputJsonValue,
+        processedAt: new Date(),
+      },
     });
   }
 

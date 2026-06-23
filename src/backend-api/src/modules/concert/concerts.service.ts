@@ -131,17 +131,22 @@ export class ConcertsService {
     const ttlSeconds = this.cacheService.getInventorySummaryTtlSeconds();
     const key = `inventory:summary:${ticketType.id}`;
 
-    return this.cacheService.getOrLoad(key, ttlSeconds, async () => {
-      const metadata = this.cacheService.metadata(ttlSeconds);
-      return {
-        ticketTypeId: ticketType.id,
-        availableCount: ticketType.inventory
-          ? ticketType.inventory.totalCapacity -
-            ticketType.inventory.reservedCount -
-            ticketType.inventory.soldCount
-          : 0,
-        ...metadata,
-      };
-    });
+    return this.cacheService.getOrLoad(
+      key,
+      ttlSeconds,
+      () => {
+        const metadata = this.cacheService.metadata(ttlSeconds);
+        return Promise.resolve({
+          ticketTypeId: ticketType.id,
+          availableCount: ticketType.inventory
+            ? ticketType.inventory.totalCapacity -
+              ticketType.inventory.reservedCount -
+              ticketType.inventory.soldCount
+            : 0,
+          ...metadata,
+        });
+      },
+      { consumeMissBudget: false },
+    );
   }
 }

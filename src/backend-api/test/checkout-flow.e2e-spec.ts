@@ -9,6 +9,7 @@ import { setupApp } from './../src/app.setup';
 import { createWebhookSignature } from './../src/common/utils/webhook-signature.util';
 import { InventoryService } from './../src/modules/inventory/inventory.service';
 import { PaymentReconciliationService } from './../src/modules/payment/payment-reconciliation.service';
+import { RedisService } from './../src/common/cache/redis.service';
 
 type TestTicketType = {
   id: string;
@@ -29,8 +30,13 @@ describe('Checkout flow and invariants (e2e)', () => {
   const userIds: string[] = [];
   const concertIds: string[] = [];
   const organizationId = randomUUID();
+  const webhookSecret = 'checkout-e2e-webhook-secret';
+  const previousWebhookSecret = process.env.WEBHOOK_SIGNING_SECRET;
+  const previousRedisUrl = process.env.REDIS_URL;
   beforeAll(async () => {
     process.env.PAYMENT_PROVIDER_TIMEOUT_MS = '50';
+    process.env.WEBHOOK_SIGNING_SECRET = webhookSecret;
+    process.env.REDIS_URL = 'redis://localhost:6379/15';
     prisma = new PrismaClient();
     await prisma.organization.create({
       data: {
@@ -47,6 +53,13 @@ describe('Checkout flow and invariants (e2e)', () => {
     await app.init();
     inventoryService = app.get(InventoryService);
     reconciliationService = app.get(PaymentReconciliationService);
+    const redis = app.get(RedisService);
+    try {
+      const rateLimitKeys = await redis.keys('rate:*');
+      await redis.del(...rateLimitKeys);
+    } catch {
+      // Redis is optional in tests; the guard falls back to fresh local counters.
+    }
   });
 
   afterAll(async () => {
@@ -128,6 +141,16 @@ describe('Checkout flow and invariants (e2e)', () => {
     });
     await app.close();
     await prisma.$disconnect();
+    if (previousWebhookSecret === undefined) {
+      delete process.env.WEBHOOK_SIGNING_SECRET;
+    } else {
+      process.env.WEBHOOK_SIGNING_SECRET = previousWebhookSecret;
+    }
+    if (previousRedisUrl === undefined) {
+      delete process.env.REDIS_URL;
+    } else {
+      process.env.REDIS_URL = previousRedisUrl;
+    }
   });
 
   it('keeps reservation idempotent for duplicate requests', async () => {
@@ -429,8 +452,20 @@ describe('Checkout flow and invariants (e2e)', () => {
     };
 
     const [first, second] = await Promise.all([
-      request(app.getHttpServer()).post('/payments/webhook').send(webhookBody),
-      request(app.getHttpServer()).post('/payments/webhook').send(webhookBody),
+      request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature(webhookSecret, webhookBody),
+        )
+        .send(webhookBody),
+      request(app.getHttpServer())
+        .post('/payments/webhook')
+        .set(
+          'x-webhook-signature',
+          createWebhookSignature(webhookSecret, webhookBody),
+        )
+        .send(webhookBody),
     ]);
 
     expect(first.status).toBe(201);
@@ -480,15 +515,20 @@ describe('Checkout flow and invariants (e2e)', () => {
         idempotencyKey: randomUUID(),
       });
 
+    const failedWebhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'mock',
+      providerTxnId: `txn-${randomUUID()}`,
+      status: 'failed' as const,
+      payload: { eventType: 'payment.failed' },
+    };
     const failedWebhook = await request(app.getHttpServer())
       .post('/payments/webhook')
-      .send({
-        orderId: orderRes.body.id,
-        provider: 'mock',
-        providerTxnId: `txn-${randomUUID()}`,
-        status: 'failed',
-        payload: { eventType: 'payment.failed' },
-      });
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, failedWebhookBody),
+      )
+      .send(failedWebhookBody);
 
     expect(failedWebhook.status).toBe(201);
     expect(failedWebhook.body.orderStatus).toBe('failed');
@@ -564,15 +604,20 @@ describe('Checkout flow and invariants (e2e)', () => {
       },
     });
 
+    const lateWebhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'mock',
+      providerTxnId: `txn-${randomUUID()}`,
+      status: 'succeeded' as const,
+      payload: { eventType: 'payment.succeeded' },
+    };
     const webhookRes = await request(app.getHttpServer())
       .post('/payments/webhook')
-      .send({
-        orderId: orderRes.body.id,
-        provider: 'mock',
-        providerTxnId: `txn-${randomUUID()}`,
-        status: 'succeeded',
-        payload: { eventType: 'payment.succeeded' },
-      });
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, lateWebhookBody),
+      )
+      .send(lateWebhookBody);
 
     expect(webhookRes.status).toBe(201);
     expect(webhookRes.body.orderStatus).toBe('refund_required');

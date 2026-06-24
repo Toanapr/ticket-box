@@ -40,6 +40,7 @@ function normalizeTicketType(ticketType: ConcertApiRecord["ticketTypes"][number]
 
   return {
     id: ticketType.id,
+    slug: ticketType.slug,
     zone,
     name: ticketType.name,
     price: Number(ticketType.price),

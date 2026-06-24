@@ -1,7 +1,7 @@
 const maxBaseLength = 80;
 
-export function slugifyConcertTitle(title: string): string {
-  const slug = title
+export function slugifyPublicLabel(label: string, fallback: string): string {
+  const slug = label
     .trim()
     .toLowerCase()
     .replaceAll('đ', 'd')
@@ -12,7 +12,11 @@ export function slugifyConcertTitle(title: string): string {
     .slice(0, maxBaseLength)
     .replace(/-+$/g, '');
 
-  return slug || 'concert';
+  return slug || fallback;
+}
+
+export function slugifyConcertTitle(title: string): string {
+  return slugifyPublicLabel(title, 'concert');
 }
 
 export function concertSlugCandidate(

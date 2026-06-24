@@ -4,6 +4,7 @@ import { CheckoutClient } from "@/components/checkout-client";
 import { PageShell } from "@/components/site-shell";
 import { getConcertByIdentifier } from "@/lib/server-api";
 import { requireAuthUser } from "@/lib/require-auth-user";
+import { resolveTicketTypeSelection } from "@/lib/ticket-type-selection";
 
 interface CheckoutPageProps {
   params: Promise<{ id: string }>;
@@ -13,18 +14,18 @@ interface CheckoutPageProps {
 export default async function CheckoutPage({ params, searchParams }: CheckoutPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;
-  const ticketTypeQuery = query?.ticketType ? `?ticketType=${encodeURIComponent(query.ticketType)}` : "";
   const concert = await getConcertByIdentifier(id);
   if (!concert) notFound();
-  if (id !== concert.slug) {
+  const selection = resolveTicketTypeSelection(concert, query?.ticketType);
+  const ticketTypeQuery = selection.canonicalIdentifier
+    ? `?ticketType=${encodeURIComponent(selection.canonicalIdentifier)}`
+    : "";
+  if (id !== concert.slug || query?.ticketType !== selection.canonicalIdentifier) {
     permanentRedirect(`/concerts/${concert.slug}/checkout${ticketTypeQuery}`);
   }
   await requireAuthUser(`/concerts/${concert.slug}/checkout${ticketTypeQuery}`);
 
-  const ticketType =
-    concert.ticketTypes.find((item) => item.id === query?.ticketType) ??
-    concert.ticketTypes.find((item) => item.availableApprox > 0) ??
-    concert.ticketTypes[0];
+  const ticketType = selection.ticketType;
   if (!ticketType) notFound();
 
   return (
@@ -32,7 +33,7 @@ export default async function CheckoutPage({ params, searchParams }: CheckoutPag
       <Breadcrumbs
         items={[
           { label: "Concerts", href: "/concerts" },
-          { label: concert.title, href: `/concerts/${concert.slug}?ticketType=${ticketType.id}` },
+          { label: concert.title, href: `/concerts/${concert.slug}?ticketType=${ticketType.slug}` },
           { label: "Checkout" },
         ]}
       />

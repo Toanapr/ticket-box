@@ -1,5 +1,6 @@
 export interface ConcertApiTicketType {
   id: string;
+  slug: string;
   zoneCode: string;
   name: string;
   price: string | number;
@@ -63,6 +64,7 @@ function parseTicketType(value: unknown, path: string): ConcertApiTicketType {
   const record = readObject(value, path);
   return {
     id: readUuid(record.id, `${path}.id`),
+    slug: readSlug(record.slug, `${path}.slug`),
     zoneCode: readString(record.zoneCode, `${path}.zoneCode`),
     name: readString(record.name, `${path}.name`),
     price: readNonNegativeNumberLike(record.price, `${path}.price`),

@@ -16,6 +16,7 @@ export type ReservationErrorCode =
 
 export interface TicketType {
   id: string;
+  slug: string;
   zone: "svip" | "vip" | "cat1" | "cat2" | "ga";
   name: string;
   price: number;

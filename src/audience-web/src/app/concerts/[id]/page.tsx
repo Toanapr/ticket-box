@@ -8,6 +8,7 @@ import { SeatingMap } from "@/components/seating-map";
 import { TicketTypeSidebar } from "@/components/ticket-type-sidebar";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { getConcertByIdentifier } from "@/lib/server-api";
+import { resolveTicketTypeSelection } from "@/lib/ticket-type-selection";
 
 interface ConcertDetailPageProps {
   params: Promise<{ id: string }>;
@@ -19,15 +20,15 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
   const query = await searchParams;
   const concert = await getConcertByIdentifier(id);
   if (!concert) notFound();
-  if (id !== concert.slug) {
-    const ticketTypeQuery = query?.ticketType ? `?ticketType=${encodeURIComponent(query.ticketType)}` : "";
+  const selection = resolveTicketTypeSelection(concert, query?.ticketType);
+  const ticketTypeQuery = selection.canonicalIdentifier
+    ? `?ticketType=${encodeURIComponent(selection.canonicalIdentifier)}`
+    : "";
+  if (id !== concert.slug || query?.ticketType !== selection.canonicalIdentifier) {
     permanentRedirect(`/concerts/${concert.slug}${ticketTypeQuery}`);
   }
 
-  const selectedTicketType =
-    concert.ticketTypes.find((type) => type.id === query?.ticketType) ??
-    concert.ticketTypes.find((type) => type.availableApprox > 0) ??
-    concert.ticketTypes[0];
+  const selectedTicketType = selection.ticketType;
   const minPrice = selectedTicketType ? Math.min(...concert.ticketTypes.map((type) => type.price)) : null;
   const [venueMain, ...venueRest] = concert.venue.split(",");
   const venueSub = venueRest.join(",").trim();
@@ -84,7 +85,7 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
               </div> : null}
               {canBuy && selectedTicketType ? (
                 <Link
-                  href={`/concerts/${concert.slug}/checkout?ticketType=${selectedTicketType.id}`}
+                  href={`/concerts/${concert.slug}/checkout?ticketType=${selectedTicketType.slug}`}
                   className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-ticket-green px-5 py-3 text-[15px] font-black uppercase tracking-wide text-white transition hover:bg-[#00964a]"
                 >
                   {heroCtaLabel}

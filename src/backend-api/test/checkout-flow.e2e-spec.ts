@@ -1000,6 +1000,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       data: {
         id,
         concertId,
+        slug: input.zoneCode.toLowerCase(),
         zoneCode: input.zoneCode,
         name: input.name,
         price: input.price,

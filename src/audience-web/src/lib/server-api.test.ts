@@ -26,6 +26,7 @@ function apiConcert(): Record<string, unknown> {
     ticketTypes: [
       {
         id: ticketTypeId,
+        slug: "vip",
         zoneCode: "VIP",
         name: "VIP",
         price: "1000000",

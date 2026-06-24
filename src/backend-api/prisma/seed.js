@@ -71,6 +71,7 @@ const ticketTypes = [
   {
     id: '66666666-6666-4666-8666-666666666661',
     concertId: concerts[0].id,
+    slug: 'svip',
     zoneCode: 'SVIP',
     name: 'SVIP',
     price: '2500000.00',
@@ -82,6 +83,7 @@ const ticketTypes = [
   {
     id: '66666666-6666-4666-8666-666666666662',
     concertId: concerts[0].id,
+    slug: 'vip',
     zoneCode: 'VIP',
     name: 'VIP',
     price: '1800000.00',
@@ -93,6 +95,7 @@ const ticketTypes = [
   {
     id: '66666666-6666-4666-8666-666666666663',
     concertId: concerts[0].id,
+    slug: 'cat-1',
     zoneCode: 'CAT1',
     name: 'CAT 1',
     price: '1200000.00',
@@ -104,6 +107,7 @@ const ticketTypes = [
   {
     id: '66666666-6666-4666-8666-666666666664',
     concertId: concerts[0].id,
+    slug: 'cat-2',
     zoneCode: 'CAT2',
     name: 'CAT 2',
     price: '800000.00',
@@ -115,6 +119,7 @@ const ticketTypes = [
   {
     id: '66666666-6666-4666-8666-666666666665',
     concertId: concerts[0].id,
+    slug: 'general-admission',
     zoneCode: 'GA',
     name: 'General Admission',
     price: '500000.00',
@@ -126,6 +131,7 @@ const ticketTypes = [
   {
     id: '77777777-7777-4777-8777-777777777771',
     concertId: concerts[1].id,
+    slug: 'vip',
     zoneCode: 'VIP',
     name: 'VIP',
     price: '1500000.00',
@@ -137,6 +143,7 @@ const ticketTypes = [
   {
     id: '77777777-7777-4777-8777-777777777772',
     concertId: concerts[1].id,
+    slug: 'general-admission',
     zoneCode: 'GA',
     name: 'General Admission',
     price: '450000.00',
@@ -150,6 +157,7 @@ const ticketTypes = [
   {
     id: '11111111-1111-4111-8111-111111111111',
     concertId: concerts[2].id,
+    slug: 'svip-early-access',
     zoneCode: 'SVIP',
     name: 'SVIP Early Access',
     price: '3500000.00',
@@ -161,6 +169,7 @@ const ticketTypes = [
   {
     id: '22222222-2222-4222-8222-222222222222',
     concertId: concerts[2].id,
+    slug: 'cat1-standard',
     zoneCode: 'CAT1',
     name: 'CAT1 Standard',
     price: '1800000.00',
@@ -265,6 +274,7 @@ async function seedTicketTypesAndInventory() {
         create: ticketType,
         update: {
           concertId: ticketType.concertId,
+          slug: ticketType.slug,
           zoneCode: ticketType.zoneCode,
           name: ticketType.name,
           price: ticketType.price,

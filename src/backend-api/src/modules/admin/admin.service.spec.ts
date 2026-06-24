@@ -23,6 +23,16 @@ const concertBody = {
   publishedArtistBio: 'Test bio',
 };
 
+const ticketTypeBody = {
+  zoneCode: 'VIP',
+  name: 'Vé VIP',
+  price: 1_800_000,
+  capacity: 100,
+  perUserLimit: 4,
+  saleStartAt: '2026-07-01T03:00:00.000Z',
+  saleEndAt: '2026-12-19T16:59:00.000Z',
+};
+
 describe('AdminService concert slugs', () => {
   const invalidateConcert = jest.fn();
   const create =
@@ -100,5 +110,116 @@ describe('AdminService concert slugs', () => {
       where: { id: 'concert-id' },
       data: { title: 'New Title' },
     });
+  });
+});
+
+describe('AdminService ticket type slugs', () => {
+  const invalidateTicketType = jest.fn();
+  const concertFindUnique = jest.fn();
+  const ticketTypeFindUnique = jest.fn();
+  const attemptedSlugs: string[] = [];
+  const updatePayloads: Prisma.TicketTypeUpdateArgs['data'][] = [];
+  let createAttempt = 0;
+
+  const transactionClient = {
+    ticketType: {
+      create: jest.fn(
+        (args: { data: Prisma.TicketTypeUncheckedCreateInput }) => {
+          attemptedSlugs.push(args.data.slug);
+          createAttempt += 1;
+          if (createAttempt === 1) {
+            return Promise.reject(
+              new Prisma.PrismaClientKnownRequestError(
+                'Unique constraint failed',
+                {
+                  code: 'P2002',
+                  clientVersion: 'test',
+                  meta: { target: ['concert_id', 'slug'] },
+                },
+              ),
+            );
+          }
+          return Promise.resolve({
+            id: 'ticket-type-id',
+            concertId: 'concert-id',
+            slug: args.data.slug,
+          });
+        },
+      ),
+      update: jest.fn((args: Prisma.TicketTypeUpdateArgs) => {
+        updatePayloads.push(args.data);
+        return Promise.resolve({
+          id: 'ticket-type-id',
+          concertId: 'concert-id',
+          slug: 've-vip',
+          name: 'New VIP Name',
+        });
+      }),
+    },
+    inventoryCounter: {
+      create: jest.fn(() =>
+        Promise.resolve({ ticketTypeId: 'ticket-type-id' }),
+      ),
+    },
+  };
+  const transaction = jest.fn(
+    (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+      callback(transactionClient as unknown as Prisma.TransactionClient),
+  );
+  const service = new AdminService(
+    { invalidateTicketType } as unknown as CacheInvalidationService,
+    {
+      concert: { findUnique: concertFindUnique },
+      ticketType: { findUnique: ticketTypeFindUnique },
+      $transaction: transaction,
+    } as unknown as PrismaService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    attemptedSlugs.length = 0;
+    updatePayloads.length = 0;
+    createAttempt = 0;
+    concertFindUnique.mockResolvedValue({
+      id: 'concert-id',
+      organizationId: organizer.organizationId,
+    });
+  });
+
+  it('retries a conflicting slug within the concert', async () => {
+    await expect(
+      service.createTicketType(organizer, 'concert-id', ticketTypeBody),
+    ).resolves.toMatchObject({ slug: 've-vip-2' });
+
+    expect(attemptedSlugs).toEqual(['ve-vip', 've-vip-2']);
+  });
+
+  it('does not change the slug when the ticket type name changes', async () => {
+    ticketTypeFindUnique.mockResolvedValue({
+      id: 'ticket-type-id',
+      concertId: 'concert-id',
+      slug: 've-vip',
+      name: 'Vé VIP',
+      saleStartAt: new Date('2027-07-01T03:00:00.000Z'),
+      saleEndAt: new Date('2027-12-19T16:59:00.000Z'),
+      inventory: null,
+      concert: { organizationId: organizer.organizationId },
+    });
+
+    await service.updateTicketType(organizer, 'ticket-type-id', {
+      name: 'New VIP Name',
+    });
+
+    expect(updatePayloads).toEqual([
+      {
+        zoneCode: undefined,
+        name: 'New VIP Name',
+        price: undefined,
+        capacity: undefined,
+        perUserLimit: undefined,
+        saleStartAt: undefined,
+        saleEndAt: undefined,
+      },
+    ]);
   });
 });

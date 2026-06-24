@@ -25,6 +25,7 @@ function concertFixture(overrides: Record<string, unknown> = {}): Record<string,
 function ticketTypeFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: ticketTypeId,
+    slug: "svip",
     zoneCode: "SVIP",
     name: "SVIP",
     price: "2500000.00",
@@ -57,6 +58,7 @@ describe("concert API adapter", () => {
       ticketTypes: [
         {
           id: ticketTypeId,
+          slug: "svip",
           zone: "svip",
           name: "SVIP",
           price: 2500000,
@@ -93,6 +95,7 @@ describe("concert API adapter", () => {
     ["invalid date", { startAt: "not-a-date" }],
     ["negative price", { ticketTypes: [ticketTypeFixture({ price: -1 })] }],
     ["unknown zone", { ticketTypes: [ticketTypeFixture({ zoneCode: "BALCONY" })] }],
+    ["invalid ticket slug", { ticketTypes: [ticketTypeFixture({ slug: "Invalid Ticket" })] }],
     ["invalid slug", { slug: "Invalid Slug" }],
     ["missing ticket array", { ticketTypes: undefined }],
   ])("rejects %s", (_label, overrides) => {

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:reload-flow": "node scripts/verify-reload-flow.mjs",
+    "verify:sync-recovery": "node scripts/verify-sync-recovery.mjs",
+    "verify:scan-workflow": "node scripts/verify-scan-workflow.mjs",
+    "verify:sync-retry": "node scripts/verify-sync-retry.mjs"
   },
   "dependencies": {
     "next": "16.2.9",
@@ -20,6 +24,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "playwright": "^1.61.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

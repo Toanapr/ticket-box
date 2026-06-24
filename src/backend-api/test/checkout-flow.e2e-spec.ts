@@ -984,6 +984,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     await prisma.concert.create({
       data: {
         id: concertId,
+        slug: `test-concert-${concertId}`,
         organizationId,
         title: `Test Concert ${input.name}`,
         venue: 'E2E Test Venue',
@@ -999,6 +1000,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       data: {
         id,
         concertId,
+        slug: input.zoneCode.toLowerCase(),
         zoneCode: input.zoneCode,
         name: input.name,
         price: input.price,

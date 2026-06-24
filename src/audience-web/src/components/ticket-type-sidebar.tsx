@@ -34,7 +34,7 @@ export function TicketTypeSidebar({
           return (
             <Link
               key={type.id}
-              href={`/concerts/${concert.id}?ticketType=${type.id}`}
+              href={`/concerts/${concert.slug}?ticketType=${type.slug}`}
               scroll={false}
               aria-current={selected ? "true" : undefined}
               className={`rounded-lg border p-4 transition ${
@@ -65,9 +65,9 @@ export function TicketTypeSidebar({
         })}
       </div>
 
-      {canCheckout ? (
+      {canCheckout && selectedType ? (
         <Link
-          href={`/concerts/${concert.id}/checkout?ticketType=${selectedTicketTypeId}`}
+          href={`/concerts/${concert.slug}/checkout?ticketType=${selectedType.slug}`}
           className="mt-6 flex min-h-12 items-center justify-center gap-2 rounded bg-ticket-obsidian px-4 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-green"
         >
           Tiếp tục checkout

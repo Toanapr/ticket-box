@@ -4,6 +4,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Copy `.env.example` to `.env.local` and set `BACKEND_API_BASE_URL` to the Nest API URL. Audience login and registration go through same-origin Next.js route handlers; the backend JWT is stored only in an HttpOnly cookie. Reservation, order, payment, and ticket calls are proxied through the authenticated BFF allowlist.
 
+Public concert list and detail pages also read this backend URL from the Next.js server. They call `GET /concerts` and `GET /concerts/:slug`; legacy concert UUID paths and ticket type UUID query values redirect to canonical slug URLs such as `/concerts/ticketbox-summer-live?ticketType=vip`. Concert reads do not fall back to mock data when configuration or the backend is unavailable. Start and seed `src/backend-api` before opening `/concerts`.
+
 Run the backend Prisma migration before using registration so the nullable `users.full_name` column exists.
 
 ## Getting Started

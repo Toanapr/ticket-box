@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightIcon, CalendarIcon, MapPinIcon } from "./icons";
+import { ConcertPoster } from "./concert-poster";
 import { formatDateTime } from "@/lib/format";
 import type { ConcertSummary } from "@/lib/types";
 
@@ -29,13 +29,6 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
 
   if (!concert) return null;
 
-  function moveSpotlight(direction: "next" | "previous"): void {
-    setActiveIndex((current) => {
-      const delta = direction === "next" ? 1 : -1;
-      return (current + delta + spotlightConcerts.length) % spotlightConcerts.length;
-    });
-  }
-
   return (
     <section className="mb-12 grid gap-8 border-b-2 border-ticket-obsidian pb-12 lg:grid-cols-[1fr_340px] lg:items-center">
       <div key={concert.id} className="motion-safe:[animation:spotlight-in_450ms_ease-out]">
@@ -57,7 +50,7 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
           </span>
         </div>
         <Link
-          href={`/concerts/${concert.id}`}
+          href={`/concerts/${concert.slug}`}
           className="mt-8 inline-flex min-h-12 items-center gap-2 rounded bg-ticket-obsidian px-6 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-green"
         >
           Mua vé ngay
@@ -84,7 +77,7 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
         ) : null}
       </div>
       <div key={`${concert.id}-poster`} className="relative aspect-square overflow-hidden rounded-lg border border-black/10 bg-slate-100 shadow-sm motion-safe:[animation:spotlight-poster_500ms_ease-out]">
-        <Image src={concert.posterPath} alt={`${concert.title} poster`} fill priority sizes="340px" className="object-cover" />
+        <ConcertPoster src={concert.posterPath} title={concert.title} priority sizes="340px" />
       </div>
     </section>
   );

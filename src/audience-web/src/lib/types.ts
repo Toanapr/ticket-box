@@ -16,6 +16,7 @@ export type ReservationErrorCode =
 
 export interface TicketType {
   id: string;
+  slug: string;
   zone: "svip" | "vip" | "cat1" | "cat2" | "ga";
   name: string;
   price: number;
@@ -28,13 +29,14 @@ export interface TicketType {
 
 export interface ConcertSummary {
   id: string;
+  slug: string;
   title: string;
   artists: string[];
   venue: string;
   startsAt: string;
   status: ConcertStatus;
   description: string;
-  posterPath: string;
+  posterPath?: string;
 }
 
 export interface ConcertDetail extends ConcertSummary {

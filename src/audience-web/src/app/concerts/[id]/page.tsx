@@ -1,13 +1,14 @@
-import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ConcertPoster } from "@/components/concert-poster";
 import { ArrowRightIcon, CalendarIcon, InfoIcon, LayersIcon, MapPinIcon, UsersIcon } from "@/components/icons";
 import { PageShell } from "@/components/site-shell";
 import { SeatingMap } from "@/components/seating-map";
 import { TicketTypeSidebar } from "@/components/ticket-type-sidebar";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { getConcertById } from "@/lib/server-api";
+import { getConcertByIdentifier } from "@/lib/server-api";
+import { resolveTicketTypeSelection } from "@/lib/ticket-type-selection";
 
 interface ConcertDetailPageProps {
   params: Promise<{ id: string }>;
@@ -17,18 +18,28 @@ interface ConcertDetailPageProps {
 export default async function ConcertDetailPage({ params, searchParams }: ConcertDetailPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;
-  const concert = await getConcertById(id);
+  const concert = await getConcertByIdentifier(id);
   if (!concert) notFound();
+  const selection = resolveTicketTypeSelection(concert, query?.ticketType);
+  const ticketTypeQuery = selection.canonicalIdentifier
+    ? `?ticketType=${encodeURIComponent(selection.canonicalIdentifier)}`
+    : "";
+  if (id !== concert.slug || query?.ticketType !== selection.canonicalIdentifier) {
+    permanentRedirect(`/concerts/${concert.slug}${ticketTypeQuery}`);
+  }
 
-  const selectedTicketType =
-    concert.ticketTypes.find((type) => type.id === query?.ticketType) ??
-    concert.ticketTypes.find((type) => type.availableApprox > 0) ??
-    concert.ticketTypes[0];
-  const minPrice = Math.min(...concert.ticketTypes.map((type) => type.price));
+  const selectedTicketType = selection.ticketType;
+  const minPrice = selectedTicketType ? Math.min(...concert.ticketTypes.map((type) => type.price)) : null;
   const [venueMain, ...venueRest] = concert.venue.split(",");
   const venueSub = venueRest.join(",").trim();
-  const canBuy = concert.status === "selling" && selectedTicketType.availableApprox > 0;
-  const heroCtaLabel = concert.status === "upcoming" ? "Sắp mở bán" : concert.status === "soldout" ? "Hết vé" : "Mua vé ngay";
+  const canBuy = concert.status === "selling" && Boolean(selectedTicketType && selectedTicketType.availableApprox > 0);
+  const heroCtaLabel = !selectedTicketType
+    ? "Chưa có vé"
+    : concert.status === "upcoming"
+      ? "Sắp mở bán"
+      : concert.status === "soldout"
+        ? "Hết vé"
+        : "Mua vé ngay";
 
   return (
     <PageShell>
@@ -65,16 +76,16 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
               </div>
             </div>
             <div className="mt-8 border-t border-white/10 pt-6">
-              <div className="flex items-center gap-2">
+              {minPrice !== null ? <div className="flex items-center gap-2">
                 <span className="text-[15px] font-bold text-white">Giá từ</span>
                 <span className="font-display text-[30px] font-black leading-none text-ticket-green md:text-[34px] lg:text-[22px]">
                   {formatCurrency(minPrice)}
                 </span>
                 <ArrowRightIcon className="h-5 w-5 text-ticket-green" />
-              </div>
-              {canBuy ? (
+              </div> : null}
+              {canBuy && selectedTicketType ? (
                 <Link
-                  href={`/concerts/${concert.id}/checkout?ticketType=${selectedTicketType.id}`}
+                  href={`/concerts/${concert.slug}/checkout?ticketType=${selectedTicketType.slug}`}
                   className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-ticket-green px-5 py-3 text-[15px] font-black uppercase tracking-wide text-white transition hover:bg-[#00964a]"
                 >
                   {heroCtaLabel}
@@ -97,7 +108,7 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
             <div className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-ticket-alabaster lg:bottom-[-12px] lg:left-1/2 lg:right-auto lg:top-auto lg:-translate-x-1/2 lg:translate-y-0" />
           </div>
           <div className="relative order-1 h-[300px] overflow-hidden bg-black lg:order-3 lg:h-full lg:flex-1">
-            <Image src={concert.posterPath} alt={`${concert.title} poster`} fill priority sizes="(max-width: 1024px) 100vw, 800px" className="object-cover" />
+            <ConcertPoster src={concert.posterPath} title={concert.title} priority sizes="(max-width: 1024px) 100vw, 800px" />
           </div>
         </div>
       </section>
@@ -116,14 +127,24 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
           </InfoSection>
 
           <InfoSection title="Sơ đồ khu vực khán đài" icon={<LayersIcon className="h-6 w-6 text-ticket-green" />}>
-            <SeatingMap concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+            {selectedTicketType ? (
+              <SeatingMap concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+            ) : (
+              <p className="text-sm font-bold text-slate-500">Sự kiện chưa công bố khu vực vé.</p>
+            )}
           </InfoSection>
 
           <InfoSection title="Thông tin chi tiết" icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}>
             <p className="max-w-3xl text-base leading-8 text-slate-600">{concert.description}</p>
           </InfoSection>
         </div>
-        <TicketTypeSidebar concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+        {selectedTicketType ? (
+          <TicketTypeSidebar concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+        ) : (
+          <aside className="rounded-lg border border-black/10 bg-white p-6 text-sm font-bold text-slate-500">
+            Chưa có hạng vé được mở bán.
+          </aside>
+        )}
       </div>
     </PageShell>
   );

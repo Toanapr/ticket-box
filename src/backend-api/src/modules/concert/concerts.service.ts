@@ -10,6 +10,10 @@ type InventorySummary = {
   staleAt: string;
 };
 
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 @Injectable()
 export class ConcertsService {
   constructor(
@@ -52,7 +56,12 @@ export class ConcertsService {
     );
   }
 
-  async getPublishedDetail(id: string) {
+  async getPublishedDetail(identifier: string) {
+    const id = await this.resolvePublishedConcertId(identifier);
+    if (!id) {
+      throw new NotFoundException('Concert not found');
+    }
+
     const cacheKey = `concert:detail:${id}`;
     const concert = await this.cacheService.getOrLoad(
       cacheKey,
@@ -88,6 +97,30 @@ export class ConcertsService {
     }
 
     return concert;
+  }
+
+  private async resolvePublishedConcertId(
+    identifier: string,
+  ): Promise<string | null> {
+    if (uuidPattern.test(identifier)) {
+      return identifier;
+    }
+
+    if (identifier.length > 100 || !slugPattern.test(identifier)) {
+      return null;
+    }
+
+    return this.cacheService.getOrLoad(
+      `concert:slug:${identifier}`,
+      this.cacheService.getPublicConcertTtlSeconds(),
+      async () => {
+        const concert = await this.prisma.concert.findFirst({
+          where: { slug: identifier, status: 'published' },
+          select: { id: true },
+        });
+        return concert?.id ?? null;
+      },
+    );
   }
 
   private async withInventorySummary<
@@ -131,17 +164,22 @@ export class ConcertsService {
     const ttlSeconds = this.cacheService.getInventorySummaryTtlSeconds();
     const key = `inventory:summary:${ticketType.id}`;
 
-    return this.cacheService.getOrLoad(key, ttlSeconds, async () => {
-      const metadata = this.cacheService.metadata(ttlSeconds);
-      return {
-        ticketTypeId: ticketType.id,
-        availableCount: ticketType.inventory
-          ? ticketType.inventory.totalCapacity -
-            ticketType.inventory.reservedCount -
-            ticketType.inventory.soldCount
-          : 0,
-        ...metadata,
-      };
-    });
+    return this.cacheService.getOrLoad(
+      key,
+      ttlSeconds,
+      () => {
+        const metadata = this.cacheService.metadata(ttlSeconds);
+        return Promise.resolve({
+          ticketTypeId: ticketType.id,
+          availableCount: ticketType.inventory
+            ? ticketType.inventory.totalCapacity -
+              ticketType.inventory.reservedCount -
+              ticketType.inventory.soldCount
+            : 0,
+          ...metadata,
+        });
+      },
+      { consumeMissBudget: false },
+    );
   }
 }

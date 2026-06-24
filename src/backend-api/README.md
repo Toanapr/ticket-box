@@ -49,9 +49,9 @@ Relevant environment variables are listed in `.env.example`:
 - `PUBLIC_CONCERT_CACHE_TTL_SECONDS`: TTL for public concert list/detail cache.
 - `INVENTORY_SUMMARY_CACHE_TTL_SECONDS`: short TTL for display-only ticket availability summaries.
 - `CACHE_TTL_JITTER_RATIO`: spreads cache expirations to reduce stampedes.
-- `CACHE_MISS_QUERY_BUDGET`: limits concurrent DB loads when public cache misses happen.
+- `CACHE_MISS_QUERY_BUDGET`: limits concurrent DB-backed loads when public cache misses happen. Cache values computed from data already loaded by the current request do not consume this budget.
 
-Public `GET /concerts` and `GET /concerts/:id` use cache-aside reads. Ticket availability summaries are cached for display only; reservation and payment flows still read and update PostgreSQL inside transactions. Admin concert/ticket-type updates, reservation changes, expiry cleanup, and payment success invalidate affected cache keys.
+Public `GET /concerts` and `GET /concerts/:slug` use cache-aside reads; legacy concert UUID identifiers remain accepted for compatibility. Concert and ticket type records expose immutable slugs for public Audience URLs, while reservation and payment contracts continue using UUIDs. Ticket availability summaries are cached for display only; reservation and payment flows still read and update PostgreSQL inside transactions. Admin concert/ticket-type updates, reservation changes, expiry cleanup, and payment success invalidate affected cache keys.
 
 Rate-limited endpoints return `429` with `Retry-After`. Rejections are logged with the request correlation id. If Redis is unavailable, the guard falls back to a bounded in-memory counter so reservation throttling remains active instead of failing open.
 

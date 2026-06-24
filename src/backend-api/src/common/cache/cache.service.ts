@@ -8,6 +8,10 @@ export type CacheMetadata = {
   staleAt: string;
 };
 
+export type CacheLoadOptions = {
+  consumeMissBudget?: boolean;
+};
+
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
@@ -113,6 +117,7 @@ export class CacheService {
     key: string,
     ttlSeconds: number,
     loader: () => Promise<T>,
+    options: CacheLoadOptions = {},
   ): Promise<T> {
     const cached = await this.getJson<T>(key);
     if (cached !== null) {
@@ -125,21 +130,26 @@ export class CacheService {
       return existing;
     }
 
-    if (this.activeMisses >= this.getMissBudget()) {
+    const consumeMissBudget = options.consumeMissBudget ?? true;
+    if (consumeMissBudget && this.activeMisses >= this.getMissBudget()) {
       this.logger.warn(
         formatStructuredLog('cache_miss_budget_exhausted', { key }),
       );
       throw new Error('Public read query budget exhausted');
     }
 
-    this.activeMisses += 1;
+    if (consumeMissBudget) {
+      this.activeMisses += 1;
+    }
     const promise = loader()
       .then(async (value) => {
         await this.setJson(key, value, ttlSeconds);
         return value;
       })
       .finally(() => {
-        this.activeMisses -= 1;
+        if (consumeMissBudget) {
+          this.activeMisses -= 1;
+        }
         this.inFlight.delete(key);
       });
 

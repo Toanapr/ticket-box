@@ -50,7 +50,7 @@ export function HeroSpotlight({ concerts }: { concerts: ConcertSummary[] }): Rea
           </span>
         </div>
         <Link
-          href={`/concerts/${concert.id}`}
+          href={`/concerts/${concert.slug}`}
           className="mt-8 inline-flex min-h-12 items-center gap-2 rounded bg-ticket-obsidian px-6 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-green"
         >
           Mua vé ngay

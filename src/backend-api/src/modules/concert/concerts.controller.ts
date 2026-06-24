@@ -15,12 +15,12 @@ export class ConcertsController {
     return this.concertsService.listPublishedUpcoming();
   }
 
-  @Get(':id')
+  @Get(':identifier')
   @RateLimit([
     { scope: 'ip', limit: 180, windowSeconds: 60 },
     { scope: 'device', limit: 300, windowSeconds: 60 },
   ])
-  detail(@Param('id') id: string) {
-    return this.concertsService.getPublishedDetail(id);
+  detail(@Param('identifier') identifier: string) {
+    return this.concertsService.getPublishedDetail(identifier);
   }
 }

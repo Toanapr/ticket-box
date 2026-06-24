@@ -12,6 +12,7 @@ export interface ConcertApiTicketType {
 
 export interface ConcertApiRecord {
   id: string;
+  slug: string;
   title: string;
   venue: string;
   artistName: string;
@@ -45,6 +46,7 @@ export function parseConcertApiRecord(value: unknown, path = "concert"): Concert
 
   return {
     id: readUuid(record.id, `${path}.id`),
+    slug: readSlug(record.slug, `${path}.slug`),
     title: readString(record.title, `${path}.title`),
     venue: readString(record.venue, `${path}.venue`),
     artistName: readString(record.artistName, `${path}.artistName`),
@@ -95,6 +97,14 @@ function readUuid(value: unknown, path: string): string {
   const result = readString(value, path);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result)) {
     throw new ConcertContractError(`${path} must be a UUID`);
+  }
+  return result;
+}
+
+function readSlug(value: unknown, path: string): string {
+  const result = readString(value, path);
+  if (result.length > 100 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(result)) {
+    throw new ConcertContractError(`${path} must be a URL-safe slug`);
   }
   return result;
 }

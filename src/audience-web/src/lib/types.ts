@@ -28,6 +28,7 @@ export interface TicketType {
 
 export interface ConcertSummary {
   id: string;
+  slug: string;
   title: string;
   artists: string[];
   venue: string;

@@ -7,7 +7,7 @@ import type { ConcertSummary } from "@/lib/types";
 
 export function ConcertCard({ concert }: { concert: ConcertSummary }): React.ReactElement {
   return (
-    <Link href={`/concerts/${concert.id}`} className="group block border-b border-black/10 pb-6">
+    <Link href={`/concerts/${concert.slug}`} className="group block border-b border-black/10 pb-6">
       <div className="relative mb-4 aspect-[16/10] overflow-hidden rounded-lg border border-black/10 bg-slate-100">
         <ConcertPoster src={concert.posterPath} title={concert.title} sizes="(max-width: 768px) 100vw, 33vw" />
         <div className="absolute right-3 top-3">

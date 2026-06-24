@@ -20,6 +20,7 @@ function normalizeConcertRecord(concert: ConcertApiRecord, now: Date): ConcertDe
   const ticketTypes = concert.ticketTypes.map(normalizeTicketType);
   return {
     id: concert.id,
+    slug: concert.slug,
     title: concert.title,
     artists: [concert.artistName],
     venue: concert.venue,

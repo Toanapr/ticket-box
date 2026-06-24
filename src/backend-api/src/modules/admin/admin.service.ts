@@ -8,6 +8,10 @@ import {
 import { Prisma } from '@prisma/client';
 import { CacheInvalidationService } from '../../common/cache/cache-invalidation.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  concertSlugCandidate,
+  slugifyConcertTitle,
+} from '../concert/concert-slug.util';
 import { CurrentUser } from '../auth/current-user';
 import {
   ConcertBody,
@@ -78,27 +82,46 @@ export class AdminService {
 
   async createConcert(user: CurrentUser, body: ConcertBody) {
     const organizationId = this.requireOrganizerOrganization(user);
+    const title = requireString(body.title, 'title');
+    const baseSlug = slugifyConcertTitle(title);
+    const data: Omit<Prisma.ConcertUncheckedCreateInput, 'slug'> = {
+      organizationId,
+      title,
+      venue: requireString(body.venue, 'venue'),
+      artistName: requireString(body.artistName, 'artistName'),
+      description:
+        optionalNullableString(body.description, 'description') ?? null,
+      startAt: parseDate(body.startAt, 'startAt'),
+      status: optionalConcertStatus(body.status) ?? 'draft',
+      seatingMapObjectKey: requireString(
+        body.seatingMapObjectKey,
+        'seatingMapObjectKey',
+      ),
+      publishedArtistBio: requireString(
+        body.publishedArtistBio,
+        'publishedArtistBio',
+      ),
+    };
 
-    const concert = await this.prisma.concert.create({
-      data: {
-        organizationId,
-        title: requireString(body.title, 'title'),
-        venue: requireString(body.venue, 'venue'),
-        artistName: requireString(body.artistName, 'artistName'),
-        description:
-          optionalNullableString(body.description, 'description') ?? null,
-        startAt: parseDate(body.startAt, 'startAt'),
-        status: optionalConcertStatus(body.status) ?? 'draft',
-        seatingMapObjectKey: requireString(
-          body.seatingMapObjectKey,
-          'seatingMapObjectKey',
-        ),
-        publishedArtistBio: requireString(
-          body.publishedArtistBio,
-          'publishedArtistBio',
-        ),
-      },
-    });
+    let concert: Awaited<ReturnType<typeof this.prisma.concert.create>> | null =
+      null;
+    for (let attempt = 1; attempt <= 100; attempt += 1) {
+      try {
+        concert = await this.prisma.concert.create({
+          data: {
+            ...data,
+            slug: concertSlugCandidate(baseSlug, attempt),
+          },
+        });
+        break;
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) throw error;
+      }
+    }
+
+    if (!concert) {
+      throw new ConflictException('Unable to generate a unique concert slug');
+    }
 
     await this.cacheInvalidationService.invalidateConcert(concert.id);
 
@@ -323,4 +346,13 @@ export class AdminService {
       throw new ForbiddenException('Concert belongs to another organization');
     }
   }
+}
+
+function isUniqueConstraintError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }

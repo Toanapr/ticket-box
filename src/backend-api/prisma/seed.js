@@ -26,6 +26,7 @@ const concerts = [
     id: '44444444-4444-4444-8444-444444444444',
     organizationId,
     title: 'TicketBox Summer Live',
+    slug: 'ticketbox-summer-live',
     venue: 'Saigon Exhibition Hall',
     artistName: 'The Aurora Lights',
     description: 'A high-energy summer concert with five ticket zones.',
@@ -39,6 +40,7 @@ const concerts = [
     id: '55555555-5555-4555-8555-555555555555',
     organizationId,
     title: 'TicketBox Winter Night',
+    slug: 'ticketbox-winter-night',
     venue: 'Hanoi Indoor Arena',
     artistName: 'Luna River',
     description: 'A winter concert focused on ballads and acoustic sets.',
@@ -52,6 +54,7 @@ const concerts = [
     id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     organizationId,
     title: 'TicketBox Reservation Test',
+    slug: 'ticketbox-reservation-test',
     venue: 'Local Docker Test Venue',
     artistName: 'TicketBox Test Artist',
     description:
@@ -239,6 +242,7 @@ async function seedConcerts() {
       update: {
         organizationId: concert.organizationId,
         title: concert.title,
+        slug: concert.slug,
         venue: concert.venue,
         artistName: concert.artistName,
         description: concert.description,

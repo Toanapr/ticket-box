@@ -8,6 +8,7 @@ const ticketTypeId = "22222222-2222-4222-8222-222222222222";
 function concertFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: concertId,
+    slug: "aurora-live",
     title: "Aurora Live",
     venue: "TicketBox Arena, Ho Chi Minh City",
     artistName: "The Aurora Lights",
@@ -45,6 +46,7 @@ describe("concert API adapter", () => {
 
     expect(concert).toEqual({
       id: concertId,
+      slug: "aurora-live",
       title: "Aurora Live",
       artists: ["The Aurora Lights"],
       venue: "TicketBox Arena, Ho Chi Minh City",
@@ -91,6 +93,7 @@ describe("concert API adapter", () => {
     ["invalid date", { startAt: "not-a-date" }],
     ["negative price", { ticketTypes: [ticketTypeFixture({ price: -1 })] }],
     ["unknown zone", { ticketTypes: [ticketTypeFixture({ zoneCode: "BALCONY" })] }],
+    ["invalid slug", { slug: "Invalid Slug" }],
     ["missing ticket array", { ticketTypes: undefined }],
   ])("rejects %s", (_label, overrides) => {
     expect(() => normalizeConcertDetail(concertFixture(overrides))).toThrow(ConcertContractError);

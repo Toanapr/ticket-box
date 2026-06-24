@@ -22,7 +22,7 @@ export function SeatingMap({
           {concert.ticketTypes.map((type) => (
             <ZoneShape
               key={type.id}
-              href={`/concerts/${concert.id}?ticketType=${type.id}`}
+              href={`/concerts/${concert.slug}?ticketType=${type.id}`}
               zone={type.zone}
               label={type.zone.toUpperCase()}
               selected={type.id === selected?.id}
@@ -35,7 +35,7 @@ export function SeatingMap({
         {concert.ticketTypes.map((type) => (
           <Link
             key={type.id}
-            href={`/concerts/${concert.id}?ticketType=${type.id}`}
+            href={`/concerts/${concert.slug}?ticketType=${type.id}`}
             scroll={false}
             className={`inline-flex min-h-11 items-center gap-2 rounded border px-3 py-2 text-sm font-bold transition ${
               type.id === selectedTicketTypeId ? "border-ticket-green bg-ticket-green/10" : "border-black/10 hover:border-ticket-obsidian"

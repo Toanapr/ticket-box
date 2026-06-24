@@ -56,6 +56,7 @@ model Concert {
   id                  String        @id @default(uuid()) @db.Uuid
   organizationId      String        @map("organization_id") @db.Uuid
   title               String
+  slug                String        @unique
   venue               String
   artistName          String        @map("artist_name")
   description         String?

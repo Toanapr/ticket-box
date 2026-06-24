@@ -6,6 +6,7 @@ const saleEndsAt = "2026-12-31T23:59:59+07:00";
 export const mockConcerts: ConcertDetail[] = [
   {
     id: "say-hi-2026",
+    slug: "say-hi-2026",
     title: "Anh Trai Say Hi - Concert 2026",
     artists: ["HIEUTHUHAI", "RHYDER", "Quang Hung MasterD", "Negav", "ISAAC", "HURRYKNG"],
     venue: "Sân vận động Quốc gia Mỹ Đình, Hà Nội",
@@ -25,6 +26,7 @@ export const mockConcerts: ConcertDetail[] = [
   },
   {
     id: "chong-gai-2",
+    slug: "chong-gai-2",
     title: "Anh Trai Vượt Ngàn Chông Gai - Concert 2",
     artists: ["Soobin Hoàng Sơn", "Bằng Kiều", "Tự Long", "Cường Seven", "Kay Trần", "Jun Phạm"],
     venue: "Sân vận động Quân khu 7, TP. Hồ Chí Minh",
@@ -44,6 +46,7 @@ export const mockConcerts: ConcertDetail[] = [
   },
   {
     id: "chi-dep-2026",
+    slug: "chi-dep-2026",
     title: "Chị Đẹp Đạp Gió Rẽ Sóng 2026",
     artists: ["Tóc Tiên", "Minh Hằng", "Thiều Bảo Trâm", "Ngọc Thanh Tâm", "Đồng Ánh Quỳnh"],
     venue: "Nhà thi đấu Phú Thọ, TP. Hồ Chí Minh",
@@ -63,6 +66,7 @@ export const mockConcerts: ConcertDetail[] = [
   },
   {
     id: "em-xinh-showcase",
+    slug: "em-xinh-showcase",
     title: "Em Xinh Say Hi - Showcases",
     artists: ["Amee", "Mono", "tlinh", "Wren Evans", "Grey D", "hieuthuhai"],
     venue: "Trung tâm Hội chợ và Triển lãm Sài Gòn SECC",

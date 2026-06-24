@@ -984,6 +984,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     await prisma.concert.create({
       data: {
         id: concertId,
+        slug: `test-concert-${concertId}`,
         organizationId,
         title: `Test Concert ${input.name}`,
         venue: 'E2E Test Venue',

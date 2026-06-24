@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ConcertPoster } from "@/components/concert-poster";
 import { ArrowRightIcon, CalendarIcon, InfoIcon, LayersIcon, MapPinIcon, UsersIcon } from "@/components/icons";
@@ -7,7 +7,7 @@ import { PageShell } from "@/components/site-shell";
 import { SeatingMap } from "@/components/seating-map";
 import { TicketTypeSidebar } from "@/components/ticket-type-sidebar";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-import { getConcertById } from "@/lib/server-api";
+import { getConcertByIdentifier } from "@/lib/server-api";
 
 interface ConcertDetailPageProps {
   params: Promise<{ id: string }>;
@@ -17,8 +17,12 @@ interface ConcertDetailPageProps {
 export default async function ConcertDetailPage({ params, searchParams }: ConcertDetailPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;
-  const concert = await getConcertById(id);
+  const concert = await getConcertByIdentifier(id);
   if (!concert) notFound();
+  if (id !== concert.slug) {
+    const ticketTypeQuery = query?.ticketType ? `?ticketType=${encodeURIComponent(query.ticketType)}` : "";
+    permanentRedirect(`/concerts/${concert.slug}${ticketTypeQuery}`);
+  }
 
   const selectedTicketType =
     concert.ticketTypes.find((type) => type.id === query?.ticketType) ??
@@ -80,7 +84,7 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
               </div> : null}
               {canBuy && selectedTicketType ? (
                 <Link
-                  href={`/concerts/${concert.id}/checkout?ticketType=${selectedTicketType.id}`}
+                  href={`/concerts/${concert.slug}/checkout?ticketType=${selectedTicketType.id}`}
                   className="mt-4 flex min-h-12 w-full items-center justify-center rounded-lg bg-ticket-green px-5 py-3 text-[15px] font-black uppercase tracking-wide text-white transition hover:bg-[#00964a]"
                 >
                   {heroCtaLabel}

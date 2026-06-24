@@ -4,15 +4,17 @@ vi.mock("server-only", () => ({}));
 vi.mock("./backend-bff", () => ({ getBackendBaseUrl: vi.fn(() => "http://backend.test") }));
 
 import { getBackendBaseUrl } from "./backend-bff";
-import { getConcertById, getConcerts } from "./server-api";
+import { getConcertByIdentifier, getConcerts } from "./server-api";
 
 const mockedBaseUrl = vi.mocked(getBackendBaseUrl);
 const concertId = "11111111-1111-4111-8111-111111111111";
+const concertSlug = "backend-concert";
 const ticketTypeId = "22222222-2222-4222-8222-222222222222";
 
 function apiConcert(): Record<string, unknown> {
   return {
     id: concertId,
+    slug: concertSlug,
     title: "Backend Concert",
     venue: "TicketBox Arena",
     artistName: "Backend Artist",
@@ -63,12 +65,21 @@ describe("concert server API", () => {
 
   it("returns null only when detail is not found", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
-    await expect(getConcertById(concertId)).resolves.toBeNull();
+    await expect(getConcertByIdentifier(concertSlug)).resolves.toBeNull();
   });
 
   it("normalizes a successful detail response", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(apiConcert())));
-    await expect(getConcertById(concertId)).resolves.toMatchObject({ id: concertId, title: "Backend Concert" });
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(apiConcert()));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getConcertByIdentifier(concertSlug)).resolves.toMatchObject({
+      id: concertId,
+      slug: concertSlug,
+      title: "Backend Concert",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://backend.test/concerts/${concertSlug}`,
+      expect.objectContaining({ next: { revalidate: 15 } }),
+    );
   });
 
   it("preserves rate-limit status and retry metadata", async () => {

@@ -29,8 +29,8 @@ export async function getConcerts(): Promise<ConcertSummary[]> {
   }
 }
 
-export async function getConcertById(id: string): Promise<ConcertDetail | null> {
-  const payload = await fetchConcertJson(`/concerts/${encodeURIComponent(id)}`, 15, true);
+export async function getConcertByIdentifier(identifier: string): Promise<ConcertDetail | null> {
+  const payload = await fetchConcertJson(`/concerts/${encodeURIComponent(identifier)}`, 15, true);
   if (payload === null) return null;
 
   try {

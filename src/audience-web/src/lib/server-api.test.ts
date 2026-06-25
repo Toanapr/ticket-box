@@ -23,6 +23,7 @@ function apiConcert(): Record<string, unknown> {
     status: "published",
     seatingMapObjectKey: "concerts/backend/map.json",
     publishedArtistBio: "Backend Artist biography",
+    posterObjectKey: null,
     ticketTypes: [
       {
         id: ticketTypeId,
@@ -79,7 +80,7 @@ describe("concert server API", () => {
     });
     expect(fetchMock).toHaveBeenCalledWith(
       `http://backend.test/concerts/${concertSlug}`,
-      expect.objectContaining({ next: { revalidate: 15 } }),
+      expect.objectContaining({ cache: "no-store" }),
     );
   });
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { apiFetch, Concert, ConcertPayload } from "@/lib/api";
+import { apiFetch, Concert, ConcertPayload, uploadPoster } from "@/lib/api";
+import { getPostCreateStatusPatch } from "@/lib/concert-form-orchestration";
 
 type ConcertFormProps = {
   mode: "create" | "edit";
@@ -20,43 +23,101 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     concert?.status ?? "draft",
   );
   const [error, setError] = useState("");
+  const [recoveryConcertId, setRecoveryConcertId] = useState<string | null>(
+    null,
+  );
   const [isSaving, setIsSaving] = useState(false);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
+  const [posterPreview, setPosterPreview] = useState<string | null>(null);
+
+  const existingPosterUrl = concert?.posterObjectKey
+    ? `/api/backend/media/concert-posters/${encodeURIComponent(concert.posterObjectKey)}`
+    : null;
+
+  useEffect(() => {
+    return () => {
+      if (posterPreview) URL.revokeObjectURL(posterPreview);
+    };
+  }, [posterPreview]);
+
+  function handlePosterChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setPosterFile(file);
+
+    setPosterPreview(file ? URL.createObjectURL(file) : null);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setRecoveryConcertId(null);
 
     if (!title.trim() || !venue.trim() || !startAt) {
       setError("Title, venue, and start time are required.");
       return;
     }
 
+    const isPublish = status === "published";
+    const hasPosterFile = Boolean(posterFile);
+    const hasExistingPoster = Boolean(concert?.posterObjectKey);
+
+    if (isPublish && !hasPosterFile && !hasExistingPoster) {
+      setError("Please select a poster image before publishing.");
+      return;
+    }
+
     setIsSaving(true);
 
-    try {
-      const payload = buildConcertPayload({
-        title,
-        venue,
-        startAt,
-        status,
-        concert,
-      });
+    let createdConcert: Concert | null = null;
 
+    try {
       if (mode === "create") {
-        await apiFetch<Concert>("/admin/concerts", {
+        createdConcert = await apiFetch<Concert>("/admin/concerts", {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify(
+            buildConcertPayload({
+              title,
+              venue,
+              startAt,
+              status: "draft",
+              concert,
+            }),
+          ),
         });
-      } else if (concert) {
-        await apiFetch<Concert>(`/admin/concerts/${concert.id}`, {
+      }
+
+      const targetId =
+        mode === "edit" && concert ? concert.id : createdConcert?.id;
+
+      if (!targetId) {
+        throw new Error("Failed to identify concert for poster upload");
+      }
+
+      if (posterFile) {
+        await uploadPoster(targetId, posterFile);
+      }
+
+      if (mode === "edit") {
+        await apiFetch<Concert>(`/admin/concerts/${concert!.id}`, {
           method: "PATCH",
-          body: JSON.stringify(payload),
+          body: JSON.stringify(
+            buildConcertPayload({ title, venue, startAt, status, concert }),
+          ),
         });
+      } else if (createdConcert) {
+        const statusPatch = getPostCreateStatusPatch(status);
+        if (statusPatch) {
+          await apiFetch<Concert>(`/admin/concerts/${createdConcert.id}`, {
+            method: "PATCH",
+            body: JSON.stringify(statusPatch),
+          });
+        }
       }
 
       router.push("/admin/concerts");
       router.refresh();
     } catch (caught) {
+      setRecoveryConcertId(createdConcert?.id ?? null);
       setError(
         caught instanceof Error ? caught.message : "Unable to save concert.",
       );
@@ -113,8 +174,59 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         </select>
       </label>
 
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">
+          Poster{mode === "create" ? " (required for publish)" : ""}
+        </span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handlePosterChange}
+          className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:rounded file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
+        />
+        {mode === "edit" && !posterFile && existingPosterUrl ? (
+          <div className="mt-2">
+            <p className="mb-1 text-xs text-slate-500">Current poster:</p>
+            <Image
+              src={existingPosterUrl}
+              alt="Current poster"
+              width={256}
+              height={128}
+              className="h-32 w-auto rounded border object-contain"
+            />
+          </div>
+        ) : null}
+        {posterPreview ? (
+          <div className="mt-2">
+            <p className="mb-1 text-xs text-slate-500">New poster preview:</p>
+            <Image
+              src={posterPreview}
+              alt="Poster preview"
+              width={256}
+              height={128}
+              unoptimized
+              className="h-32 w-auto rounded border object-contain"
+            />
+          </div>
+        ) : null}
+      </label>
+
       {error ? (
-        <p className="text-sm font-medium text-red-700">{error}</p>
+        <div className="space-y-1 text-sm font-medium text-red-700">
+          <p>{error}</p>
+          {recoveryConcertId ? (
+            <p>
+              Draft created. Continue editing at{" "}
+              <Link
+                href={`/admin/concerts/${recoveryConcertId}/edit`}
+                className="underline"
+              >
+                concert {recoveryConcertId}
+              </Link>
+              .
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       <button

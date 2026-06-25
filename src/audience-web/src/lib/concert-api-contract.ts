@@ -22,6 +22,7 @@ export interface ConcertApiRecord {
   status: "published";
   seatingMapObjectKey: string;
   publishedArtistBio: string;
+  posterObjectKey: string | null;
   ticketTypes: ConcertApiTicketType[];
 }
 
@@ -56,6 +57,7 @@ export function parseConcertApiRecord(value: unknown, path = "concert"): Concert
     status,
     seatingMapObjectKey: readString(record.seatingMapObjectKey, `${path}.seatingMapObjectKey`),
     publishedArtistBio: readString(record.publishedArtistBio, `${path}.publishedArtistBio`),
+    posterObjectKey: record.posterObjectKey === undefined ? null : readNullableString(record.posterObjectKey, `${path}.posterObjectKey`),
     ticketTypes: ticketTypes.map((item, index) => parseTicketType(item, `${path}.ticketTypes[${index}]`)),
   };
 }

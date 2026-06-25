@@ -1,12 +1,20 @@
 import {
   Body,
   Controller,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   Patch,
   Post,
+  Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user';
 import { Roles } from '../auth/roles.decorator';
@@ -47,6 +55,29 @@ export class AdminController {
     @Body() body: ConcertBody,
   ) {
     return this.adminService.updateConcert(user, id, body);
+  }
+
+  @Put('concerts/:id/poster')
+  @UseInterceptors(
+    FileInterceptor('poster', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    }),
+  )
+  uploadPoster(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: '.(jpeg|jpg|png|webp)' }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.adminService.uploadPoster(user, id, file);
   }
 
   @Post('concerts/:id/ticket-types')

@@ -3,11 +3,14 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CacheInvalidationService } from '../../common/cache/cache-invalidation.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ConcertPosterStorageService } from '../concert-poster/concert-poster-storage.service';
 import {
   concertSlugCandidate,
   slugifyConcertTitle,
@@ -34,8 +37,11 @@ import {
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly cacheInvalidationService: CacheInvalidationService,
+    private readonly concertPosterStorage: ConcertPosterStorageService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -86,7 +92,15 @@ export class AdminService {
 
   async createConcert(user: CurrentUser, body: ConcertBody) {
     const organizationId = this.requireOrganizerOrganization(user);
+    const status = optionalConcertStatus(body.status) ?? 'draft';
     const title = requireString(body.title, 'title');
+
+    if (status === 'published') {
+      throw new BadRequestException(
+        'Cannot create a published concert without a poster. Create as draft, upload a poster, then publish.',
+      );
+    }
+
     const baseSlug = slugifyConcertTitle(title);
     const data: Omit<Prisma.ConcertUncheckedCreateInput, 'slug'> = {
       organizationId,
@@ -96,7 +110,7 @@ export class AdminService {
       description:
         optionalNullableString(body.description, 'description') ?? null,
       startAt: parseDate(body.startAt, 'startAt'),
-      status: optionalConcertStatus(body.status) ?? 'draft',
+      status,
       seatingMapObjectKey: requireString(
         body.seatingMapObjectKey,
         'seatingMapObjectKey',
@@ -151,12 +165,17 @@ export class AdminService {
       'publishedArtistBio',
     );
 
+    if (status !== undefined) {
+      if (status === 'published') {
+        await this.assertPosterAvailableForPublish(existing.posterObjectKey);
+      }
+      data.status = status;
+    }
     if (title !== undefined) data.title = title;
     if (venue !== undefined) data.venue = venue;
     if (artistName !== undefined) data.artistName = artistName;
     if (description !== undefined) data.description = description;
     if (startAt !== undefined) data.startAt = startAt;
-    if (status !== undefined) data.status = status;
     if (seatingMapObjectKey !== undefined) {
       data.seatingMapObjectKey = seatingMapObjectKey;
     }
@@ -342,6 +361,69 @@ export class AdminService {
     return updated;
   }
 
+  async uploadPoster(
+    user: CurrentUser,
+    concertId: string,
+    file: Express.Multer.File,
+  ) {
+    const concert = await this.findOwnedConcert(user, concertId);
+
+    const oldKey = concert.posterObjectKey;
+    const nextVersion = oldKey
+      ? (this.concertPosterStorage.parseVersion(oldKey) ?? 0) + 1
+      : 1;
+
+    const mime = file.mimetype;
+    const { objectKey } = await this.concertPosterStorage.save(
+      concertId,
+      mime,
+      file.buffer,
+      nextVersion,
+    );
+
+    let updatedCount: number;
+    try {
+      const updateResult = await this.prisma.concert.updateMany({
+        where: { id: concertId, posterObjectKey: oldKey },
+        data: { posterObjectKey: objectKey },
+      });
+      updatedCount = updateResult.count;
+    } catch {
+      await this.concertPosterStorage
+        .delete(objectKey)
+        .catch((cleanupError) => {
+          this.logger.error(
+            `Failed to compensate poster ${objectKey} after database error`,
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError),
+          );
+        });
+      throw new InternalServerErrorException(
+        'Failed to update concert poster key after saving file',
+      );
+    }
+
+    if (updatedCount !== 1) {
+      await this.concertPosterStorage.delete(objectKey);
+      throw new ConflictException(
+        'Concert poster was replaced by another request. Retry with the latest concert state.',
+      );
+    }
+
+    await this.cacheInvalidationService.invalidateConcert(concertId);
+
+    if (oldKey) {
+      this.concertPosterStorage.delete(oldKey).catch((err) => {
+        this.logger.warn(
+          `Failed to clean up old poster ${oldKey}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    }
+
+    return { posterObjectKey: objectKey };
+  }
+
   private async findOwnedConcert(user: CurrentUser, concertId: string) {
     const concert = await this.prisma.concert.findUnique({
       where: { id: concertId },
@@ -354,6 +436,19 @@ export class AdminService {
     this.assertOrganizerOwnsConcert(user, concert.organizationId);
 
     return concert;
+  }
+
+  private async assertPosterAvailableForPublish(
+    posterObjectKey: string | null,
+  ): Promise<void> {
+    if (
+      !posterObjectKey ||
+      !(await this.concertPosterStorage.fileExists(posterObjectKey))
+    ) {
+      throw new BadRequestException(
+        'Cannot publish a concert without a stored poster. Upload a poster first.',
+      );
+    }
   }
 
   private requireOrganizerOrganization(user: CurrentUser): string {

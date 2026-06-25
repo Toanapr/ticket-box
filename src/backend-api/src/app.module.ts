@@ -8,6 +8,7 @@ import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AppConfigModule } from './config/config.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ConcertPosterModule } from './modules/concert-poster/concert-poster.module';
 import { ConcertsModule } from './modules/concert/concerts.module';
 
 import { HealthModule } from './modules/health/health.module';
@@ -35,6 +36,7 @@ const backendEnvFilePath = resolve(__dirname, '..', '.env');
 
     // Feature Modules
     AuthModule,
+    ConcertPosterModule,
     ConcertsModule,
     AdminModule,
     HealthModule,

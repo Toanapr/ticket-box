@@ -1,5 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const { randomBytes, scryptSync } = require('node:crypto');
+const {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+} = require('node:fs');
+const { join, resolve } = require('node:path');
 
 const prisma = new PrismaClient();
 
@@ -21,6 +28,12 @@ function hashPassword(password) {
   return `scrypt:${salt}:${hash}`;
 }
 
+const posterSourceFileNames = {
+  '44444444-4444-4444-8444-444444444444': 'say-hi-poster.png',
+  '55555555-5555-4555-8555-555555555555': 'chi-dep-poster.png',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': 'chong-gai-poster.png',
+};
+
 const concerts = [
   {
     id: '44444444-4444-4444-8444-444444444444',
@@ -35,6 +48,7 @@ const concerts = [
     seatingMapObjectKey: 'seating-maps/summer-live.svg',
     publishedArtistBio:
       'The Aurora Lights blend pop, electronic, and orchestral textures for arena-scale shows.',
+    posterObjectKey: '44444444-4444-4444-8444-444444444444-1.jpg',
   },
   {
     id: '55555555-5555-4555-8555-555555555555',
@@ -49,6 +63,7 @@ const concerts = [
     seatingMapObjectKey: 'seating-maps/winter-night.svg',
     publishedArtistBio:
       'Luna River is known for intimate vocals, cinematic staging, and fan-led choruses.',
+    posterObjectKey: '55555555-5555-4555-8555-555555555555-1.jpg',
   },
   {
     id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -64,6 +79,7 @@ const concerts = [
     seatingMapObjectKey: 'seating-maps/reservation-test.svg',
     publishedArtistBio:
       'Seed data used exclusively for local backend integration testing.',
+    posterObjectKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-1.jpg',
   },
 ];
 
@@ -259,8 +275,48 @@ async function seedConcerts() {
         status: concert.status,
         seatingMapObjectKey: concert.seatingMapObjectKey,
         publishedArtistBio: concert.publishedArtistBio,
+        posterObjectKey: concert.posterObjectKey,
       },
     });
+  }
+}
+
+function seedPosterFixtures() {
+  const storageDir = resolve(
+    process.env.CONCERT_POSTER_STORAGE_DIR ?? 'storage/concert-posters',
+  );
+
+  if (!existsSync(storageDir)) {
+    mkdirSync(storageDir, { recursive: true });
+  }
+
+  const assetsDir = resolve(__dirname, '..', '..', '..', 'mock-ui', 'images');
+
+  for (const concert of concerts) {
+    if (!concert.posterObjectKey) continue;
+
+    const fixtureName = posterSourceFileNames[concert.id];
+    if (!fixtureName) continue;
+
+    const sourcePath = join(assetsDir, fixtureName);
+    const destPath = join(storageDir, concert.posterObjectKey);
+
+    if (!existsSync(sourcePath)) {
+      throw new Error(`Missing concert poster seed asset: ${sourcePath}`);
+    }
+
+    assertJpegFixture(sourcePath);
+    copyFileSync(sourcePath, destPath);
+    console.log(`  Seeded poster: ${concert.posterObjectKey}`);
+  }
+}
+
+function assertJpegFixture(sourcePath) {
+  const header = readFileSync(sourcePath).subarray(0, 3);
+  if (header[0] !== 0xff || header[1] !== 0xd8 || header[2] !== 0xff) {
+    throw new Error(
+      `Concert poster fixture must contain JPEG bytes for its .jpg object key: ${sourcePath}`,
+    );
   }
 }
 
@@ -307,6 +363,7 @@ async function seedTicketTypesAndInventory() {
 async function main() {
   await seedOrganization();
   await seedUsers();
+  seedPosterFixtures();
   await seedConcerts();
   await seedTicketTypesAndInventory();
 

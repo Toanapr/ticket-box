@@ -21,7 +21,9 @@ export class ConcertApiError extends Error {
 }
 
 export async function getConcerts(): Promise<ConcertSummary[]> {
-  const payload = await fetchConcertJson("/concerts", 30);
+  const payload = await fetchConcertJson("/concerts", {
+    revalidate: 30,
+  });
   try {
     return normalizeConcertList(payload);
   } catch {
@@ -30,7 +32,10 @@ export async function getConcerts(): Promise<ConcertSummary[]> {
 }
 
 export async function getConcertByIdentifier(identifier: string): Promise<ConcertDetail | null> {
-  const payload = await fetchConcertJson(`/concerts/${encodeURIComponent(identifier)}`, 15, true);
+  const payload = await fetchConcertJson(`/concerts/${encodeURIComponent(identifier)}`, {
+    allowNotFound: true,
+    cache: "no-store",
+  });
   if (payload === null) return null;
 
   try {
@@ -40,7 +45,17 @@ export async function getConcertByIdentifier(identifier: string): Promise<Concer
   }
 }
 
-async function fetchConcertJson(path: string, revalidate: number, allowNotFound = false): Promise<unknown | null> {
+type ConcertFetchOptions =
+  | {
+      allowNotFound?: boolean;
+      revalidate: number;
+    }
+  | {
+      allowNotFound?: boolean;
+      cache: "no-store";
+    };
+
+async function fetchConcertJson(path: string, options: ConcertFetchOptions): Promise<unknown | null> {
   let baseUrl: string;
   try {
     baseUrl = getBackendBaseUrl();
@@ -54,10 +69,10 @@ async function fetchConcertJson(path: string, revalidate: number, allowNotFound 
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       signal: controller.signal,
-      next: { revalidate },
+      ...buildCacheOptions(options),
     });
 
-    if (allowNotFound && response.status === 404) return null;
+    if (options.allowNotFound && response.status === 404) return null;
     if (!response.ok) {
       const retryAfter = response.headers.get("retry-after") ?? undefined;
       const kind: ConcertApiErrorKind = response.status === 429 ? "rate-limit" : "upstream";
@@ -76,4 +91,14 @@ async function fetchConcertJson(path: string, revalidate: number, allowNotFound 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function buildCacheOptions(
+  options: ConcertFetchOptions,
+): Pick<RequestInit, "cache"> | { next: { revalidate: number } } {
+  if ("cache" in options) {
+    return { cache: options.cache };
+  }
+
+  return { next: { revalidate: options.revalidate } };
 }

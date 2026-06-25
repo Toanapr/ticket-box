@@ -10,7 +10,6 @@ const allowedRoutes = [
   { method: "POST", pattern: /^orders$/ },
   { method: "GET", pattern: /^orders\/[0-9a-f-]{36}$/i },
   { method: "POST", pattern: /^payments\/[0-9a-f-]{36}\/intent$/i },
-  { method: "POST", pattern: /^payments\/mock-success$/ },
   { method: "GET", pattern: /^tickets\/[0-9a-f-]{36}$/i },
 ];
 

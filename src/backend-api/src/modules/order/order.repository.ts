@@ -9,6 +9,48 @@ import { DomainError } from '../../common/errors/domain-error';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
+const orderSummaryInclude = {
+  payments: {
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
+  },
+  items: {
+    orderBy: {
+      id: 'asc' as const,
+    },
+    include: {
+      ticketType: {
+        include: {
+          concert: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.OrderInclude;
+
+const orderDetailInclude = {
+  payments: {
+    orderBy: {
+      createdAt: 'asc' as const,
+    },
+  },
+  reservations: {
+    include: {
+      ticketType: {
+        include: {
+          concert: true,
+        },
+      },
+    },
+  },
+  tickets: {
+    orderBy: {
+      sequenceNo: 'asc' as const,
+    },
+  },
+} satisfies Prisma.OrderInclude;
+
 @Injectable()
 export class OrderRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -22,7 +64,7 @@ export class OrderRepository {
         },
       },
       include: {
-        items: true,
+        ...orderSummaryInclude,
       },
     });
   }
@@ -33,19 +75,7 @@ export class OrderRepository {
         id: orderId,
         userId,
       },
-      include: {
-        payments: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-        reservations: true,
-        tickets: {
-          orderBy: {
-            sequenceNo: 'asc',
-          },
-        },
-      },
+      include: orderDetailInclude,
     });
   }
 
@@ -152,7 +182,12 @@ export class OrderRepository {
         },
       });
 
-      return order;
+      return tx.order.findUniqueOrThrow({
+        where: {
+          id: order.id,
+        },
+        include: orderSummaryInclude,
+      });
     });
   }
 }

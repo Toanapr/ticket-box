@@ -14,6 +14,7 @@ export interface CheckoutIntentInput {
 export interface CheckoutIntent extends CheckoutIntentInput {
   reservationIdempotencyKey: string;
   orderIdempotencyKey: string;
+  paymentIntentIdempotencyKey: string;
   createdAt: string;
 }
 
@@ -26,6 +27,7 @@ export function getCheckoutIntent(input: CheckoutIntentInput): CheckoutIntent {
     ...input,
     reservationIdempotencyKey: makeIdempotencyKey("reservation"),
     orderIdempotencyKey: makeIdempotencyKey("order"),
+    paymentIntentIdempotencyKey: makeIdempotencyKey("payment-intent"),
     createdAt: new Date().toISOString(),
   };
   writeStoredIntent(signature, next);
@@ -54,6 +56,7 @@ function readStoredIntent(signature: string): CheckoutIntent | null {
       typeof value.userKey === "string" &&
       typeof value.reservationIdempotencyKey === "string" &&
       typeof value.orderIdempotencyKey === "string" &&
+      typeof value.paymentIntentIdempotencyKey === "string" &&
       typeof value.createdAt === "string"
     ) {
       return value as CheckoutIntent;

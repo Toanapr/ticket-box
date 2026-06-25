@@ -19,11 +19,19 @@ const copyByState: Record<WaitingRoomState, { title: string; message: string; to
     tone: "border-red-200 bg-red-50 text-red-900",
   },
   unavailable: {
-    title: "Chua co token waiting room",
-    message: "Neu backend yeu cau waiting room, checkout se dung den khi ban duoc cap token.",
+    title: "Waiting room chua duoc backend yeu cau",
+    message: "Neu dot ban bat waiting room, trang nay se hien trang thai cho vao sale tai day.",
     tone: "border-slate-200 bg-slate-50 text-slate-700",
   },
 };
+
+export function getWaitingRoomCopy(state: WaitingRoomState): { title: string; message: string; tone: string } {
+  return copyByState[state];
+}
+
+export function shouldRenderWaitingRoomBanner(state: WaitingRoomState): boolean {
+  return state !== "unavailable";
+}
 
 export function WaitingRoomBanner({
   state,
@@ -32,7 +40,7 @@ export function WaitingRoomBanner({
   state: WaitingRoomState;
   retryAt?: string;
 }): React.ReactElement {
-  const copy = copyByState[state];
+  const copy = getWaitingRoomCopy(state);
   return (
     <div className={`flex gap-3 rounded border p-4 ${copy.tone}`}>
       {state === "admitted" ? <CheckIcon className="mt-0.5 h-5 w-5 shrink-0" /> : <AlertIcon className="mt-0.5 h-5 w-5 shrink-0" />}

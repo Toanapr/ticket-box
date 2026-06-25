@@ -77,12 +77,36 @@ export class OrderService {
     userId: string;
     status: string;
     totalAmount: { toString(): string };
+    payments: Array<{
+      id: string;
+    }>;
+    items: Array<{
+      ticketTypeId: string;
+      quantity: number;
+      ticketType: {
+        name: string;
+        concertId: string;
+        concert: {
+          title: string;
+          venue: string;
+        };
+      };
+    }>;
   }) {
+    const primaryItem = order.items[0];
+    const primaryPayment = order.payments[0];
     return {
       id: order.id,
       userId: order.userId,
       status: order.status,
       totalAmount: order.totalAmount.toString(),
+      paymentId: primaryPayment?.id ?? null,
+      concertId: primaryItem?.ticketType.concertId ?? null,
+      concertTitle: primaryItem?.ticketType.concert.title ?? null,
+      venue: primaryItem?.ticketType.concert.venue ?? null,
+      ticketTypeId: primaryItem?.ticketTypeId ?? null,
+      ticketTypeName: primaryItem?.ticketType.name ?? null,
+      quantity: primaryItem?.quantity ?? null,
     };
   }
 
@@ -96,6 +120,7 @@ export class OrderService {
       provider: string;
       status: string;
       providerTxnId: string | null;
+      checkoutUrl: string | null;
     }>;
     reservations: Array<{
       id: string;
@@ -103,6 +128,14 @@ export class OrderService {
       quantity: number;
       status: string;
       expiresAt: Date;
+      ticketType: {
+        name: string;
+        concertId: string;
+        concert: {
+          title: string;
+          venue: string;
+        };
+      };
     }>;
     tickets: Array<{
       id: string;
@@ -111,16 +144,26 @@ export class OrderService {
       ticketTypeId: string;
     }>;
   }) {
+    const primaryReservation = order.reservations[0];
+    const primaryPayment = order.payments[0];
     return {
       id: order.id,
       userId: order.userId,
       status: order.status,
       totalAmount: order.totalAmount.toString(),
+      paymentId: primaryPayment?.id ?? null,
+      concertId: primaryReservation?.ticketType.concertId ?? null,
+      concertTitle: primaryReservation?.ticketType.concert.title ?? null,
+      venue: primaryReservation?.ticketType.concert.venue ?? null,
+      ticketTypeId: primaryReservation?.ticketTypeId ?? null,
+      ticketTypeName: primaryReservation?.ticketType.name ?? null,
+      quantity: primaryReservation?.quantity ?? null,
       payments: order.payments.map((payment) => ({
         id: payment.id,
         provider: payment.provider,
         status: payment.status,
         providerTxnId: payment.providerTxnId,
+        checkoutUrl: payment.checkoutUrl,
       })),
       reservations: order.reservations.map((reservation) => ({
         id: reservation.id,

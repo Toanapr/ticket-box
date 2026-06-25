@@ -115,11 +115,31 @@ export interface ReservationResponse {
   saleAccessTokenExpiresAt?: string;
 }
 
+export interface ActiveReservationRecord {
+  reservationId: string;
+  concertId: string;
+  concertSlug: string;
+  concertTitle: string;
+  venue: string;
+  ticketTypeId: string;
+  ticketTypeSlug: string;
+  ticketTypeName: string;
+  quantity: number;
+  buyer: BuyerInfo;
+  totalAmount: number;
+  createdAt: string;
+  expiresAt: string;
+}
+
 export interface OrderRecord {
   orderId: string;
   reservationId: string;
+  reservationExpiresAt?: string;
   concertId: string;
+  concertTitle?: string;
+  venue?: string;
   ticketTypeId: string;
+  ticketTypeName?: string;
   quantity: number;
   buyer: BuyerInfo;
   status: OrderStatus;
@@ -133,6 +153,7 @@ export interface OrderRecord {
     providerTxnId?: string | null;
     checkoutUrl?: string | null;
     reason?: PaymentIntentReason | null;
+    retryAfterSeconds?: number | null;
     bankName?: string;
     accountNo?: string;
     accountName?: string;
@@ -147,7 +168,11 @@ export interface TicketRecord {
   ticketId: string;
   orderId: string;
   concertId: string;
+  concertTitle?: string;
+  venue?: string;
+  startsAt?: string;
   ticketTypeId: string;
+  ticketTypeName?: string;
   owner: BuyerInfo;
   quantity: number;
   seats: string[];

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { AlertIcon, CheckIcon } from "./icons";
 import { formatCurrency, formatDateTime, shortVenue } from "@/lib/format";
-import { findConcert } from "@/lib/mock-data";
-import type { OrderRecord, TicketRecord } from "@/lib/types";
+import type { ActiveReservationRecord, OrderRecord, TicketRecord } from "@/lib/types";
 
 export function ProfileRow({ label, value }: { label: string; value: string }): React.ReactElement {
   return (
@@ -44,9 +43,6 @@ export function AccountPanel({ title, description, icon, children }: { title: st
 }
 
 export function OrderCard({ order, actionHref, actionLabel }: { order: OrderRecord; actionHref: string; actionLabel: string }): React.ReactElement {
-  const concert = findConcert(order.concertId);
-  const ticketType = concert?.ticketTypes.find((item) => item.id === order.ticketTypeId);
-
   return (
     <article className="rounded-lg border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-start justify-between gap-4">
@@ -55,10 +51,11 @@ export function OrderCard({ order, actionHref, actionLabel }: { order: OrderReco
             <AlertIcon className="h-3.5 w-3.5" />
             Chờ thanh toán
           </div>
-          <h3 className="mt-3 font-display text-lg font-black">{concert?.title ?? order.concertId}</h3>
+          <h3 className="mt-3 font-display text-lg font-black">{order.concertTitle ?? order.concertId}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-700">
-            {ticketType?.name ?? order.ticketTypeId} x {order.quantity}
+            {order.ticketTypeName ?? order.ticketTypeId} x {order.quantity}
           </p>
+          {order.venue ? <p className="mt-1 text-xs font-bold text-slate-500">{shortVenue(order.venue)}</p> : null}
         </div>
         <div className="text-right font-black">{formatCurrency(order.totalAmount)}</div>
       </div>
@@ -73,10 +70,37 @@ export function OrderCard({ order, actionHref, actionLabel }: { order: OrderReco
   );
 }
 
-export function TicketCard({ ticket }: { ticket: TicketRecord }): React.ReactElement {
-  const concert = findConcert(ticket.concertId);
-  const ticketType = concert?.ticketTypes.find((item) => item.id === ticket.ticketTypeId);
+export function HeldReservationCard({ reservation }: { reservation: ActiveReservationRecord }): React.ReactElement {
+  return (
+    <article className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded bg-white px-2 py-1 text-[11px] font-black uppercase tracking-wide text-amber-700">
+            <AlertIcon className="h-3.5 w-3.5" />
+            Đang giữ vé
+          </div>
+          <h3 className="mt-3 font-display text-lg font-black">{reservation.concertTitle}</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-700">
+            {reservation.ticketTypeName} x {reservation.quantity} - {shortVenue(reservation.venue)}
+          </p>
+        </div>
+        <div className="text-right font-black">{formatCurrency(reservation.totalAmount)}</div>
+      </div>
+      <div className="mt-4 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2">
+        <span>Mã giữ chỗ: {reservation.reservationId}</span>
+        <span>Hết hạn: {formatDateTime(reservation.expiresAt)}</span>
+      </div>
+      <Link
+        href={`/concerts/${reservation.concertSlug}/checkout?ticketType=${reservation.ticketTypeSlug}`}
+        className="mt-4 flex min-h-11 items-center justify-center rounded bg-ticket-obsidian px-4 text-sm font-black uppercase tracking-wide text-white"
+      >
+        Quay lại checkout
+      </Link>
+    </article>
+  );
+}
 
+export function TicketCard({ ticket }: { ticket: TicketRecord }): React.ReactElement {
   return (
     <article className="rounded-lg border border-ticket-green/30 bg-ticket-green/5 p-4">
       <div className="flex items-start justify-between gap-4">
@@ -85,9 +109,9 @@ export function TicketCard({ ticket }: { ticket: TicketRecord }): React.ReactEle
             <CheckIcon className="h-3.5 w-3.5" />
             Đã phát hành
           </div>
-          <h3 className="mt-3 font-display text-lg font-black">{concert?.title ?? ticket.concertId}</h3>
+          <h3 className="mt-3 font-display text-lg font-black">{ticket.concertTitle ?? ticket.concertId}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-700">
-            {ticketType?.name ?? ticket.ticketTypeId} - {shortVenue(concert?.venue ?? "TicketBox")}
+            {ticket.ticketTypeName ?? ticket.ticketTypeId} - {shortVenue(ticket.venue ?? "TicketBox")}
           </p>
         </div>
         <div className="text-right text-sm font-black">{ticket.quantity} vé</div>

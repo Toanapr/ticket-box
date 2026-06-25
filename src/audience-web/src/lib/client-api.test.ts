@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createReservation, getOrder, normalizeErrorCode, parseRetryAfter, ReservationApiError } from "./client-api";
+import { createOrder, createPaymentIntent, createReservation, getOrder, getTicket, normalizeErrorCode, parseRetryAfter, ReservationApiError } from "./client-api";
 
 describe("client API transient errors", () => {
   afterEach(() => {
@@ -86,6 +86,144 @@ describe("client API transient errors", () => {
     );
   });
 
+  it("captures paymentId and order metadata from create order response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          id: "order-1",
+          status: "pending_payment",
+          totalAmount: "250000",
+          paymentId: "payment-1",
+          concertId: "concert-1",
+          concertTitle: "Summer Tour",
+          venue: "TicketBox Arena, Ho Chi Minh City",
+          ticketTypeId: "ticket-1",
+          ticketTypeName: "VIP",
+          quantity: 2,
+        }),
+      ),
+    );
+
+    await expect(
+      createOrder({
+        reservation: {
+          reservationId: "reservation-1",
+          expiresAt: "2026-07-15T00:10:00.000Z",
+          ticketTypeId: "ticket-1",
+          quantity: 2,
+        },
+        concertId: "concert-1",
+        buyer: { fullName: "Khán giả TicketBox", phone: "0909", email: "fan@test.local" },
+        paymentMethod: "VNPAY",
+        idempotencyKey: "order-key",
+      }),
+    ).resolves.toMatchObject({
+      orderId: "order-1",
+      concertId: "concert-1",
+      concertTitle: "Summer Tour",
+      venue: "TicketBox Arena, Ho Chi Minh City",
+      ticketTypeId: "ticket-1",
+      ticketTypeName: "VIP",
+      quantity: 2,
+      paymentIntent: {
+        paymentId: "payment-1",
+      },
+    });
+  });
+
+  it("sends Idempotency-Key and preserves degraded payment intent retry metadata", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          paymentId: "payment-1",
+          orderId: "order-1",
+          status: "pending",
+          checkoutUrl: null,
+          degraded: true,
+          reason: "provider_unavailable",
+          retryAfterSeconds: 30,
+        },
+        { status: 503, headers: { "retry-after": "30" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createPaymentIntent({ paymentId: "payment-1", idempotencyKey: "payment-intent-key" })).resolves.toEqual({
+      paymentId: "payment-1",
+      orderId: "order-1",
+      status: "pending",
+      checkoutUrl: null,
+      degraded: true,
+      reason: "provider_unavailable",
+      retryAfterSeconds: 30,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/backend/payments/payment-1/intent",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "Idempotency-Key": "payment-intent-key" }),
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("returns checkoutUrl for a successful payment intent response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            paymentId: "payment-success",
+            orderId: "order-success",
+            status: "pending",
+            checkoutUrl: "https://pay.example/checkout/payment-success",
+            degraded: false,
+            reason: null,
+            retryAfterSeconds: null,
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    await expect(createPaymentIntent({ paymentId: "payment-success", idempotencyKey: "payment-intent-key" })).resolves.toEqual({
+      paymentId: "payment-success",
+      orderId: "order-success",
+      status: "pending",
+      checkoutUrl: "https://pay.example/checkout/payment-success",
+      degraded: false,
+      reason: null,
+      retryAfterSeconds: null,
+    });
+  });
+
+  it("maps ambiguous payment intent responses into pending reconciliation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          paymentId: "payment-2",
+          orderId: "order-2",
+          status: "pending_reconciliation",
+          checkoutUrl: null,
+          degraded: true,
+          reason: "provider_timeout_ambiguous",
+          retryAfterSeconds: 5,
+        }),
+      ),
+    );
+
+    await expect(createPaymentIntent({ paymentId: "payment-2", idempotencyKey: "payment-intent-key" })).resolves.toMatchObject({
+      paymentId: "payment-2",
+      status: "pending_reconciliation",
+      degraded: true,
+      reason: "provider_timeout_ambiguous",
+      retryAfterSeconds: 5,
+    });
+  });
+
   it("derives order display status from the first payment status", async () => {
     vi.stubGlobal(
       "fetch",
@@ -94,28 +232,80 @@ describe("client API transient errors", () => {
           id: "11111111-1111-4111-8111-111111111111",
           status: "pending_payment",
           totalAmount: "2000000",
-          reservations: [{ id: "reservation-1", ticketTypeId: "ticket-1", quantity: 2 }],
+          reservations: [{ id: "reservation-1", ticketTypeId: "ticket-1", quantity: 2, expiresAt: "2026-07-15T00:10:00.000Z" }],
           payments: [
             {
               id: "22222222-2222-4222-8222-222222222222",
               provider: "mock",
               status: "pending_reconciliation",
               providerTxnId: null,
+              checkoutUrl: "https://pay.example/checkout/2222",
             },
           ],
           tickets: [],
+          paymentId: "22222222-2222-4222-8222-222222222222",
+          concertId: "concert-1",
+          concertTitle: "Flash Sale Concert",
+          venue: "TicketBox Arena, Ho Chi Minh City",
+          ticketTypeId: "ticket-1",
+          ticketTypeName: "SVIP",
+          quantity: 2,
         }),
       ),
     );
 
     await expect(getOrder("11111111-1111-4111-8111-111111111111")).resolves.toMatchObject({
       status: "PAYMENT_PENDING_RECONCILIATION",
+      reservationExpiresAt: "2026-07-15T00:10:00.000Z",
+      concertId: "concert-1",
+      concertTitle: "Flash Sale Concert",
+      venue: "TicketBox Arena, Ho Chi Minh City",
+      ticketTypeId: "ticket-1",
+      ticketTypeName: "SVIP",
+      quantity: 2,
       paymentIntent: {
         paymentId: "22222222-2222-4222-8222-222222222222",
         provider: "mock",
         status: "pending_reconciliation",
         providerTxnId: null,
+        checkoutUrl: "https://pay.example/checkout/2222",
       },
+    });
+  });
+
+  it("maps ticket response metadata from backend contract", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          id: "ticket-1",
+          orderId: "order-1",
+          concertId: "concert-1",
+          concertTitle: "Flash Sale Concert",
+          venue: "TicketBox Arena, Ho Chi Minh City",
+          startsAt: "2026-12-01T12:00:00.000Z",
+          ticketTypeId: "ticket-1",
+          ticketTypeName: "SVIP",
+          sequenceNo: 7,
+          status: "issued",
+          qrCode: { value: "opaque-qr-token" },
+        }),
+      ),
+    );
+
+    await expect(getTicket("ticket-1")).resolves.toMatchObject({
+      ticketId: "ticket-1",
+      orderId: "order-1",
+      concertId: "concert-1",
+      concertTitle: "Flash Sale Concert",
+      venue: "TicketBox Arena, Ho Chi Minh City",
+      startsAt: "2026-12-01T12:00:00.000Z",
+      ticketTypeId: "ticket-1",
+      ticketTypeName: "SVIP",
+      seats: ["Vé #7"],
+      qrPayload: "opaque-qr-token",
+      signedPayload: "opaque-qr-token",
+      status: "issued",
     });
   });
 });

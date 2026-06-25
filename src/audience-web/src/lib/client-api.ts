@@ -4,6 +4,8 @@ import type {
   BuyerInfo,
   CheckoutTransientError,
   OrderRecord,
+  PaymentIntentReason,
+  PaymentIntentResponse,
   ReservationErrorCode,
   ReservationRequest,
   ReservationResponse,
@@ -98,7 +100,18 @@ export async function createOrder(input: {
   idempotencyKey: string;
 }): Promise<OrderRecord> {
   {
-    const response = await fetchJson<{ id: string; status: string; totalAmount: string }>("/orders", {
+    const response = await fetchJson<{
+      id: string;
+      status: string;
+      totalAmount: string;
+      paymentId: string | null;
+      concertId: string | null;
+      concertTitle: string | null;
+      venue: string | null;
+      ticketTypeId: string | null;
+      ticketTypeName: string | null;
+      quantity: number | null;
+    }>("/orders", {
       method: "POST",
       body: JSON.stringify({
         reservationId: input.reservation.reservationId,
@@ -108,14 +121,18 @@ export async function createOrder(input: {
     return {
       orderId: response.id,
       reservationId: input.reservation.reservationId,
-      concertId: input.concertId,
-      ticketTypeId: input.reservation.ticketTypeId,
-      quantity: input.reservation.quantity,
+      concertId: response.concertId ?? input.concertId,
+      concertTitle: response.concertTitle ?? undefined,
+      venue: response.venue ?? undefined,
+      ticketTypeId: response.ticketTypeId ?? input.reservation.ticketTypeId,
+      ticketTypeName: response.ticketTypeName ?? undefined,
+      quantity: response.quantity ?? input.reservation.quantity,
       buyer: input.buyer,
       status: mapOrderStatus(response.status),
       totalAmount: Number(response.totalAmount),
       createdAt: new Date().toISOString(),
       paymentIntent: {
+        paymentId: response.paymentId ?? undefined,
         provider: input.paymentMethod,
         providerName: input.paymentMethod,
         memo: response.id,
@@ -125,20 +142,31 @@ export async function createOrder(input: {
   }
 }
 
+export async function createPaymentIntent(input: { paymentId: string; idempotencyKey: string }): Promise<PaymentIntentResponse> {
+  const response = await fetch(`/api/backend/payments/${input.paymentId}/intent`, {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": input.idempotencyKey,
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+  }
+
+  if (!response.ok && response.status !== 503) {
+    throw await createReservationApiError(response);
+  }
+
+  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  return parsePaymentIntentResponse(body, response);
+}
+
 export async function getOrder(orderId: string): Promise<OrderRecord | null> {
   const response = await fetchJson<BackendOrder>(`/orders/${orderId}`, { cache: "no-store" });
   return mapBackendOrder(response);
-}
-
-export async function mockPaymentSuccess(orderId: string): Promise<OrderRecord> {
-  await fetchJson("/payments/mock-success", {
-    method: "POST",
-    body: JSON.stringify({ orderId }),
-    cache: "no-store",
-  });
-  const order = await getOrder(orderId);
-  if (!order) throw new Error("Order not found");
-  return order;
 }
 
 export async function getTicket(ticketId: string): Promise<TicketRecord | null> {
@@ -146,8 +174,12 @@ export async function getTicket(ticketId: string): Promise<TicketRecord | null> 
   return {
     ticketId: response.id,
     orderId: response.orderId,
-    concertId: "",
+    concertId: response.concertId ?? "",
+    concertTitle: response.concertTitle ?? undefined,
+    venue: response.venue ?? undefined,
+    startsAt: response.startsAt ?? undefined,
     ticketTypeId: response.ticketTypeId,
+    ticketTypeName: response.ticketTypeName ?? undefined,
     owner: { fullName: "Khán giả TicketBox", phone: "", email: "" },
     quantity: 1,
     seats: [`Vé #${response.sequenceNo}`],
@@ -162,7 +194,14 @@ interface BackendOrder {
   id: string;
   status: string;
   totalAmount: string;
-  reservations: Array<{ id: string; ticketTypeId: string; quantity: number }>;
+  paymentId?: string | null;
+  concertId?: string | null;
+  concertTitle?: string | null;
+  venue?: string | null;
+  ticketTypeId?: string | null;
+  ticketTypeName?: string | null;
+  quantity?: number | null;
+  reservations: Array<{ id: string; ticketTypeId: string; quantity: number; expiresAt?: string }>;
   payments: Array<{
     id: string;
     provider: string;
@@ -176,7 +215,12 @@ interface BackendOrder {
 interface BackendTicket {
   id: string;
   orderId: string;
+  concertId?: string | null;
+  concertTitle?: string | null;
+  venue?: string | null;
+  startsAt?: string | null;
   ticketTypeId: string;
+  ticketTypeName?: string | null;
   sequenceNo: number;
   status: "issued" | "revoked" | "checked_in";
   qrCode: { value: string };
@@ -184,20 +228,24 @@ interface BackendTicket {
 
 function mapBackendOrder(order: BackendOrder): OrderRecord {
   const reservation = order.reservations[0];
-  const payment = order.payments[0];
+  const payment = order.payments.find((item) => item.id === order.paymentId) ?? order.payments[0];
   const ticketId = order.tickets[0]?.id;
   return {
     orderId: order.id,
     reservationId: reservation?.id ?? "",
-    concertId: "",
-    ticketTypeId: reservation?.ticketTypeId ?? "",
-    quantity: reservation?.quantity ?? 0,
+    reservationExpiresAt: reservation?.expiresAt,
+    concertId: order.concertId ?? "",
+    concertTitle: order.concertTitle ?? undefined,
+    venue: order.venue ?? undefined,
+    ticketTypeId: order.ticketTypeId ?? reservation?.ticketTypeId ?? "",
+    ticketTypeName: order.ticketTypeName ?? undefined,
+    quantity: order.quantity ?? reservation?.quantity ?? 0,
     buyer: { fullName: "Khán giả TicketBox", phone: "", email: "" },
     status: mapOrderAndPaymentStatus(order.status, payment?.status, Boolean(ticketId)),
     totalAmount: Number(order.totalAmount),
     createdAt: new Date().toISOString(),
     paymentIntent: {
-      paymentId: payment?.id,
+      paymentId: order.paymentId ?? payment?.id,
       provider: normalizePaymentProvider(payment?.provider),
       providerName: payment?.provider ?? "Mock payment",
       status: payment?.status,
@@ -253,6 +301,54 @@ function mapPaymentStatus(status: string): OrderRecord["status"] | undefined {
 function normalizePaymentProvider(provider: string | undefined): PaymentProvider {
   if (provider === "VNPAY" || provider === "MOMO" || provider === "mock" || provider === "mock-bank") return provider;
   return "mock";
+}
+
+function parsePaymentIntentResponse(body: Record<string, unknown> | null, response: Response): PaymentIntentResponse {
+  if (!body) throw invalidPaymentIntentResponse(response.status);
+
+  const status = body.status;
+  const reason = normalizePaymentIntentReason(body.reason);
+  const retryAfterSeconds = normalizeRetryAfterSeconds(body.retryAfterSeconds, response.headers.get("retry-after"));
+
+  if (
+    typeof body.paymentId !== "string" ||
+    typeof body.orderId !== "string" ||
+    (status !== "pending" && status !== "pending_reconciliation") ||
+    (body.checkoutUrl !== null && typeof body.checkoutUrl !== "string") ||
+    typeof body.degraded !== "boolean"
+  ) {
+    throw invalidPaymentIntentResponse(response.status);
+  }
+
+  return {
+    paymentId: body.paymentId,
+    orderId: body.orderId,
+    status,
+    checkoutUrl: body.checkoutUrl,
+    degraded: body.degraded,
+    reason,
+    retryAfterSeconds,
+  };
+}
+
+function normalizePaymentIntentReason(value: unknown): PaymentIntentReason | null {
+  return value === "provider_unavailable" || value === "provider_timeout_ambiguous" ? value : null;
+}
+
+function normalizeRetryAfterSeconds(bodyValue: unknown, headerValue: string | null): number | null {
+  if (typeof bodyValue === "number" && Number.isFinite(bodyValue) && bodyValue >= 0) return bodyValue;
+  const retry = parseRetryAfter(headerValue);
+  if (typeof retry.retryAfterMs !== "number") return null;
+  return Math.ceil(retry.retryAfterMs / 1000);
+}
+
+function invalidPaymentIntentResponse(status: number): ReservationApiError {
+  return new ReservationApiError("UNKNOWN", "Phan hoi tao payment intent khong hop le.", {
+    kind: "backend-error",
+    status,
+    code: "UNKNOWN",
+    message: "Phan hoi tao payment intent khong hop le.",
+  });
 }
 
 export function normalizeErrorCode(code: string | undefined): ReservationErrorCode {

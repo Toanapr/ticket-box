@@ -3,7 +3,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { useAuth } from "./auth-provider";
 import { CreditCardIcon, TicketIcon, UsersIcon } from "./icons";
-import { AccountPanel, EmptyState, Metric, OrderCard, ProfileRow, TicketCard } from "./user-account-cards";
+import { AccountPanel, EmptyState, HeldReservationCard, Metric, OrderCard, ProfileRow, TicketCard } from "./user-account-cards";
 import { formatCurrency } from "@/lib/format";
 import {
   getFallbackUserAccountSnapshot,
@@ -30,11 +30,13 @@ export function UserAccountClient(): React.ReactElement {
     () => snapshot?.orders.filter((order) => pendingStatuses.has(order.status)) ?? [],
     [snapshot],
   );
+  const activeReservations = snapshot.activeReservations;
   const purchasedOrders = useMemo(
     () => snapshot?.orders.filter((order) => boughtStatuses.has(order.status)) ?? [],
     [snapshot],
   );
   const spentAmount = purchasedOrders.reduce((total, order) => total + order.totalAmount, 0);
+  const holdingCount = activeReservations.length + pendingOrders.length;
 
   return (
     <div className="grid gap-8">
@@ -52,7 +54,7 @@ export function UserAccountClient(): React.ReactElement {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="Đang giữ chỗ" value={pendingOrders.length.toString()} tone="amber" />
+          <Metric label="Đang giữ chỗ" value={holdingCount.toString()} tone="amber" />
           <Metric label="Vé đã mua" value={snapshot.tickets.length.toString()} tone="green" />
           <Metric label="Đã thanh toán" value={formatCurrency(spentAmount)} tone="dark" />
         </div>
@@ -61,11 +63,14 @@ export function UserAccountClient(): React.ReactElement {
       <section className="grid gap-8 lg:grid-cols-[1fr_1fr]">
         <AccountPanel
           title="Vé đang giữ chỗ"
-          description="Các đơn đã chọn ghế/khu vé nhưng chưa hoàn tất thanh toán."
+          description="Các lượt giữ chỗ còn hiệu lực hoặc đơn chưa hoàn tất thanh toán."
           icon={<CreditCardIcon className="h-5 w-5" />}
         >
-          {pendingOrders.length > 0 ? (
+          {holdingCount > 0 ? (
             <div className="grid gap-4">
+              {activeReservations.map((reservation) => (
+                <HeldReservationCard key={reservation.reservationId} reservation={reservation} />
+              ))}
               {pendingOrders.map((order) => (
                 <OrderCard key={order.orderId} order={order} actionLabel="Tiếp tục thanh toán" actionHref={`/orders/${order.orderId}`} />
               ))}

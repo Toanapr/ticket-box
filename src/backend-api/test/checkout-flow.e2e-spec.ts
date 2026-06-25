@@ -229,6 +229,17 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     expect(orderRes.status).toBe(201);
     expect(orderRes.body.status).toBe('pending_payment');
+    expect(orderRes.body.paymentId).toMatch(
+      /^[0-9a-f-]{36}$/i,
+    );
+    expect(orderRes.body.concertId).toBe(testTicketType.concertId);
+    expect(orderRes.body.concertTitle).toBe(
+      `Test Concert ${testTicketType.name}`,
+    );
+    expect(orderRes.body.venue).toBe('E2E Test Venue');
+    expect(orderRes.body.ticketTypeId).toBe(testTicketType.id);
+    expect(orderRes.body.ticketTypeName).toBe(testTicketType.name);
+    expect(orderRes.body.quantity).toBe(2);
 
     const paymentRes = await request(app.getHttpServer())
       .post('/payments/mock-success')
@@ -306,6 +317,24 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(
       await prisma.idempotencyRecord.count({ where: { userId, key } }),
     ).toBe(1);
+
+    const orderDetail = await request(app.getHttpServer())
+      .get(`/orders/${order.body.id}`)
+      .set('Authorization', bearerToken(userId));
+
+    expect(orderDetail.status).toBe(200);
+    expect(orderDetail.body.paymentId).toBe(payment.id);
+    expect(orderDetail.body.concertId).toBe(testTicketType.concertId);
+    expect(orderDetail.body.concertTitle).toBe(
+      `Test Concert ${testTicketType.name}`,
+    );
+    expect(orderDetail.body.venue).toBe('E2E Test Venue');
+    expect(orderDetail.body.ticketTypeId).toBe(testTicketType.id);
+    expect(orderDetail.body.ticketTypeName).toBe(testTicketType.name);
+    expect(orderDetail.body.quantity).toBe(1);
+    expect(orderDetail.body.payments[0]?.checkoutUrl).toBe(
+      first.body.checkoutUrl,
+    );
   });
 
   it('moves an ambiguous timeout to reconciliation without breaking public reads', async () => {
@@ -762,6 +791,13 @@ describe('Checkout flow and invariants (e2e)', () => {
       .set('Authorization', bearerToken(userId));
 
     expect(ticketRes.status).toBe(200);
+    expect(ticketRes.body.concertId).toBe(testTicketType.concertId);
+    expect(ticketRes.body.concertTitle).toBe(
+      `Test Concert ${testTicketType.name}`,
+    );
+    expect(ticketRes.body.venue).toBe('E2E Test Venue');
+    expect(ticketRes.body.startsAt).toBe('2026-12-01T12:00:00.000Z');
+    expect(ticketRes.body.ticketTypeName).toBe(testTicketType.name);
     expect(ticketRes.body.qrCode.mode).toBe('opaque_token');
     expect(ticketRes.body.qrCode.renderable).toBe(true);
     expect(typeof ticketRes.body.qrCode.value).toBe('string');

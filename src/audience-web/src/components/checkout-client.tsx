@@ -5,11 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
 import { useAuth } from "./auth-provider";
 import { AlertIcon, CreditCardIcon } from "./icons";
-import { WaitingRoomBanner, type WaitingRoomState } from "./waiting-room-banner";
-import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
-import { getCheckoutIntent } from "@/lib/checkout-intent";
+import { shouldRenderWaitingRoomBanner, WaitingRoomBanner, type WaitingRoomState } from "./waiting-room-banner";
+import { createOrder, createPaymentIntent, createReservation, ReservationApiError } from "@/lib/client-api";
+import { clearCheckoutIntent, getCheckoutIntent } from "@/lib/checkout-intent";
 import { formatCurrency, formatDateTime, serviceFee, shortVenue } from "@/lib/format";
+import { formatHoldCountdown, getHoldRemainingMs } from "@/lib/reservation-hold";
 import { clearSaleAccessToken, getSaleAccessToken, setSaleAccessToken } from "@/lib/sale-access-token-storage";
+import { clearActiveReservation, findActiveReservation, upsertActiveReservation, upsertOrderRecord } from "@/lib/user-account-data";
+import type { PaymentIntentResponse } from "@/lib/types";
+import type { ActiveReservationRecord } from "@/lib/types";
 import type { BuyerInfo, ConcertDetail, PaymentMethod, ReservationErrorCode } from "@/lib/types";
 import { ConcertPoster } from "./concert-poster";
 
@@ -51,6 +55,7 @@ export function CheckoutClient({
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [waitingRoomState, setWaitingRoomState] = useState<WaitingRoomState>("unavailable");
   const [retryLockout, setRetryLockout] = useState<{ retryAt: string; reason: "rate-limit" | "overload"; correlationId?: string } | null>(null);
+  const [activeReservationOverride, setActiveReservationOverride] = useState<ActiveReservationRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [, setClockTick] = useState(0);
 
@@ -68,31 +73,48 @@ export function CheckoutClient({
     return () => window.clearTimeout(timer);
   }, [concert.id]);
 
+  const activeReservation =
+    activeReservationOverride ??
+    findActiveReservation({
+      concertId: concert.id,
+      ticketTypeId: ticketType.id,
+      buyerEmail: user?.email,
+    });
+
   useEffect(() => {
-    if (!retryLockout) return;
+    if (!retryLockout && !activeReservation) return;
     const timer = window.setInterval(() => {
       setClockTick((value) => value + 1);
-      if (Date.parse(retryLockout.retryAt) <= new Date().getTime()) setRetryLockout(null);
+      if (retryLockout && Date.parse(retryLockout.retryAt) <= new Date().getTime()) setRetryLockout(null);
+      if (activeReservation && getHoldRemainingMs(activeReservation.expiresAt) === 0) {
+        clearActiveReservation(activeReservation.reservationId);
+        setActiveReservationOverride(null);
+      }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [retryLockout]);
+  }, [activeReservation, retryLockout]);
 
   const retryActive = Boolean(retryLockout);
   const userKey = user?.email ?? "anonymous";
+  const holdCountdown = activeReservation ? formatHoldCountdown(activeReservation.expiresAt) : "--:--";
+  const hasActiveReservation = Boolean(activeReservation);
+  const showWaitingRoomBanner = shouldRenderWaitingRoomBanner(waitingRoomState);
 
   async function submit(): Promise<void> {
     if (submitting || retryActive) return;
     setSubmitting(true);
     setError(null);
+    let createdOrderId: string | null = null;
 
     try {
       const saleAccess = getSaleAccessToken(concert.id);
-      const intent = getCheckoutIntent({
+      const intentInput = {
         concertId: concert.id,
         ticketTypeId: ticketType.id,
         quantity,
         userKey,
-      });
+      };
+      const intent = getCheckoutIntent(intentInput);
       const reservation = await createReservation(
         {
           concertId: concert.id,
@@ -111,6 +133,23 @@ export function CheckoutClient({
         });
         setWaitingRoomState("admitted");
       }
+      const nextActiveReservation: ActiveReservationRecord = {
+        reservationId: reservation.reservationId,
+        concertId: concert.id,
+        concertSlug: concert.slug,
+        concertTitle: concert.title,
+        venue: concert.venue,
+        ticketTypeId: ticketType.id,
+        ticketTypeSlug: ticketType.slug,
+        ticketTypeName: ticketType.name,
+        quantity,
+        buyer,
+        totalAmount: totals.total,
+        createdAt: new Date().toISOString(),
+        expiresAt: reservation.expiresAt,
+      };
+      upsertActiveReservation(nextActiveReservation);
+      setActiveReservationOverride(nextActiveReservation);
       const order = await createOrder({
         reservation,
         concertId: concert.id,
@@ -118,8 +157,26 @@ export function CheckoutClient({
         paymentMethod,
         idempotencyKey: intent.orderIdempotencyKey,
       });
-      router.push(`/orders/${order.orderId}`);
+      createdOrderId = order.orderId;
+      clearCheckoutIntent(intentInput);
+      upsertOrderRecord(order);
+      setActiveReservationOverride(null);
+
+      let paymentIntent: PaymentIntentResponse | undefined;
+
+      if (order.paymentIntent?.paymentId) {
+        paymentIntent = await createPaymentIntent({
+          paymentId: order.paymentIntent.paymentId,
+          idempotencyKey: intent.paymentIntentIdempotencyKey,
+        });
+      }
+
+      router.push(buildOrderUrl(order.orderId, paymentIntent));
     } catch (caught) {
+      if (createdOrderId) {
+        router.push(`/orders/${createdOrderId}`);
+        return;
+      }
       if (caught instanceof ReservationApiError) {
         if (caught.transient.kind === "sale-token-expired" || caught.transient.kind === "sale-access-required") {
           clearSaleAccessToken(concert.id);
@@ -144,16 +201,24 @@ export function CheckoutClient({
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
       <section className="grid gap-8">
-        <WaitingRoomBanner state={waitingRoomState} retryAt={retryLockout?.retryAt} />
+        {showWaitingRoomBanner ? <WaitingRoomBanner state={waitingRoomState} retryAt={retryLockout?.retryAt} /> : null}
         <div className="flex items-center gap-4 rounded bg-ticket-obsidian p-4 text-white">
           <div className="grid h-11 w-11 place-items-center rounded bg-ticket-green/20 text-ticket-green">
             <CreditCardIcon className="h-6 w-6" />
           </div>
           <div className="flex-1">
-            <h1 className="font-display text-xl font-black">Đang giữ vé của bạn</h1>
-            <p className="text-sm text-slate-300">Hoàn tất thanh toán sau khi tạo order. Reservation/order backend là nguồn quyết định.</p>
+            <h1 className="font-display text-xl font-black">{hasActiveReservation ? "Đang giữ vé của bạn" : "Sẵn sàng checkout"}</h1>
+            <p className="text-sm text-slate-300">
+              {activeReservation
+                ? "Hoàn tất thanh toán trước khi backend hết hạn giữ chỗ."
+                : "Đồng hồ giữ vé chỉ bắt đầu sau khi backend tạo reservation thành công."}
+            </p>
           </div>
-          <span className="font-mono text-xl font-black text-ticket-green">10:00</span>
+          {hasActiveReservation ? (
+            <span className="font-mono text-xl font-black text-ticket-green">{holdCountdown}</span>
+          ) : (
+            <span className="text-xs font-black uppercase tracking-wide text-slate-400">Chua bat dau</span>
+          )}
         </div>
         {error ? (
           <div role="alert" className="flex gap-3 rounded border border-red-600 bg-red-50 p-4 text-red-900">
@@ -264,4 +329,16 @@ export function CheckoutClient({
       </aside>
     </div>
   );
+}
+
+function buildOrderUrl(orderId: string, paymentIntent: PaymentIntentResponse | undefined): string {
+  if (!paymentIntent) return `/orders/${orderId}`;
+
+  const search = new URLSearchParams();
+  if (paymentIntent.degraded) search.set("paymentDegraded", "1");
+  if (paymentIntent.status === "pending_reconciliation") search.set("paymentStatus", paymentIntent.status);
+  if (typeof paymentIntent.retryAfterSeconds === "number") search.set("paymentRetryAfter", String(paymentIntent.retryAfterSeconds));
+
+  const query = search.toString();
+  return query ? `/orders/${orderId}?${query}` : `/orders/${orderId}`;
 }

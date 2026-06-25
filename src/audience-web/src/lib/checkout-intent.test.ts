@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getCheckoutIntent } from "./checkout-intent";
+import { clearCheckoutIntent, getCheckoutIntent } from "./checkout-intent";
 
 describe("checkout intent", () => {
   beforeEach(() => {
@@ -17,6 +17,7 @@ describe("checkout intent", () => {
 
     expect(retry.reservationIdempotencyKey).toBe(first.reservationIdempotencyKey);
     expect(retry.orderIdempotencyKey).toBe(first.orderIdempotencyKey);
+    expect(retry.paymentIntentIdempotencyKey).toBe(first.paymentIntentIdempotencyKey);
   });
 
   it("creates a new intent when quantity changes", () => {
@@ -25,6 +26,19 @@ describe("checkout intent", () => {
 
     expect(changed.reservationIdempotencyKey).not.toBe(first.reservationIdempotencyKey);
     expect(changed.orderIdempotencyKey).not.toBe(first.orderIdempotencyKey);
+    expect(changed.paymentIntentIdempotencyKey).not.toBe(first.paymentIntentIdempotencyKey);
+  });
+
+  it("creates a new intent after the previous checkout intent is cleared", () => {
+    const input = { concertId: "concert-1", ticketTypeId: "ticket-1", quantity: 2, userKey: "user@example.com" };
+    const first = getCheckoutIntent(input);
+
+    clearCheckoutIntent(input);
+
+    const restarted = getCheckoutIntent(input);
+    expect(restarted.reservationIdempotencyKey).not.toBe(first.reservationIdempotencyKey);
+    expect(restarted.orderIdempotencyKey).not.toBe(first.orderIdempotencyKey);
+    expect(restarted.paymentIntentIdempotencyKey).not.toBe(first.paymentIntentIdempotencyKey);
   });
 });
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createReservation, normalizeErrorCode, parseRetryAfter, ReservationApiError } from "./client-api";
+import { createReservation, getOrder, normalizeErrorCode, parseRetryAfter, ReservationApiError } from "./client-api";
 
 describe("client API transient errors", () => {
   afterEach(() => {
@@ -84,5 +84,38 @@ describe("client API transient errors", () => {
         headers: expect.objectContaining({ "x-sale-access-token": "sale-token" }),
       }),
     );
+  });
+
+  it("derives order display status from the first payment status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          id: "11111111-1111-4111-8111-111111111111",
+          status: "pending_payment",
+          totalAmount: "2000000",
+          reservations: [{ id: "reservation-1", ticketTypeId: "ticket-1", quantity: 2 }],
+          payments: [
+            {
+              id: "22222222-2222-4222-8222-222222222222",
+              provider: "mock",
+              status: "pending_reconciliation",
+              providerTxnId: null,
+            },
+          ],
+          tickets: [],
+        }),
+      ),
+    );
+
+    await expect(getOrder("11111111-1111-4111-8111-111111111111")).resolves.toMatchObject({
+      status: "PAYMENT_PENDING_RECONCILIATION",
+      paymentIntent: {
+        paymentId: "22222222-2222-4222-8222-222222222222",
+        provider: "mock",
+        status: "pending_reconciliation",
+        providerTxnId: null,
+      },
+    });
   });
 });

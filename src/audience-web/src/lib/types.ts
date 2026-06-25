@@ -84,6 +84,19 @@ export interface BuyerInfo {
 }
 
 export type PaymentMethod = "VNPAY" | "MOMO";
+export type PaymentProvider = PaymentMethod | "mock" | "mock-bank";
+export type PaymentIntentStatus = "pending" | "pending_reconciliation";
+export type PaymentIntentReason = "provider_unavailable" | "provider_timeout_ambiguous";
+
+export interface PaymentIntentResponse {
+  paymentId: string;
+  orderId: string;
+  status: PaymentIntentStatus;
+  checkoutUrl: string | null;
+  degraded: boolean;
+  reason: PaymentIntentReason | null;
+  retryAfterSeconds: number | null;
+}
 
 export interface ReservationRequest {
   concertId: string;
@@ -113,8 +126,13 @@ export interface OrderRecord {
   totalAmount: number;
   createdAt: string;
   paymentIntent?: {
-    provider: PaymentMethod | "mock-bank";
+    paymentId?: string;
+    provider: PaymentProvider;
     providerName?: string;
+    status?: string;
+    providerTxnId?: string | null;
+    checkoutUrl?: string | null;
+    reason?: PaymentIntentReason | null;
     bankName?: string;
     accountNo?: string;
     accountName?: string;

@@ -8,6 +8,7 @@ import type {
   ReservationRequest,
   ReservationResponse,
   PaymentMethod,
+  PaymentProvider,
   TicketRecord,
 } from "./types";
 
@@ -162,7 +163,13 @@ interface BackendOrder {
   status: string;
   totalAmount: string;
   reservations: Array<{ id: string; ticketTypeId: string; quantity: number }>;
-  payments: Array<{ provider: string }>;
+  payments: Array<{
+    id: string;
+    provider: string;
+    status: string;
+    providerTxnId: string | null;
+    checkoutUrl?: string | null;
+  }>;
   tickets: Array<{ id: string }>;
 }
 
@@ -177,6 +184,8 @@ interface BackendTicket {
 
 function mapBackendOrder(order: BackendOrder): OrderRecord {
   const reservation = order.reservations[0];
+  const payment = order.payments[0];
+  const ticketId = order.tickets[0]?.id;
   return {
     orderId: order.id,
     reservationId: reservation?.id ?? "",
@@ -184,17 +193,28 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
     ticketTypeId: reservation?.ticketTypeId ?? "",
     quantity: reservation?.quantity ?? 0,
     buyer: { fullName: "Khán giả TicketBox", phone: "", email: "" },
-    status: mapOrderStatus(order.status),
+    status: mapOrderAndPaymentStatus(order.status, payment?.status, Boolean(ticketId)),
     totalAmount: Number(order.totalAmount),
     createdAt: new Date().toISOString(),
     paymentIntent: {
-      provider: "VNPAY",
-      providerName: order.payments[0]?.provider ?? "Mock payment",
+      paymentId: payment?.id,
+      provider: normalizePaymentProvider(payment?.provider),
+      providerName: payment?.provider ?? "Mock payment",
+      status: payment?.status,
+      providerTxnId: payment?.providerTxnId,
+      checkoutUrl: payment?.checkoutUrl ?? null,
       memo: order.id,
       amount: Number(order.totalAmount),
     },
-    ticketId: order.tickets[0]?.id,
+    ticketId,
   };
+}
+
+function mapOrderAndPaymentStatus(orderStatus: string, paymentStatus: string | undefined, hasTicket: boolean): OrderRecord["status"] {
+  if (hasTicket) return "TICKET_ISSUED";
+  const paymentMapped = paymentStatus ? mapPaymentStatus(paymentStatus) : undefined;
+  if (paymentMapped && orderStatus === "pending_payment") return paymentMapped;
+  return mapOrderStatus(orderStatus);
 }
 
 function mapOrderStatus(status: string): OrderRecord["status"] {
@@ -216,6 +236,23 @@ function mapOrderStatus(status: string): OrderRecord["status"] {
     refund_required: "PAYMENT_PENDING_RECONCILIATION",
   };
   return statuses[status] ?? "PENDING_PAYMENT";
+}
+
+function mapPaymentStatus(status: string): OrderRecord["status"] | undefined {
+  const statuses: Record<string, OrderRecord["status"]> = {
+    created: "PENDING_PAYMENT",
+    pending: "PENDING_PAYMENT",
+    pending_reconciliation: "PAYMENT_PENDING_RECONCILIATION",
+    succeeded: "PAID",
+    failed: "PAYMENT_FAILED",
+    expired: "PAYMENT_EXPIRED",
+  };
+  return statuses[status];
+}
+
+function normalizePaymentProvider(provider: string | undefined): PaymentProvider {
+  if (provider === "VNPAY" || provider === "MOMO" || provider === "mock" || provider === "mock-bank") return provider;
+  return "mock";
 }
 
 export function normalizeErrorCode(code: string | undefined): ReservationErrorCode {

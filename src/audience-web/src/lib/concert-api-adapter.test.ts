@@ -66,6 +66,8 @@ describe("concert API adapter", () => {
           price: 2500000,
           maxPerUser: 4,
           availableApprox: 80,
+          inventoryCachedAt: "2026-07-15T00:00:00.000Z",
+          inventoryStaleAt: "2026-07-15T00:00:05.000Z",
           capacity: 100,
           saleStartsAt: "2026-07-01T00:00:00.000Z",
           saleEndsAt: "2026-09-01T00:00:00.000Z",
@@ -90,6 +92,15 @@ describe("concert API adapter", () => {
 
   it("normalizes an empty list without injecting mocks", () => {
     expect(normalizeConcertList([])).toEqual([]);
+  });
+
+  it("keeps old ticket responses valid when freshness metadata is absent", () => {
+    const ticket = ticketTypeFixture({ cachedAt: undefined, staleAt: undefined });
+    const concert = normalizeConcertDetail(concertFixture({ ticketTypes: [ticket] }), new Date("2026-07-15T00:00:00.000Z"));
+
+    expect(concert.ticketTypes[0]).toMatchObject({ availableApprox: 80 });
+    expect(concert.ticketTypes[0].inventoryCachedAt).toBeUndefined();
+    expect(concert.ticketTypes[0].inventoryStaleAt).toBeUndefined();
   });
 
   it.each([

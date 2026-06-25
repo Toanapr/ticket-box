@@ -86,6 +86,11 @@ export class TicketRepository {
         ownerUserId: userId,
       },
       include: {
+        ticketType: {
+          include: {
+            concert: true,
+          },
+        },
         order: {
           include: {
             payments: {

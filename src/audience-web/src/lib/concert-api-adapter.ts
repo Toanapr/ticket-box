@@ -41,7 +41,7 @@ function normalizeTicketType(ticketType: ConcertApiRecord["ticketTypes"][number]
     throw new ConcertContractError(`unsupported ticket zone ${ticketType.zoneCode}`);
   }
 
-  return {
+  const normalized: TicketType = {
     id: ticketType.id,
     slug: ticketType.slug,
     zone,
@@ -53,6 +53,10 @@ function normalizeTicketType(ticketType: ConcertApiRecord["ticketTypes"][number]
     saleStartsAt: ticketType.saleStartAt,
     saleEndsAt: ticketType.saleEndAt,
   };
+  if (ticketType.cachedAt) normalized.inventoryCachedAt = ticketType.cachedAt;
+  if (ticketType.staleAt) normalized.inventoryStaleAt = ticketType.staleAt;
+  if (ticketType.inventoryState) normalized.inventoryState = ticketType.inventoryState;
+  return normalized;
 }
 
 function deriveSaleStatus(ticketTypes: TicketType[], now: Date): ConcertStatus {

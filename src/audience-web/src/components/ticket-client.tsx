@@ -6,7 +6,6 @@ import { PrinterIcon, TicketIcon } from "./icons";
 import { MockQr } from "./mock-qr";
 import { getTicket } from "@/lib/client-api";
 import { formatDateTime, shortVenue } from "@/lib/format";
-import { findConcert } from "@/lib/mock-data";
 import type { TicketRecord } from "@/lib/types";
 
 export function TicketClient({ ticketId }: { ticketId: string }): React.ReactElement {
@@ -29,13 +28,10 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
     return (
       <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-8">
         <h1 className="font-display text-2xl font-black text-red-900">Không tìm thấy ticket</h1>
-        <p className="mt-2 text-sm text-red-800">Hãy hoàn tất mock payment success từ trang order trước.</p>
+        <p className="mt-2 text-sm text-red-800">E-ticket chỉ xuất hiện sau khi backend xác nhận thanh toán và phát hành vé.</p>
       </div>
     );
   }
-
-  const concert = findConcert(ticket.concertId);
-  const ticketType = concert?.ticketTypes.find((item) => item.id === ticket.ticketTypeId);
 
   return (
     <section className="mx-auto max-w-3xl">
@@ -65,11 +61,11 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
         </div>
 
         <div className="p-6 md:p-8">
-          <h1 className="font-display text-3xl font-black tracking-tight">{concert?.title ?? "TicketBox Concert"}</h1>
+          <h1 className="font-display text-3xl font-black tracking-tight">{ticket.concertTitle ?? "TicketBox Concert"}</h1>
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            <Meta label="Thời gian" value={concert ? formatDateTime(concert.startsAt) : "-"} />
-            <Meta label="Địa điểm" value={concert ? shortVenue(concert.venue) : "-"} />
-            <Meta label="Khu vé" value={ticketType?.name ?? ticket.ticketTypeId} />
+            <Meta label="Thời gian" value={ticket.startsAt ? formatDateTime(ticket.startsAt) : "-"} />
+            <Meta label="Địa điểm" value={ticket.venue ? shortVenue(ticket.venue) : "-"} />
+            <Meta label="Khu vé" value={ticket.ticketTypeName ?? ticket.ticketTypeId} />
             <Meta label="Vị trí / ghế" value={ticket.seats.join(", ")} />
             <Meta label="Chủ sở hữu" value={ticket.owner.fullName} />
             <Meta label="Email" value={ticket.owner.email} />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRightIcon } from "./icons";
 import { StatusBadge } from "./status-badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { formatInventoryFreshness } from "@/lib/inventory-freshness";
 import type { ConcertDetail } from "@/lib/types";
 
 export function TicketTypeSidebar({
@@ -31,6 +32,7 @@ export function TicketTypeSidebar({
         {concert.ticketTypes.map((type) => {
           const soldOut = type.availableApprox <= 0;
           const selected = type.id === selectedTicketTypeId;
+          const freshness = formatInventoryFreshness(type);
           return (
             <Link
               key={type.id}
@@ -50,6 +52,17 @@ export function TicketTypeSidebar({
                   <span className="block font-black leading-tight">{type.name}</span>
                   <span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-600 ring-1 ring-black/10">
                     {soldOut ? "Hết vé" : `Còn ~${type.availableApprox}`}
+                  </span>
+                  <span
+                    className={`ml-2 mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-black ring-1 ring-black/10 ${
+                      freshness.tone === "green"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : freshness.tone === "amber"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    {freshness.label}
                   </span>
                 </div>
                 <span className="shrink-0 text-right font-display text-lg font-black leading-tight text-ticket-obsidian">

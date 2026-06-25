@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
 import { useAuth } from "./auth-provider";
 import { AlertIcon, CreditCardIcon } from "./icons";
-import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
-import { formatCurrency, formatDateTime, makeIdempotencyKey, serviceFee, shortVenue } from "@/lib/format";
+import { shouldRenderWaitingRoomBanner, WaitingRoomBanner, type WaitingRoomState } from "./waiting-room-banner";
+import { createOrder, createPaymentIntent, createReservation, ReservationApiError } from "@/lib/client-api";
+import { clearCheckoutIntent, getCheckoutIntent } from "@/lib/checkout-intent";
+import { formatCurrency, formatDateTime, serviceFee, shortVenue } from "@/lib/format";
+import { formatHoldCountdown, getHoldRemainingMs } from "@/lib/reservation-hold";
+import { clearSaleAccessToken, getSaleAccessToken, setSaleAccessToken } from "@/lib/sale-access-token-storage";
+import { clearActiveReservation, findActiveReservation, upsertActiveReservation, upsertOrderRecord } from "@/lib/user-account-data";
+import type { PaymentIntentResponse } from "@/lib/types";
+import type { ActiveReservationRecord } from "@/lib/types";
 import type { BuyerInfo, ConcertDetail, PaymentMethod, ReservationErrorCode } from "@/lib/types";
 import { ConcertPoster } from "./concert-poster";
 
@@ -17,6 +24,13 @@ const errorTitles: Record<ReservationErrorCode, string> = {
   QUOTA_EXCEEDED: "Vượt hạn mức mua vé",
   SALE_NOT_OPEN: "Cổng bán vé chưa mở",
   RESERVATION_EXPIRED: "Phiên giữ vé hết hạn",
+  RATE_LIMITED: "Thử lại sau",
+  OVERLOADED: "Hệ thống quá tải",
+  SALE_ACCESS_REQUIRED: "Cần vào hàng chờ",
+  SALE_TOKEN_EXPIRED: "Token vào sale hết hạn",
+  PAYMENT_DEGRADED: "Thanh toán gián đoạn",
+  PAYMENT_PENDING_RECONCILIATION: "Thanh toán chờ đối soát",
+  IDEMPOTENCY_CONFLICT: "Checkout đã thay đổi",
   UNKNOWN: "Không thể tạo đơn",
 };
 
@@ -39,7 +53,11 @@ export function CheckoutClient({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("VNPAY");
   const [mockFailure, setMockFailure] = useState<MockFailure>("NORMAL");
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const [waitingRoomState, setWaitingRoomState] = useState<WaitingRoomState>("unavailable");
+  const [retryLockout, setRetryLockout] = useState<{ retryAt: string; reason: "rate-limit" | "overload"; correlationId?: string } | null>(null);
+  const [activeReservationOverride, setActiveReservationOverride] = useState<ActiveReservationRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [, setClockTick] = useState(0);
 
   const totals = useMemo(() => {
     const ticketTotal = ticketType.price * quantity;
@@ -47,30 +65,131 @@ export function CheckoutClient({
     return { ticketTotal, fee, total: ticketTotal + fee };
   }, [quantity, ticketType.price]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const token = getSaleAccessToken(concert.id);
+      setWaitingRoomState(token ? "admitted" : "unavailable");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [concert.id]);
+
+  const activeReservation =
+    activeReservationOverride ??
+    findActiveReservation({
+      concertId: concert.id,
+      ticketTypeId: ticketType.id,
+      buyerEmail: user?.email,
+    });
+
+  useEffect(() => {
+    if (!retryLockout && !activeReservation) return;
+    const timer = window.setInterval(() => {
+      setClockTick((value) => value + 1);
+      if (retryLockout && Date.parse(retryLockout.retryAt) <= new Date().getTime()) setRetryLockout(null);
+      if (activeReservation && getHoldRemainingMs(activeReservation.expiresAt) === 0) {
+        clearActiveReservation(activeReservation.reservationId);
+        setActiveReservationOverride(null);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeReservation, retryLockout]);
+
+  const retryActive = Boolean(retryLockout);
+  const userKey = user?.email ?? "anonymous";
+  const holdCountdown = activeReservation ? formatHoldCountdown(activeReservation.expiresAt) : "--:--";
+  const hasActiveReservation = Boolean(activeReservation);
+  const showWaitingRoomBanner = shouldRenderWaitingRoomBanner(waitingRoomState);
+
   async function submit(): Promise<void> {
+    if (submitting || retryActive) return;
     setSubmitting(true);
     setError(null);
+    let createdOrderId: string | null = null;
 
     try {
+      const saleAccess = getSaleAccessToken(concert.id);
+      const intentInput = {
+        concertId: concert.id,
+        ticketTypeId: ticketType.id,
+        quantity,
+        userKey,
+      };
+      const intent = getCheckoutIntent(intentInput);
       const reservation = await createReservation(
         {
           concertId: concert.id,
           ticketTypeId: ticketType.id,
           quantity,
-          idempotencyKey: makeIdempotencyKey("reservation"),
+          idempotencyKey: intent.reservationIdempotencyKey,
+          saleAccessToken: saleAccess?.token,
         },
         mockFailure,
       );
+      if (reservation.saleAccessToken) {
+        setSaleAccessToken(concert.id, {
+          token: reservation.saleAccessToken,
+          expiresAt: reservation.saleAccessTokenExpiresAt,
+          issuedAt: new Date().toISOString(),
+        });
+        setWaitingRoomState("admitted");
+      }
+      const nextActiveReservation: ActiveReservationRecord = {
+        reservationId: reservation.reservationId,
+        concertId: concert.id,
+        concertSlug: concert.slug,
+        concertTitle: concert.title,
+        venue: concert.venue,
+        ticketTypeId: ticketType.id,
+        ticketTypeSlug: ticketType.slug,
+        ticketTypeName: ticketType.name,
+        quantity,
+        buyer,
+        totalAmount: totals.total,
+        createdAt: new Date().toISOString(),
+        expiresAt: reservation.expiresAt,
+      };
+      upsertActiveReservation(nextActiveReservation);
+      setActiveReservationOverride(nextActiveReservation);
       const order = await createOrder({
         reservation,
         concertId: concert.id,
         buyer,
         paymentMethod,
-        idempotencyKey: makeIdempotencyKey("order"),
+        idempotencyKey: intent.orderIdempotencyKey,
       });
-      router.push(`/orders/${order.orderId}`);
+      createdOrderId = order.orderId;
+      clearCheckoutIntent(intentInput);
+      upsertOrderRecord(order);
+      setActiveReservationOverride(null);
+
+      let paymentIntent: PaymentIntentResponse | undefined;
+
+      if (order.paymentIntent?.paymentId) {
+        paymentIntent = await createPaymentIntent({
+          paymentId: order.paymentIntent.paymentId,
+          idempotencyKey: intent.paymentIntentIdempotencyKey,
+        });
+      }
+
+      router.push(buildOrderUrl(order.orderId, paymentIntent));
     } catch (caught) {
+      if (createdOrderId) {
+        router.push(`/orders/${createdOrderId}`);
+        return;
+      }
       if (caught instanceof ReservationApiError) {
+        if (caught.transient.kind === "sale-token-expired" || caught.transient.kind === "sale-access-required") {
+          clearSaleAccessToken(concert.id);
+          setWaitingRoomState(caught.transient.kind === "sale-token-expired" ? "expired" : "waiting");
+        }
+        if (caught.transient.kind === "rate-limit" || caught.transient.kind === "overload") {
+          const retryAt = caught.transient.retryAt ?? new Date(new Date().getTime() + 5_000).toISOString();
+          setRetryLockout({
+            retryAt,
+            reason: caught.transient.kind,
+            correlationId: caught.transient.correlationId,
+          });
+        }
         setError({ title: errorTitles[caught.code], message: caught.message });
       } else {
         setError({ title: "Không thể tạo đơn", message: "Hệ thống đang bận. Vui lòng thử lại sau." });
@@ -82,15 +201,24 @@ export function CheckoutClient({
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
       <section className="grid gap-8">
+        {showWaitingRoomBanner ? <WaitingRoomBanner state={waitingRoomState} retryAt={retryLockout?.retryAt} /> : null}
         <div className="flex items-center gap-4 rounded bg-ticket-obsidian p-4 text-white">
           <div className="grid h-11 w-11 place-items-center rounded bg-ticket-green/20 text-ticket-green">
             <CreditCardIcon className="h-6 w-6" />
           </div>
           <div className="flex-1">
-            <h1 className="font-display text-xl font-black">Đang giữ vé của bạn</h1>
-            <p className="text-sm text-slate-300">Hoàn tất thanh toán sau khi tạo order. Reservation/order backend là nguồn quyết định.</p>
+            <h1 className="font-display text-xl font-black">{hasActiveReservation ? "Đang giữ vé của bạn" : "Sẵn sàng checkout"}</h1>
+            <p className="text-sm text-slate-300">
+              {activeReservation
+                ? "Hoàn tất thanh toán trước khi backend hết hạn giữ chỗ."
+                : "Đồng hồ giữ vé chỉ bắt đầu sau khi backend tạo reservation thành công."}
+            </p>
           </div>
-          <span className="font-mono text-xl font-black text-ticket-green">10:00</span>
+          {hasActiveReservation ? (
+            <span className="font-mono text-xl font-black text-ticket-green">{holdCountdown}</span>
+          ) : (
+            <span className="text-xs font-black uppercase tracking-wide text-slate-400">Chua bat dau</span>
+          )}
         </div>
         {error ? (
           <div role="alert" className="flex gap-3 rounded border border-red-600 bg-red-50 p-4 text-red-900">
@@ -98,6 +226,12 @@ export function CheckoutClient({
             <div>
               <h2 className="font-black">{error.title}</h2>
               <p className="mt-1 text-sm">{error.message}</p>
+              {retryLockout ? (
+                <p className="mt-2 text-xs font-black">
+                  Backend yêu cầu thử lại sau {new Date(retryLockout.retryAt).toLocaleTimeString("vi-VN")}.
+                  {retryLockout.correlationId ? ` Mã theo dõi: ${retryLockout.correlationId}.` : ""}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -112,7 +246,7 @@ export function CheckoutClient({
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                disabled={quantity <= 1 || submitting}
+                disabled={quantity <= 1 || submitting || retryActive}
                 onClick={() => setQuantity((value) => Math.max(1, value - 1))}
                 className="h-11 w-11 rounded border border-black/10 bg-ticket-stone text-xl font-black disabled:opacity-40"
               >
@@ -121,7 +255,7 @@ export function CheckoutClient({
               <span className="w-8 text-center font-display text-xl font-black">{quantity}</span>
               <button
                 type="button"
-                disabled={quantity >= ticketType.maxPerUser || submitting}
+                disabled={quantity >= ticketType.maxPerUser || submitting || retryActive}
                 onClick={() => setQuantity((value) => Math.min(ticketType.maxPerUser, value + 1))}
                 className="h-11 w-11 rounded border border-black/10 bg-ticket-stone text-xl font-black disabled:opacity-40"
               >
@@ -146,7 +280,7 @@ export function CheckoutClient({
         </section>
         <section className="border-b border-black/10 pb-8">
           <h2 className="font-display text-2xl font-black">3. Phương thức thanh toán</h2>
-          <PaymentMethodSelector value={paymentMethod} disabled={submitting} onChange={setPaymentMethod} />
+          <PaymentMethodSelector value={paymentMethod} disabled={submitting || retryActive} onChange={setPaymentMethod} />
         </section>
         <section className="rounded-lg border border-dashed border-black/20 bg-ticket-stone p-5">
           <h2 className="text-sm font-black uppercase tracking-wide">Local demo controls</h2>
@@ -186,13 +320,25 @@ export function CheckoutClient({
         <button
           type="button"
           onClick={submit}
-          disabled={submitting}
+          disabled={submitting || retryActive}
           className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded bg-ticket-green px-4 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-obsidian disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Đang tạo reservation..." : "Xác nhận & thanh toán"}
+          {submitting ? "Đang tạo reservation..." : retryActive ? "Đang chờ Retry-After" : "Xác nhận & thanh toán"}
           <CreditCardIcon className="h-5 w-5" />
         </button>
       </aside>
     </div>
   );
+}
+
+function buildOrderUrl(orderId: string, paymentIntent: PaymentIntentResponse | undefined): string {
+  if (!paymentIntent) return `/orders/${orderId}`;
+
+  const search = new URLSearchParams();
+  if (paymentIntent.degraded) search.set("paymentDegraded", "1");
+  if (paymentIntent.status === "pending_reconciliation") search.set("paymentStatus", paymentIntent.status);
+  if (typeof paymentIntent.retryAfterSeconds === "number") search.set("paymentRetryAfter", String(paymentIntent.retryAfterSeconds));
+
+  const query = search.toString();
+  return query ? `/orders/${orderId}?${query}` : `/orders/${orderId}`;
 }

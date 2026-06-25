@@ -15,6 +15,8 @@ interface ConcertDetailPageProps {
   searchParams?: Promise<{ ticketType?: string }>;
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function ConcertDetailPage({ params, searchParams }: ConcertDetailPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;

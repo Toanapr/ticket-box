@@ -23,6 +23,7 @@ export type Concert = {
   status: ConcertStatus;
   seatingMapObjectKey: string;
   publishedArtistBio: string;
+  posterObjectKey?: string | null;
   ticketTypes: TicketType[];
 };
 
@@ -60,13 +61,28 @@ export type TicketTypePayload = {
   perUserLimit: number;
 };
 
+export async function uploadPoster(
+  concertId: string,
+  file: File,
+): Promise<{ posterObjectKey: string }> {
+  const formData = new FormData();
+  formData.append("poster", file);
+
+  return apiFetch<{ posterObjectKey: string }>(
+    `/admin/concerts/${concertId}/poster`,
+    { method: "PUT", body: formData },
+  );
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const headers = new Headers(init?.headers);
 
-  headers.set("Content-Type", "application/json");
+  if (typeof init?.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(`/api/backend${path}`, {
     ...init,

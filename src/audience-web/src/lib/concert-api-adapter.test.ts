@@ -17,6 +17,7 @@ function concertFixture(overrides: Record<string, unknown> = {}): Record<string,
     status: "published",
     seatingMapObjectKey: "concerts/aurora/seating-map.json",
     publishedArtistBio: "Artist biography",
+    posterObjectKey: "11111111-1111-4111-8111-111111111111-1.png",
     ticketTypes: [ticketTypeFixture()],
     ...overrides,
   };
@@ -55,6 +56,7 @@ describe("concert API adapter", () => {
       status: "selling",
       description: "Artist biography",
       seatingMapVersion: "concerts/aurora/seating-map.json",
+      posterPath: "/api/media/concert-posters/11111111-1111-4111-8111-111111111111-1.png",
       ticketTypes: [
         {
           id: ticketTypeId,
@@ -70,7 +72,6 @@ describe("concert API adapter", () => {
         },
       ],
     });
-    expect(concert.posterPath).toBeUndefined();
   });
 
   it.each([

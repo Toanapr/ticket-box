@@ -64,6 +64,7 @@ model Concert {
   status              ConcertStatus @default(draft)
   seatingMapObjectKey String        @map("seating_map_object_key")
   publishedArtistBio  String        @map("published_artist_bio")
+  posterObjectKey     String?       @unique @map("poster_object_key")
   organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   ticketTypes         TicketType[]
 

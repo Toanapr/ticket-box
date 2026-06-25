@@ -23,6 +23,16 @@
 
 ## TicketBox backend
 
+### Concert poster storage
+
+Concert posters are stored on backend local disk. Set `CONCERT_POSTER_STORAGE_DIR` to a writable persistent directory; it defaults to `storage/concert-posters` relative to the backend working directory. Run `pnpm exec prisma migrate deploy` and `pnpm run seed` after provisioning the directory.
+
+Organizer uploads use `PUT /admin/concerts/:id/poster` with multipart field `poster`. JPEG, PNG, and WebP are accepted up to 5 MB. Publishing requires the referenced poster file to exist. Public bytes are served from `/media/concert-posters/:objectKey` with immutable cache headers.
+
+Local seed posters are copied from `mock-ui/images`. Those source files use `.png` names but contain JPEG bytes, so seeded object keys intentionally use `.jpg`.
+
+Local storage supports a single backend writer. Mount the directory on persistent storage and back it up together with PostgreSQL; restoring only the database leaves dangling poster keys. Multi-replica deployments require migration to shared object storage.
+
 ### Audience authentication
 
 `POST /auth/register` accepts `fullName`, `email`, and `password`. `POST /auth/login` returns the same user shape plus a Bearer access token. Authenticated clients can resolve the current active profile with `GET /auth/me`.

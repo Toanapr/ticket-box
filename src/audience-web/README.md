@@ -6,6 +6,8 @@ Copy `.env.example` to `.env.local` and set `BACKEND_API_BASE_URL` to the Nest A
 
 Public concert list and detail pages also read this backend URL from the Next.js server. They call `GET /concerts` and `GET /concerts/:slug`; legacy concert UUID paths and ticket type UUID query values redirect to canonical slug URLs such as `/concerts/ticketbox-summer-live?ticketType=vip`. Concert reads do not fall back to mock data when configuration or the backend is unavailable. Start and seed `src/backend-api` before opening `/concerts`.
 
+Concert posters use the same-origin `/api/media/concert-posters/:objectKey` route. The route allowlists generated keys, times out stalled backend reads, preserves cache validators, and returns upstream 404 responses. Concert UI falls back to its gradient poster when a legacy record has no key or image loading fails.
+
 Run the backend Prisma migration before using registration so the nullable `users.full_name` column exists.
 
 ## Getting Started

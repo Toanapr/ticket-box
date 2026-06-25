@@ -28,6 +28,9 @@ function normalizeConcertRecord(concert: ConcertApiRecord, now: Date): ConcertDe
     status: deriveSaleStatus(ticketTypes, now),
     description: concert.description ?? concert.publishedArtistBio,
     seatingMapVersion: concert.seatingMapObjectKey,
+    posterPath: concert.posterObjectKey
+      ? `/api/media/concert-posters/${encodeURIComponent(concert.posterObjectKey)}`
+      : undefined,
     ticketTypes,
   };
 }

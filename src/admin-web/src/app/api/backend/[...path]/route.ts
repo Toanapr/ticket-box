@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, apiBaseUrl } from "@/lib/auth";
-
-const BODYLESS_METHODS = new Set(["GET", "HEAD"]);
+import { prepareBackendProxyRequest } from "@/lib/backend-proxy-request";
 
 type BackendRouteContext = {
   params: Promise<{
@@ -53,12 +52,16 @@ async function proxyBackendRequest(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  const preparedRequest = await prepareBackendProxyRequest(request, headers);
+  if (!preparedRequest.ok) {
+    return NextResponse.json(
+      { message: preparedRequest.message },
+      { status: 400 },
+    );
+  }
+
   const backendResponse = await fetch(targetUrl, {
-    method: request.method,
-    headers,
-    body: BODYLESS_METHODS.has(request.method)
-      ? undefined
-      : await request.text(),
+    ...preparedRequest.init,
   });
 
   const responseHeaders = new Headers(backendResponse.headers);

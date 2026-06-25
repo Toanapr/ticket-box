@@ -12,7 +12,7 @@ import {
   subscribeToUserAccountStorage,
 } from "@/lib/user-account-data";
 
-const pendingStatuses = new Set(["PENDING_PAYMENT"]);
+const pendingStatuses = new Set(["PENDING_PAYMENT", "PAYMENT_DEGRADED", "PAYMENT_PENDING_RECONCILIATION"]);
 const boughtStatuses = new Set(["PAID", "TICKET_ISSUED"]);
 
 export function UserAccountClient(): React.ReactElement {

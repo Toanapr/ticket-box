@@ -2,6 +2,7 @@
 
 import type {
   BuyerInfo,
+  CheckoutTransientError,
   OrderRecord,
   ReservationErrorCode,
   ReservationRequest,
@@ -11,12 +12,20 @@ import type {
 } from "./types";
 
 export class ReservationApiError extends Error {
-  constructor(public readonly code: ReservationErrorCode, message: string) {
+  constructor(
+    public readonly code: ReservationErrorCode,
+    message: string,
+    public readonly transient: CheckoutTransientError,
+  ) {
     super(message);
   }
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+interface FetchJsonOptions {
+  onResponse?: (response: Response) => void;
+}
+
+async function fetchJson<T>(path: string, init?: RequestInit, options: FetchJsonOptions = {}): Promise<T> {
   const response = await fetch(`/api/backend${path}`, {
     ...init,
     headers: {
@@ -30,10 +39,10 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       const next = `${window.location.pathname}${window.location.search}`;
       window.location.assign(`/login?next=${encodeURIComponent(next)}`);
     }
-    const body = (await response.json().catch(() => ({}))) as { code?: ReservationErrorCode; error?: string; message?: string };
-    throw new ReservationApiError(normalizeErrorCode(body.code ?? body.error), body.message ?? "Request failed");
+    throw await createReservationApiError(response);
   }
 
+  options.onResponse?.(response);
   return response.json() as Promise<T>;
 }
 
@@ -42,15 +51,39 @@ export async function createReservation(
   mockFailure: ReservationErrorCode | "NORMAL" = "NORMAL",
 ): Promise<ReservationResponse> {
   if (mockFailure === "NORMAL") {
-    const response = await fetchJson<{ id: string; expiresAt: string; ticketTypeId: string; quantity: number }>("/reservations", {
-      method: "POST",
-      body: JSON.stringify({
-        ticketTypeId: payload.ticketTypeId,
-        quantity: payload.quantity,
-        idempotencyKey: payload.idempotencyKey,
-      }),
-    });
-    return { ...response, reservationId: response.id };
+    let saleAccessTokenFromHeader: string | undefined;
+    let saleAccessTokenExpiresAtFromHeader: string | undefined;
+    const response = await fetchJson<{
+      id: string;
+      expiresAt: string;
+      ticketTypeId: string;
+      quantity: number;
+      saleAccessToken?: string;
+      saleAccessTokenExpiresAt?: string;
+    }>(
+      "/reservations",
+      {
+        method: "POST",
+        headers: payload.saleAccessToken ? { "x-sale-access-token": payload.saleAccessToken } : undefined,
+        body: JSON.stringify({
+          ticketTypeId: payload.ticketTypeId,
+          quantity: payload.quantity,
+          idempotencyKey: payload.idempotencyKey,
+        }),
+      },
+      {
+        onResponse: (apiResponse) => {
+          saleAccessTokenFromHeader = apiResponse.headers.get("x-sale-access-token") ?? undefined;
+          saleAccessTokenExpiresAtFromHeader = apiResponse.headers.get("x-sale-access-expires-at") ?? undefined;
+        },
+      },
+    );
+    return {
+      ...response,
+      reservationId: response.id,
+      saleAccessToken: response.saleAccessToken ?? saleAccessTokenFromHeader,
+      saleAccessTokenExpiresAt: response.saleAccessTokenExpiresAt ?? saleAccessTokenExpiresAtFromHeader,
+    };
   }
 
   throw mockError(mockFailure);
@@ -167,20 +200,85 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
 function mapOrderStatus(status: string): OrderRecord["status"] {
   const statuses: Record<string, OrderRecord["status"]> = {
     pending_payment: "PENDING_PAYMENT",
+    payment_pending: "PENDING_PAYMENT",
+    payment_degraded: "PAYMENT_DEGRADED",
+    payment_circuit_open: "PAYMENT_DEGRADED",
+    circuit_open: "PAYMENT_DEGRADED",
+    payment_pending_reconciliation: "PAYMENT_PENDING_RECONCILIATION",
+    pending_reconciliation: "PAYMENT_PENDING_RECONCILIATION",
     paid: "PAID",
     issued: "TICKET_ISSUED",
+    ticket_issued: "TICKET_ISSUED",
     failed: "PAYMENT_FAILED",
-    expired: "EXPIRED",
-    refund_required: "EXPIRED",
+    payment_failed: "PAYMENT_FAILED",
+    expired: "PAYMENT_EXPIRED",
+    payment_expired: "PAYMENT_EXPIRED",
+    refund_required: "PAYMENT_PENDING_RECONCILIATION",
   };
   return statuses[status] ?? "PENDING_PAYMENT";
 }
 
-function normalizeErrorCode(code: string | undefined): ReservationErrorCode {
+export function normalizeErrorCode(code: string | undefined): ReservationErrorCode {
   const normalized = code?.toUpperCase();
-  return normalized === "SOLD_OUT" || normalized === "QUOTA_EXCEEDED" || normalized === "SALE_NOT_OPEN" || normalized === "RESERVATION_EXPIRED"
+  return normalized === "SOLD_OUT" ||
+    normalized === "QUOTA_EXCEEDED" ||
+    normalized === "SALE_NOT_OPEN" ||
+    normalized === "RESERVATION_EXPIRED" ||
+    normalized === "RATE_LIMITED" ||
+    normalized === "OVERLOADED" ||
+    normalized === "SALE_ACCESS_REQUIRED" ||
+    normalized === "SALE_TOKEN_EXPIRED" ||
+    normalized === "PAYMENT_DEGRADED" ||
+    normalized === "PAYMENT_PENDING_RECONCILIATION" ||
+    normalized === "IDEMPOTENCY_CONFLICT"
     ? normalized
     : "UNKNOWN";
+}
+
+export function parseRetryAfter(value: string | null, now = new Date()): Pick<CheckoutTransientError, "retryAfterMs" | "retryAt"> {
+  if (!value) return {};
+  const numericSeconds = Number(value);
+  if (Number.isFinite(numericSeconds) && numericSeconds >= 0) {
+    const retryAfterMs = Math.round(numericSeconds * 1000);
+    return { retryAfterMs, retryAt: new Date(now.getTime() + retryAfterMs).toISOString() };
+  }
+
+  const retryAtMs = Date.parse(value);
+  if (Number.isNaN(retryAtMs)) return {};
+  const retryAfterMs = Math.max(0, retryAtMs - now.getTime());
+  return { retryAfterMs, retryAt: new Date(now.getTime() + retryAfterMs).toISOString() };
+}
+
+async function createReservationApiError(response: Response): Promise<ReservationApiError> {
+  const body = (await response.json().catch(() => ({}))) as { code?: string; error?: string; message?: string };
+  const code = normalizeErrorCode(body.code ?? body.error);
+  const retry = parseRetryAfter(response.headers.get("retry-after"));
+  const transient: CheckoutTransientError = {
+    kind: transientKindFor(response.status, code),
+    status: response.status,
+    code,
+    message: body.message ?? defaultErrorMessage(response.status, code),
+    correlationId: response.headers.get("x-correlation-id") ?? undefined,
+    ...retry,
+  };
+  return new ReservationApiError(code, transient.message, transient);
+}
+
+function transientKindFor(status: number, code: ReservationErrorCode): CheckoutTransientError["kind"] {
+  if (status === 429 || code === "RATE_LIMITED") return "rate-limit";
+  if (status === 503 || code === "OVERLOADED") return "overload";
+  if (code === "SALE_TOKEN_EXPIRED") return "sale-token-expired";
+  if (code === "SALE_ACCESS_REQUIRED") return "sale-access-required";
+  if (code === "IDEMPOTENCY_CONFLICT") return "idempotency-conflict";
+  return "backend-error";
+}
+
+function defaultErrorMessage(status: number, code: ReservationErrorCode): string {
+  if (status === 429 || code === "RATE_LIMITED") return "Bạn thao tác quá nhanh. Vui lòng thử lại sau thời gian backend yêu cầu.";
+  if (status === 503 || code === "OVERLOADED") return "Hệ thống đang quá tải. Đây không phải tín hiệu hết vé.";
+  if (code === "SALE_TOKEN_EXPIRED") return "Token vào sale đã hết hạn. Vui lòng vào lại hàng chờ.";
+  if (code === "SALE_ACCESS_REQUIRED") return "Bạn cần được backend cho vào sale trước khi checkout.";
+  return "Request failed";
 }
 
 function mockError(code: ReservationErrorCode): ReservationApiError {
@@ -189,7 +287,19 @@ function mockError(code: ReservationErrorCode): ReservationApiError {
     QUOTA_EXCEEDED: "Số lượng vé vượt hạn mức cho phép của tài khoản.",
     SALE_NOT_OPEN: "Cổng bán vé chưa mở hoặc đã đóng.",
     RESERVATION_EXPIRED: "Phiên giữ vé đã hết hạn. Vui lòng thử lại.",
+    RATE_LIMITED: "Bạn thao tác quá nhanh. Vui lòng thử lại theo Retry-After.",
+    OVERLOADED: "Hệ thống đang quá tải. Vui lòng thử lại sau.",
+    SALE_ACCESS_REQUIRED: "Bạn cần vào hàng chờ trước khi checkout.",
+    SALE_TOKEN_EXPIRED: "Token vào sale đã hết hạn. Vui lòng vào lại hàng chờ.",
+    PAYMENT_DEGRADED: "Cổng thanh toán đang gián đoạn.",
+    PAYMENT_PENDING_RECONCILIATION: "Thanh toán đang chờ đối soát.",
+    IDEMPOTENCY_CONFLICT: "Request checkout đã thay đổi. Vui lòng bắt đầu lại.",
     UNKNOWN: "Không thể tạo giao dịch lúc này.",
   };
-  return new ReservationApiError(code, messages[code]);
+  return new ReservationApiError(code, messages[code], {
+    kind: code === "OVERLOADED" ? "overload" : code === "RATE_LIMITED" ? "rate-limit" : "backend-error",
+    status: 400,
+    code,
+    message: messages[code],
+  });
 }

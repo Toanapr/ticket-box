@@ -9,6 +9,9 @@ export interface ConcertApiTicketType {
   saleStartAt: string;
   saleEndAt: string;
   availableCount: number;
+  cachedAt?: string;
+  staleAt?: string;
+  inventoryState?: "fresh" | "cached" | "stale";
 }
 
 export interface ConcertApiRecord {
@@ -75,6 +78,9 @@ function parseTicketType(value: unknown, path: string): ConcertApiTicketType {
     saleStartAt: readIsoDate(record.saleStartAt, `${path}.saleStartAt`),
     saleEndAt: readIsoDate(record.saleEndAt, `${path}.saleEndAt`),
     availableCount: readNonNegativeInteger(record.availableCount, `${path}.availableCount`),
+    cachedAt: readOptionalIsoDate(record.cachedAt, `${path}.cachedAt`),
+    staleAt: readOptionalIsoDate(record.staleAt, `${path}.staleAt`),
+    inventoryState: readOptionalInventoryState(record.inventoryState, `${path}.inventoryState`),
   };
 }
 
@@ -117,6 +123,16 @@ function readIsoDate(value: unknown, path: string): string {
   const result = readString(value, path);
   if (Number.isNaN(Date.parse(result))) throw new ConcertContractError(`${path} must be an ISO date`);
   return result;
+}
+
+function readOptionalIsoDate(value: unknown, path: string): string | undefined {
+  return value === undefined || value === null ? undefined : readIsoDate(value, path);
+}
+
+function readOptionalInventoryState(value: unknown, path: string): ConcertApiTicketType["inventoryState"] {
+  if (value === undefined || value === null) return undefined;
+  if (value === "fresh" || value === "cached" || value === "stale") return value;
+  throw new ConcertContractError(`${path} must be fresh, cached, or stale`);
 }
 
 function readNonNegativeNumberLike(value: unknown, path: string): number {

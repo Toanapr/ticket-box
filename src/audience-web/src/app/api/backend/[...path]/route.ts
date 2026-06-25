@@ -37,7 +37,7 @@ async function proxyRequest(request: Request, context: RouteContext): Promise<Re
   if (!token) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
 
   const headers = new Headers({ Authorization: `Bearer ${token}` });
-  for (const name of ["content-type", "idempotency-key", "x-correlation-id"]) {
+  for (const name of ["content-type", "idempotency-key", "x-correlation-id", "x-sale-access-token"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -53,7 +53,7 @@ async function proxyRequest(request: Request, context: RouteContext): Promise<Re
     if (response.status === 401) await clearAccessToken();
 
     const responseHeaders = new Headers();
-    for (const name of ["content-type", "retry-after", "x-correlation-id"]) {
+    for (const name of ["content-type", "retry-after", "x-correlation-id", "x-sale-access-token", "x-sale-access-expires-at"]) {
       const value = response.headers.get(name);
       if (value) responseHeaders.set(name, value);
     }

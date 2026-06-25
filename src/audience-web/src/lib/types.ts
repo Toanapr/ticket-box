@@ -2,8 +2,11 @@ export type ConcertStatus = "selling" | "upcoming" | "soldout";
 
 export type OrderStatus =
   | "PENDING_PAYMENT"
+  | "PAYMENT_DEGRADED"
+  | "PAYMENT_PENDING_RECONCILIATION"
   | "PAID"
   | "PAYMENT_FAILED"
+  | "PAYMENT_EXPIRED"
   | "EXPIRED"
   | "TICKET_ISSUED";
 
@@ -12,7 +15,34 @@ export type ReservationErrorCode =
   | "QUOTA_EXCEEDED"
   | "SALE_NOT_OPEN"
   | "RESERVATION_EXPIRED"
+  | "RATE_LIMITED"
+  | "OVERLOADED"
+  | "SALE_ACCESS_REQUIRED"
+  | "SALE_TOKEN_EXPIRED"
+  | "PAYMENT_DEGRADED"
+  | "PAYMENT_PENDING_RECONCILIATION"
+  | "IDEMPOTENCY_CONFLICT"
   | "UNKNOWN";
+
+export type CheckoutTransientKind =
+  | "rate-limit"
+  | "overload"
+  | "sale-token-expired"
+  | "sale-access-required"
+  | "idempotency-conflict"
+  | "backend-error";
+
+export interface CheckoutTransientError {
+  kind: CheckoutTransientKind;
+  status: number;
+  code: ReservationErrorCode;
+  message: string;
+  retryAfterMs?: number;
+  retryAt?: string;
+  correlationId?: string;
+}
+
+export type InventoryState = "fresh" | "cached" | "stale";
 
 export interface TicketType {
   id: string;
@@ -22,6 +52,9 @@ export interface TicketType {
   price: number;
   maxPerUser: number;
   availableApprox: number;
+  inventoryCachedAt?: string;
+  inventoryStaleAt?: string;
+  inventoryState?: InventoryState;
   capacity: number;
   saleStartsAt: string;
   saleEndsAt: string;
@@ -57,6 +90,7 @@ export interface ReservationRequest {
   ticketTypeId: string;
   quantity: number;
   idempotencyKey: string;
+  saleAccessToken?: string;
 }
 
 export interface ReservationResponse {
@@ -64,6 +98,8 @@ export interface ReservationResponse {
   expiresAt: string;
   ticketTypeId: string;
   quantity: number;
+  saleAccessToken?: string;
+  saleAccessTokenExpiresAt?: string;
 }
 
 export interface OrderRecord {

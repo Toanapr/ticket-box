@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckoutField, PaymentMethodSelector, SummaryRow } from "./checkout-parts";
 import { useAuth } from "./auth-provider";
 import { AlertIcon, CreditCardIcon } from "./icons";
+import { WaitingRoomBanner, type WaitingRoomState } from "./waiting-room-banner";
 import { createOrder, createReservation, ReservationApiError } from "@/lib/client-api";
-import { formatCurrency, formatDateTime, makeIdempotencyKey, serviceFee, shortVenue } from "@/lib/format";
+import { getCheckoutIntent } from "@/lib/checkout-intent";
+import { formatCurrency, formatDateTime, serviceFee, shortVenue } from "@/lib/format";
+import { clearSaleAccessToken, getSaleAccessToken, setSaleAccessToken } from "@/lib/sale-access-token-storage";
 import type { BuyerInfo, ConcertDetail, PaymentMethod, ReservationErrorCode } from "@/lib/types";
 import { ConcertPoster } from "./concert-poster";
 
@@ -17,6 +20,13 @@ const errorTitles: Record<ReservationErrorCode, string> = {
   QUOTA_EXCEEDED: "Vượt hạn mức mua vé",
   SALE_NOT_OPEN: "Cổng bán vé chưa mở",
   RESERVATION_EXPIRED: "Phiên giữ vé hết hạn",
+  RATE_LIMITED: "Thử lại sau",
+  OVERLOADED: "Hệ thống quá tải",
+  SALE_ACCESS_REQUIRED: "Cần vào hàng chờ",
+  SALE_TOKEN_EXPIRED: "Token vào sale hết hạn",
+  PAYMENT_DEGRADED: "Thanh toán gián đoạn",
+  PAYMENT_PENDING_RECONCILIATION: "Thanh toán chờ đối soát",
+  IDEMPOTENCY_CONFLICT: "Checkout đã thay đổi",
   UNKNOWN: "Không thể tạo đơn",
 };
 
@@ -39,7 +49,10 @@ export function CheckoutClient({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("VNPAY");
   const [mockFailure, setMockFailure] = useState<MockFailure>("NORMAL");
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const [waitingRoomState, setWaitingRoomState] = useState<WaitingRoomState>("unavailable");
+  const [retryLockout, setRetryLockout] = useState<{ retryAt: string; reason: "rate-limit" | "overload"; correlationId?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [, setClockTick] = useState(0);
 
   const totals = useMemo(() => {
     const ticketTotal = ticketType.price * quantity;
@@ -47,30 +60,79 @@ export function CheckoutClient({
     return { ticketTotal, fee, total: ticketTotal + fee };
   }, [quantity, ticketType.price]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const token = getSaleAccessToken(concert.id);
+      setWaitingRoomState(token ? "admitted" : "unavailable");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [concert.id]);
+
+  useEffect(() => {
+    if (!retryLockout) return;
+    const timer = window.setInterval(() => {
+      setClockTick((value) => value + 1);
+      if (Date.parse(retryLockout.retryAt) <= new Date().getTime()) setRetryLockout(null);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [retryLockout]);
+
+  const retryActive = Boolean(retryLockout);
+  const userKey = user?.email ?? "anonymous";
+
   async function submit(): Promise<void> {
+    if (submitting || retryActive) return;
     setSubmitting(true);
     setError(null);
 
     try {
+      const saleAccess = getSaleAccessToken(concert.id);
+      const intent = getCheckoutIntent({
+        concertId: concert.id,
+        ticketTypeId: ticketType.id,
+        quantity,
+        userKey,
+      });
       const reservation = await createReservation(
         {
           concertId: concert.id,
           ticketTypeId: ticketType.id,
           quantity,
-          idempotencyKey: makeIdempotencyKey("reservation"),
+          idempotencyKey: intent.reservationIdempotencyKey,
+          saleAccessToken: saleAccess?.token,
         },
         mockFailure,
       );
+      if (reservation.saleAccessToken) {
+        setSaleAccessToken(concert.id, {
+          token: reservation.saleAccessToken,
+          expiresAt: reservation.saleAccessTokenExpiresAt,
+          issuedAt: new Date().toISOString(),
+        });
+        setWaitingRoomState("admitted");
+      }
       const order = await createOrder({
         reservation,
         concertId: concert.id,
         buyer,
         paymentMethod,
-        idempotencyKey: makeIdempotencyKey("order"),
+        idempotencyKey: intent.orderIdempotencyKey,
       });
       router.push(`/orders/${order.orderId}`);
     } catch (caught) {
       if (caught instanceof ReservationApiError) {
+        if (caught.transient.kind === "sale-token-expired" || caught.transient.kind === "sale-access-required") {
+          clearSaleAccessToken(concert.id);
+          setWaitingRoomState(caught.transient.kind === "sale-token-expired" ? "expired" : "waiting");
+        }
+        if (caught.transient.kind === "rate-limit" || caught.transient.kind === "overload") {
+          const retryAt = caught.transient.retryAt ?? new Date(new Date().getTime() + 5_000).toISOString();
+          setRetryLockout({
+            retryAt,
+            reason: caught.transient.kind,
+            correlationId: caught.transient.correlationId,
+          });
+        }
         setError({ title: errorTitles[caught.code], message: caught.message });
       } else {
         setError({ title: "Không thể tạo đơn", message: "Hệ thống đang bận. Vui lòng thử lại sau." });
@@ -82,6 +144,7 @@ export function CheckoutClient({
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
       <section className="grid gap-8">
+        <WaitingRoomBanner state={waitingRoomState} retryAt={retryLockout?.retryAt} />
         <div className="flex items-center gap-4 rounded bg-ticket-obsidian p-4 text-white">
           <div className="grid h-11 w-11 place-items-center rounded bg-ticket-green/20 text-ticket-green">
             <CreditCardIcon className="h-6 w-6" />
@@ -98,6 +161,12 @@ export function CheckoutClient({
             <div>
               <h2 className="font-black">{error.title}</h2>
               <p className="mt-1 text-sm">{error.message}</p>
+              {retryLockout ? (
+                <p className="mt-2 text-xs font-black">
+                  Backend yêu cầu thử lại sau {new Date(retryLockout.retryAt).toLocaleTimeString("vi-VN")}.
+                  {retryLockout.correlationId ? ` Mã theo dõi: ${retryLockout.correlationId}.` : ""}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -112,7 +181,7 @@ export function CheckoutClient({
             <div className="flex items-center gap-4">
               <button
                 type="button"
-                disabled={quantity <= 1 || submitting}
+                disabled={quantity <= 1 || submitting || retryActive}
                 onClick={() => setQuantity((value) => Math.max(1, value - 1))}
                 className="h-11 w-11 rounded border border-black/10 bg-ticket-stone text-xl font-black disabled:opacity-40"
               >
@@ -121,7 +190,7 @@ export function CheckoutClient({
               <span className="w-8 text-center font-display text-xl font-black">{quantity}</span>
               <button
                 type="button"
-                disabled={quantity >= ticketType.maxPerUser || submitting}
+                disabled={quantity >= ticketType.maxPerUser || submitting || retryActive}
                 onClick={() => setQuantity((value) => Math.min(ticketType.maxPerUser, value + 1))}
                 className="h-11 w-11 rounded border border-black/10 bg-ticket-stone text-xl font-black disabled:opacity-40"
               >
@@ -146,7 +215,7 @@ export function CheckoutClient({
         </section>
         <section className="border-b border-black/10 pb-8">
           <h2 className="font-display text-2xl font-black">3. Phương thức thanh toán</h2>
-          <PaymentMethodSelector value={paymentMethod} disabled={submitting} onChange={setPaymentMethod} />
+          <PaymentMethodSelector value={paymentMethod} disabled={submitting || retryActive} onChange={setPaymentMethod} />
         </section>
         <section className="rounded-lg border border-dashed border-black/20 bg-ticket-stone p-5">
           <h2 className="text-sm font-black uppercase tracking-wide">Local demo controls</h2>
@@ -186,10 +255,10 @@ export function CheckoutClient({
         <button
           type="button"
           onClick={submit}
-          disabled={submitting}
+          disabled={submitting || retryActive}
           className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded bg-ticket-green px-4 py-3 text-sm font-black uppercase tracking-wide text-white transition hover:bg-ticket-obsidian disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Đang tạo reservation..." : "Xác nhận & thanh toán"}
+          {submitting ? "Đang tạo reservation..." : retryActive ? "Đang chờ Retry-After" : "Xác nhận & thanh toán"}
           <CreditCardIcon className="h-5 w-5" />
         </button>
       </aside>

@@ -22,7 +22,33 @@ describe('formatStructuredLog', () => {
       method: 'POST',
       path: '/payments/webhook',
       userId: 'user-1',
+      order_id: 'order-1',
       orderId: 'order-1',
+    });
+  });
+
+  it('adds snake_case business id aliases and redacts sensitive fields', () => {
+    expect(
+      JSON.parse(
+        formatStructuredLog('ticket_issued', {
+          paymentId: 'payment-1',
+          reservationId: 'reservation-1',
+          qrToken: 'raw-qr-token',
+          paymentSecret: 'secret',
+        }),
+      ),
+    ).toEqual({
+      event: 'ticket_issued',
+      correlationId: null,
+      method: null,
+      path: null,
+      userId: null,
+      payment_id: 'payment-1',
+      reservation_id: 'reservation-1',
+      paymentId: 'payment-1',
+      reservationId: 'reservation-1',
+      qrToken: '[redacted]',
+      paymentSecret: '[redacted]',
     });
   });
 

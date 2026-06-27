@@ -38,6 +38,11 @@ export class PaymentReconciliationService {
   async runBatch(): Promise<{ claimed: number; processed: number }> {
     const owner = randomUUID();
     const claimed = await this.claimDue(owner);
+    this.logger.log(
+      formatStructuredLog('payment_reconciliation_started', {
+        claimed: claimed.length,
+      }),
+    );
     let processed = 0;
     for (const payment of claimed) {
       if (await this.reconcile(payment, owner)) processed += 1;
@@ -103,7 +108,7 @@ export class PaymentReconciliationService {
           );
         }
         this.logger.log(
-          formatStructuredLog('payment_reconciliation_result', {
+          formatStructuredLog('payment_reconciliation_resolved', {
             paymentId: payment.id,
             orderId: payment.orderId,
             outcome: status,
@@ -112,7 +117,17 @@ export class PaymentReconciliationService {
         );
         return true;
       }
-      if (await this.expireIfOrderExpired(payment, owner)) return true;
+      if (await this.expireIfOrderExpired(payment, owner)) {
+        this.logger.log(
+          formatStructuredLog('payment_reconciliation_resolved', {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            outcome: 'expired',
+            pendingAgeSeconds,
+          }),
+        );
+        return true;
+      }
       await this.reschedule(payment.id, owner, result.status);
       return false;
     } catch (error) {
@@ -120,10 +135,20 @@ export class PaymentReconciliationService {
         error instanceof PaymentProviderError
           ? error.code
           : 'reconciliation_error';
-      if (await this.expireIfOrderExpired(payment, owner)) return true;
+      if (await this.expireIfOrderExpired(payment, owner)) {
+        this.logger.log(
+          formatStructuredLog('payment_reconciliation_resolved', {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            outcome: 'expired',
+            pendingAgeSeconds,
+          }),
+        );
+        return true;
+      }
       await this.reschedule(payment.id, owner, code);
       this.logger.warn(
-        formatStructuredLog('payment_reconciliation_result', {
+        formatStructuredLog('payment_reconciliation_resolved', {
           paymentId: payment.id,
           orderId: payment.orderId,
           outcome: 'retry',

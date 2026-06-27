@@ -68,8 +68,18 @@ export class PaymentCircuitBreakerService {
   private transition(next: CircuitState) {
     const previous = this.state;
     this.state = next;
+    const eventByState: Record<CircuitState, string> = {
+      closed: 'circuit_breaker_closed',
+      open: 'circuit_breaker_opened',
+      half_open: 'circuit_breaker_half_open',
+    };
     this.logger.warn(
-      formatStructuredLog('payment_circuit_transition', { previous, next }),
+      formatStructuredLog(eventByState[next], {
+        provider: 'mock',
+        operation: 'payment_intent',
+        previous,
+        next,
+      }),
     );
   }
 }

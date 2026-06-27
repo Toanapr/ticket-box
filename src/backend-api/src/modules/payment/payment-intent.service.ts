@@ -85,6 +85,12 @@ export class PaymentIntentService {
       });
       const body = this.toBody(updated, false, null, null);
       await this.idempotency.complete(claim.recordId, claim.owner, 201, body);
+      this.logger.log(
+        formatStructuredLog('payment_pending', {
+          paymentId: payment.id,
+          orderId: payment.orderId,
+        }),
+      );
       return { httpStatus: 201, body };
     } catch (error) {
       return this.handleProviderError(error, payment, claim);
@@ -128,9 +134,11 @@ export class PaymentIntentService {
     const body = this.toBody(updated, true, 'provider_timeout_ambiguous', 5);
     await this.idempotency.complete(claim.recordId, claim.owner, 202, body);
     this.logger.warn(
-      formatStructuredLog('payment_pending_reconciliation', {
+      formatStructuredLog('payment_pending', {
         paymentId: payment.id,
         orderId: payment.orderId,
+        reason: providerError.code ?? 'provider_error',
+        status: 'pending_reconciliation',
       }),
     );
     return { httpStatus: 202, body };

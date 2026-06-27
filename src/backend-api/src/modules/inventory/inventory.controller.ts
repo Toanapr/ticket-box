@@ -6,8 +6,9 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { InventoryService } from './inventory.service';
+import { ReservationRiskGuard } from './reservation-risk.guard';
 
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard, ReservationRiskGuard)
 @Roles('audience')
 @Controller('reservations')
 export class InventoryController {

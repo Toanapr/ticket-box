@@ -27,6 +27,7 @@ interface ImportSummary {
   duplicateRows: number;
   delimiter?: string;
   schemaVersion: string;
+  errorReason?: string;
 }
 
 interface ValidatedRow {
@@ -84,7 +85,32 @@ export class GuestListImportService {
       return { ...existing, idempotent: true };
     }
 
-    const parsed = parseGuestListCsv(file.buffer);
+    const { objectKey } = await this.storage.save(concertId, checksum, file.buffer);
+
+    let parsed: ReturnType<typeof parseGuestListCsv>;
+    try {
+      parsed = parseGuestListCsv(file.buffer);
+    } catch (error) {
+      try {
+        const summary = this.failedSummary(error);
+        const batch = await this.prisma.guestListBatch.create({
+          data: {
+            concertId,
+            fileChecksum: checksum,
+            schemaVersion: GUEST_LIST_SCHEMA_VERSION,
+            rawObjectKey: objectKey,
+            originalName: file.originalname,
+            status: 'failed',
+            summary: summary as unknown as Prisma.InputJsonValue,
+          },
+        });
+        return { ...batch, idempotent: false };
+      } catch (createError) {
+        await this.storage.delete(objectKey);
+        throw createError;
+      }
+    }
+
     const ticketTypes = await this.prisma.ticketType.findMany({
       where: { concertId },
       select: { id: true, slug: true, zoneCode: true },
@@ -98,8 +124,6 @@ export class GuestListImportService {
       ticketTypes,
       activeIdentityKeys,
     );
-
-    const { objectKey } = await this.storage.save(concertId, checksum, file.buffer);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -241,15 +265,27 @@ export class GuestListImportService {
       orderBy: { rowNumber: 'asc' },
     });
 
+    const rowErrors = rows.map((row) => ({
+      rowNumber: row.rowNumber,
+      errorReason: sanitizeCsvFormula(row.errorReason ?? ''),
+      rawRow: sanitizeRawRow(row.rawRow),
+    }));
+    const summary = batch.summary as Prisma.JsonObject;
+
     return {
       batchId,
       status: batch.status,
       summary: batch.summary,
-      errors: rows.map((row) => ({
-        rowNumber: row.rowNumber,
-        errorReason: sanitizeCsvFormula(row.errorReason ?? ''),
-        rawRow: sanitizeRawRow(row.rawRow),
-      })),
+      errors:
+        rowErrors.length > 0 || typeof summary.errorReason !== 'string'
+          ? rowErrors
+          : [
+              {
+                rowNumber: 0,
+                errorReason: sanitizeCsvFormula(summary.errorReason),
+                rawRow: {},
+              },
+            ],
     };
   }
 
@@ -296,6 +332,18 @@ export class GuestListImportService {
           ticketTypeId: entry.ticketTypeId,
         })),
       },
+    };
+  }
+
+
+  private failedSummary(error: unknown): ImportSummary {
+    return {
+      totalRows: 0,
+      validRows: 0,
+      invalidRows: 0,
+      duplicateRows: 0,
+      schemaVersion: GUEST_LIST_SCHEMA_VERSION,
+      errorReason: error instanceof Error ? error.message : String(error),
     };
   }
 

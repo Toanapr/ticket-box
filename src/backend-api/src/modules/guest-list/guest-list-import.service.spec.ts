@@ -35,6 +35,7 @@ describe('GuestListImportService', () => {
 
   const concertFindUnique = jest.fn();
   const batchFindUnique = jest.fn();
+  const batchCreate = jest.fn();
   const ticketTypeFindMany = jest.fn();
   const activeVersionFindFirst = jest.fn();
   const txBatchCreate = jest.fn();
@@ -61,7 +62,7 @@ describe('GuestListImportService', () => {
 
   const prisma = {
     concert: { findUnique: concertFindUnique },
-    guestListBatch: { findUnique: batchFindUnique },
+    guestListBatch: { findUnique: batchFindUnique, create: batchCreate },
     ticketType: { findMany: ticketTypeFindMany },
     guestListVersion: { findFirst: activeVersionFindFirst },
     $transaction: transaction,
@@ -76,6 +77,14 @@ describe('GuestListImportService', () => {
       organizationId: organizer.organizationId,
     });
     batchFindUnique.mockResolvedValue(null);
+    batchCreate.mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        id: 'batch-id',
+        concertId,
+        status: args.data.status,
+        summary: args.data.summary,
+      }),
+    );
     ticketTypeFindMany.mockResolvedValue([
       { id: ticketTypeId, slug: 'vip', zoneCode: 'VIP' },
     ]);
@@ -147,6 +156,29 @@ describe('GuestListImportService', () => {
       data: expect.arrayContaining([
         expect.objectContaining({ status: 'invalid' }),
       ]),
+    });
+  });
+
+
+  it('records file-level CSV errors as failed batches without publishing', async () => {
+    const result = await service.importCsv(
+      organizer,
+      concertId,
+      csvFile('full_name,zone_code\nJane Guest,VIP\n'),
+    );
+
+    expect(result).toMatchObject({ status: 'failed', idempotent: false });
+    expect(storage.save).toHaveBeenCalled();
+    expect(ticketTypeFindMany).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+    expect(txVersionCreate).not.toHaveBeenCalled();
+    expect(batchCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: 'failed',
+        summary: expect.objectContaining({
+          errorReason: expect.stringContaining('CSV must include one of'),
+        }),
+      }),
     });
   });
 

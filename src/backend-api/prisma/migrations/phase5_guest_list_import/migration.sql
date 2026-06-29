@@ -1,4 +1,4 @@
-CREATE TYPE "GuestListBatchStatus" AS ENUM ('imported', 'validation_failed', 'published');
+CREATE TYPE "GuestListBatchStatus" AS ENUM ('imported', 'validation_failed', 'published', 'failed');
 
 CREATE TYPE "GuestEntryStagingStatus" AS ENUM ('valid', 'invalid');
 

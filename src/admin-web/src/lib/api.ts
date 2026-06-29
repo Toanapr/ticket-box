@@ -48,6 +48,7 @@ export type GuestListImportSummary = {
   duplicateRows: number;
   delimiter?: string;
   schemaVersion: string;
+  errorReason?: string;
 };
 
 export type GuestListImportBatch = {
@@ -57,7 +58,7 @@ export type GuestListImportBatch = {
   schemaVersion: string;
   rawObjectKey: string;
   originalName?: string | null;
-  status: "imported" | "validation_failed" | "published";
+  status: "imported" | "validation_failed" | "published" | "failed";
   summary: GuestListImportSummary;
   createdAt: string;
   updatedAt: string;

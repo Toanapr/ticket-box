@@ -122,6 +122,7 @@ enum GuestListBatchStatus {
   imported
   validation_failed
   published
+  failed
 }
 
 enum GuestEntryStagingStatus {

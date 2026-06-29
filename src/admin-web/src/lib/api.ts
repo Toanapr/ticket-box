@@ -40,6 +40,48 @@ export type NotificationRecord = {
   createdAt: string;
 };
 
+
+export type GuestListImportSummary = {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  delimiter?: string;
+  schemaVersion: string;
+};
+
+export type GuestListImportBatch = {
+  id: string;
+  concertId: string;
+  fileChecksum: string;
+  schemaVersion: string;
+  rawObjectKey: string;
+  originalName?: string | null;
+  status: "imported" | "validation_failed" | "published";
+  summary: GuestListImportSummary;
+  createdAt: string;
+  updatedAt: string;
+  idempotent?: boolean;
+  version?: {
+    id: string;
+    versionNo: number;
+    isActive: boolean;
+    entryCount: number;
+    publishedAt: string;
+  } | null;
+};
+
+export type GuestListImportErrors = {
+  batchId: string;
+  status: GuestListImportBatch["status"];
+  summary: GuestListImportSummary;
+  errors: Array<{
+    rowNumber: number;
+    errorReason: string;
+    rawRow: Record<string, unknown>;
+  }>;
+};
+
 export type ConcertPayload = {
   title: string;
   venue: string;
@@ -60,6 +102,28 @@ export type TicketTypePayload = {
   saleEndAt: string;
   perUserLimit: number;
 };
+
+
+export async function uploadGuestListCsv(
+  concertId: string,
+  file: File,
+): Promise<GuestListImportBatch> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<GuestListImportBatch>(
+    `/admin/concerts/${concertId}/guest-list/import`,
+    { method: "POST", body: formData },
+  );
+}
+
+export async function listGuestListImports(
+  concertId: string,
+): Promise<GuestListImportBatch[]> {
+  return apiFetch<GuestListImportBatch[]>(
+    `/admin/concerts/${concertId}/guest-list/imports`,
+  );
+}
 
 export async function uploadPoster(
   concertId: string,

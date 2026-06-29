@@ -20,13 +20,17 @@ import { CurrentUser } from '../auth/current-user';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminService } from './admin.service';
+import { GuestListImportService } from '../guest-list/guest-list-import.service';
 import type { ConcertBody, TicketTypeBody } from './dto/admin.dto';
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('organizer')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly guestListImportService: GuestListImportService,
+  ) {}
 
   @Get('concerts')
   listConcerts(@CurrentUser() user: CurrentUser) {
@@ -78,6 +82,43 @@ export class AdminController {
     file: Express.Multer.File,
   ) {
     return this.adminService.uploadPoster(user, id, file);
+  }
+
+
+  @Post('concerts/:id/guest-list/import')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+    }),
+  )
+  importGuestList(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: 2 * 1024 * 1024 })],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.guestListImportService.importCsv(user, id, file);
+  }
+
+  @Get('concerts/:id/guest-list/imports')
+  listGuestListImports(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.guestListImportService.listImports(user, id);
+  }
+
+  @Get('guest-list/imports/:batchId/errors')
+  listGuestListImportErrors(
+    @CurrentUser() user: CurrentUser,
+    @Param('batchId') batchId: string,
+  ) {
+    return this.guestListImportService.listImportErrors(user, batchId);
   }
 
   @Post('concerts/:id/ticket-types')

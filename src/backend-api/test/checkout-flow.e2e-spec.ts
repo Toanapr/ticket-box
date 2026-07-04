@@ -229,9 +229,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     expect(orderRes.status).toBe(201);
     expect(orderRes.body.status).toBe('pending_payment');
-    expect(orderRes.body.paymentId).toMatch(
-      /^[0-9a-f-]{36}$/i,
-    );
+    expect(orderRes.body.paymentId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(orderRes.body.concertId).toBe(testTicketType.concertId);
     expect(orderRes.body.concertTitle).toBe(
       `Test Concert ${testTicketType.name}`,

@@ -67,10 +67,64 @@ model Concert {
   posterObjectKey     String?       @unique @map("poster_object_key")
   organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   ticketTypes         TicketType[]
+  artistBioJobs       ArtistBioJob[]
 
   @@index([status, startAt])
   @@index([organizationId])
   @@map("concerts")
+}
+
+enum ArtistBioJobStatus {
+  queued
+  processing
+  draft_ready
+  failed
+}
+
+enum ArtistBioReviewStatus {
+  pending_review
+  approved
+  rejected
+}
+
+model ArtistBioJob {
+  id              String             @id @default(uuid()) @db.Uuid
+  concertId       String             @map("concert_id") @db.Uuid
+  objectKey       String             @map("object_key")
+  checksum        String
+  pipelineVersion String             @map("pipeline_version")
+  status          ArtistBioJobStatus @default(queued)
+  extractedText   String?            @map("extracted_text")
+  retryCount      Int                @default(0) @map("retry_count")
+  maxRetries      Int                @default(2) @map("max_retries")
+  errorCode       String?            @map("error_code")
+  errorMessage    String?            @map("error_message")
+  dlqReason       String?            @map("dlq_reason")
+  dlqAt           DateTime?          @map("dlq_at") @db.Timestamptz(6)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert         Concert            @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  draft           ArtistBioDraft?
+
+  @@unique([concertId, checksum, pipelineVersion])
+  @@index([concertId, createdAt])
+  @@index([status, updatedAt])
+  @@map("artist_bio_jobs")
+}
+
+model ArtistBioDraft {
+  id                   String                @id @default(uuid()) @db.Uuid
+  jobId                String                @unique @map("job_id") @db.Uuid
+  generatedContent     String                @map("generated_content")
+  editedContent        String?               @map("edited_content")
+  reviewStatus         ArtistBioReviewStatus @default(pending_review) @map("review_status")
+  promptVersion        String                @map("prompt_version")
+  modelProviderVersion String                @map("model_provider_version")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  job                  ArtistBioJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("artist_bio_drafts")
 }
 
 enum ReservationStatus {

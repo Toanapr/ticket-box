@@ -39,6 +39,7 @@ erDiagram
     CONCERT ||--o{ GUEST_LIST_BATCH : imports
     GUEST_LIST_BATCH ||--o{ GUEST_ENTRY : contains
     CONCERT ||--o{ ARTIST_BIO_JOB : generates
+    ARTIST_BIO_JOB ||--o| ARTIST_BIO_DRAFT : produces
 ```
 
 ## Entity quan trọng
@@ -218,10 +219,75 @@ Khi expire:
 | `result` | enum | accepted/conflict/rejected. |
 | `scanned_at`, `synced_at` | timestamptz | Thời gian scan/sync. |
 
-### `guest_list_batches`, `guest_entries`, `artist_bio_jobs`
+### `guest_list_batches`, `guest_entries`
 
 | Entity | Mục đích |
 |---|---|
 | `guest_list_batches` | Lưu batch import CSV, status, file object key, summary lỗi. |
 | `guest_entries` | Guest list đã validate theo concert/zone/version. |
-| `artist_bio_jobs` | Trạng thái xử lý PDF, extracted text, AI output, review status. |
+
+### `artist_bio_jobs`
+
+`artist_bio_jobs` lưu metadata và trạng thái xử lý PDF press kit. Binary PDF không được lưu trong PostgreSQL; file gốc được lưu trong object storage bằng `object_key`.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | UUID | Primary key. |
+| `concert_id` | UUID | FK tới `concerts.id`; job thuộc concert nào. |
+| `object_key` | text | Key của PDF trong object storage/MinIO. |
+| `checksum` | text | SHA-256 của nội dung PDF, dùng cho idempotency upload. |
+| `pipeline_version` | text | Version pipeline extract/sanitize/generate. |
+| `status` | enum | `queued`, `processing`, `draft_ready`, `failed`. |
+| `extracted_text` | text nullable | Text đã extract và sanitize từ PDF; giới hạn trước khi gửi AI. |
+| `retry_count` | int | Số lần retry đã dùng. |
+| `max_retries` | int | Retry budget tối đa cho job. |
+| `error_code` | text nullable | Mã lỗi cuối cùng, ví dụ `PDF_UNREADABLE`, `AI_RETRY_EXHAUSTED`. |
+| `error_message` | text nullable | Thông tin lỗi ngắn để admin/ops đọc; không log toàn bộ PDF. |
+| `dlq_reason` | text nullable | Lý do chuyển failed/DLQ nếu vượt retry hoặc poison input. |
+| `dlq_at` | timestamptz nullable | Thời điểm job bị đưa vào failed/DLQ. |
+| `created_at`, `updated_at` | timestamptz | Audit timestamps. |
+
+Constraint và index:
+
+- `UNIQUE(concert_id, checksum, pipeline_version)` để upload lại cùng PDF không tạo job trùng.
+- Index `(concert_id, created_at)` để lấy job mới nhất cho admin review.
+- Index `(status, updated_at)` để vận hành worker/retry/dashboard.
+
+Invariant:
+
+```
+PDF binary chỉ nằm trong object storage, không lưu trong PostgreSQL.
+
+Một concert + checksum + pipeline_version chỉ có một artist_bio_job.
+
+Job failed không được ghi đè published_artist_bio của concert.
+```
+
+### `artist_bio_drafts`
+
+`artist_bio_drafts` lưu draft AI output để admin review/edit trước khi publish. AI output không tự động ghi vào `concerts.published_artist_bio`.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| `id` | UUID | Primary key. |
+| `job_id` | UUID | FK tới `artist_bio_jobs.id`; unique để mỗi job có tối đa một draft. |
+| `generated_content` | text | Nội dung bio do AI adapter sinh ra. |
+| `edited_content` | text nullable | Nội dung admin chỉnh sửa; null khi chưa chỉnh. |
+| `review_status` | enum | `pending_review`, `approved`, `rejected`. |
+| `prompt_version` | text | Version prompt/system instruction dùng để sinh draft. |
+| `model_provider_version` | text | Provider/model/mock version dùng để sinh draft. |
+| `created_at`, `updated_at` | timestamptz | Audit timestamps. |
+
+Constraint:
+
+- `UNIQUE(job_id)` để RabbitMQ redelivery hoặc manual retry không tạo nhiều draft cho cùng job.
+
+Invariant:
+
+```
+Một artist_bio_job có tối đa một artist_bio_draft.
+
+Draft mới mặc định review_status = pending_review.
+
+AI output không tự động publish; chỉ review/publish flow mới được cập nhật concerts.published_artist_bio.
+```

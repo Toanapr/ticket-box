@@ -7,6 +7,7 @@ import { CacheModule } from './common/cache/cache.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AppConfigModule } from './config/config.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ArtistBioModule } from './modules/artist-bio/artist-bio.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConcertPosterModule } from './modules/concert-poster/concert-poster.module';
 import { ConcertsModule } from './modules/concert/concerts.module';
@@ -36,6 +37,7 @@ const backendEnvFilePath = resolve(__dirname, '..', '.env');
 
     // Feature Modules
     AuthModule,
+    ArtistBioModule,
     ConcertPosterModule,
     ConcertsModule,
     AdminModule,

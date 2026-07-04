@@ -33,6 +33,28 @@ Local seed posters are copied from `mock-ui/images`. Those source files use `.pn
 
 Local storage supports a single backend writer. Mount the directory on persistent storage and back it up together with PostgreSQL; restoring only the database leaves dangling poster keys. Multi-replica deployments require migration to shared object storage.
 
+### AI Artist Bio storage and queue
+
+Artist bio PDF uploads are stored in MinIO/S3-compatible object storage. PostgreSQL stores only the object key, checksum, pipeline version and job state; it never stores PDF bytes.
+
+AI jobs are published to RabbitMQ after metadata is persisted. The `artist-bio` module declares a durable queue, exchange and DLQ:
+
+- queue: `ARTIST_BIO_QUEUE_NAME` (default `artist-bio.jobs`)
+- exchange: `ARTIST_BIO_EXCHANGE_NAME` (default `artist-bio.jobs`)
+- DLQ: `ARTIST_BIO_DLQ_NAME` (default `artist-bio.jobs.dlq`)
+
+Start the required local infrastructure:
+
+```bash
+docker compose up -d postgres redis rabbitmq minio
+```
+
+RabbitMQ management UI is available at `http://localhost:15672` with `ticketbox/ticketbox123`. MinIO console is available at `http://localhost:9001` with `ticketbox/ticketbox123`.
+
+Relevant environment variables are listed in `.env.example`, including `ARTIST_BIO_RABBITMQ_URL`, `ARTIST_BIO_S3_ENDPOINT`, `ARTIST_BIO_S3_BUCKET`, and MinIO credentials.
+
+PDF text extraction uses `pdf-parse` against the PDF text layer, then sanitizes and truncates the extracted content before calling the AI adapter. Vietnamese text with valid Unicode/text-layer mapping is supported. Scan-only PDFs still require OCR and will fail clearly as unreadable.
+
 ### Audience authentication
 
 `POST /auth/register` accepts `fullName`, `email`, and `password`. `POST /auth/login` returns the same user shape plus a Bearer access token. Authenticated clients can resolve the current active profile with `GET /auth/me`.

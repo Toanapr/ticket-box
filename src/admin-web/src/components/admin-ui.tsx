@@ -217,10 +217,16 @@ export function AdminStatusBadge({
 }): React.ReactElement {
   const normalized = status.toLowerCase();
   const classes =
-    normalized === "published" || normalized === "sent"
+    normalized === "published" ||
+    normalized === "sent" ||
+    normalized === "draft_ready"
       ? "bg-ticket-green text-white"
-      : normalized === "draft" || normalized === "imported"
+      : normalized === "draft" ||
+          normalized === "imported" ||
+          normalized === "queued"
         ? "bg-ticket-obsidian text-white"
+        : normalized === "processing"
+          ? "bg-amber-100 text-amber-800"
         : normalized === "validation_failed" || normalized === "failed"
           ? "bg-red-100 text-red-700"
           : "bg-slate-200 text-slate-700";

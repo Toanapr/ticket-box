@@ -27,6 +27,62 @@ export type Concert = {
   ticketTypes: TicketType[];
 };
 
+export type ArtistBioJobStatus =
+  | "queued"
+  | "processing"
+  | "draft_ready"
+  | "failed";
+
+export type ArtistBioDraft = {
+  id: string;
+  concertId: string;
+  jobId: string;
+  content: string;
+  reviewStatus: "pending_review" | string;
+  providerVersion: string;
+  modelVersion: string;
+  promptVersion: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ArtistBioJob = {
+  id: string;
+  concertId: string;
+  fileChecksum: string;
+  pipelineVersion: string;
+  rawObjectKey: string;
+  originalName?: string | null;
+  sourceMimeType?: string | null;
+  status: ArtistBioJobStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  nextAttemptAt: string;
+  leaseOwner?: string | null;
+  leaseExpiresAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  lastError?: string | null;
+  lastErrorAt?: string | null;
+  extractedText?: string | null;
+  sanitizedText?: string | null;
+  providerVersion?: string | null;
+  modelVersion?: string | null;
+  promptVersion?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  idempotent?: boolean;
+  draft?: ArtistBioDraft | null;
+};
+
+export type ArtistBioReviewState = {
+  concertId: string;
+  artistName: string;
+  publishedArtistBio: string;
+  latestDraft: ArtistBioDraft | null;
+  jobs: ArtistBioJob[];
+};
+
 export type NotificationRecord = {
   id: string;
   eventType: string;
@@ -189,6 +245,62 @@ export async function uploadPoster(
     `/admin/concerts/${concertId}/poster`,
     { method: "PUT", body: formData },
   );
+}
+
+export async function uploadArtistBioPdf(
+  concertId: string,
+  file: File,
+): Promise<ArtistBioJob> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<ArtistBioJob>(`/admin/concerts/${concertId}/artist-bio/jobs`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function listArtistBioJobs(
+  concertId: string,
+): Promise<ArtistBioJob[]> {
+  return apiFetch<ArtistBioJob[]>(`/admin/concerts/${concertId}/artist-bio/jobs`);
+}
+
+export async function getArtistBioReviewState(
+  concertId: string,
+): Promise<ArtistBioReviewState> {
+  return apiFetch<ArtistBioReviewState>(
+    `/admin/concerts/${concertId}/artist-bio/review`,
+  );
+}
+
+export async function retryArtistBioJob(jobId: string): Promise<ArtistBioJob> {
+  return apiFetch<ArtistBioJob>(`/admin/artist-bio/jobs/${jobId}/retry`, {
+    method: "POST",
+  });
+}
+
+export async function updateArtistBioDraft(
+  draftId: string,
+  content: string,
+): Promise<ArtistBioDraft> {
+  return apiFetch<ArtistBioDraft>(`/admin/artist-bio/drafts/${draftId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function publishArtistBioDraft(
+  draftId: string,
+): Promise<{
+  concertId: string;
+  draftId: string;
+  jobId: string;
+  publishedArtistBio: string;
+}> {
+  return apiFetch(`/admin/artist-bio/drafts/${draftId}/publish`, {
+    method: "POST",
+  });
 }
 
 export async function apiFetch<T>(

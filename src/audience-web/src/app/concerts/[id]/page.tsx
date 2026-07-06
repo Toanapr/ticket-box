@@ -2,7 +2,14 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ConcertPoster } from "@/components/concert-poster";
-import { ArrowRightIcon, CalendarIcon, InfoIcon, LayersIcon, MapPinIcon, UsersIcon } from "@/components/icons";
+import {
+  ArrowRightIcon,
+  CalendarIcon,
+  InfoIcon,
+  LayersIcon,
+  MapPinIcon,
+  UsersIcon,
+} from "@/components/icons";
 import { PageShell } from "@/components/site-shell";
 import { SeatingMap } from "@/components/seating-map";
 import { TicketTypeSidebar } from "@/components/ticket-type-sidebar";
@@ -17,35 +24,49 @@ interface ConcertDetailPageProps {
 
 export const dynamic = "force-dynamic";
 
-export default async function ConcertDetailPage({ params, searchParams }: ConcertDetailPageProps): Promise<React.ReactElement> {
+export default async function ConcertDetailPage({
+  params,
+  searchParams,
+}: ConcertDetailPageProps): Promise<React.ReactElement> {
   const { id } = await params;
   const query = await searchParams;
   const concert = await getConcertByIdentifier(id);
   if (!concert) notFound();
+
   const selection = resolveTicketTypeSelection(concert, query?.ticketType);
   const ticketTypeQuery = selection.canonicalIdentifier
     ? `?ticketType=${encodeURIComponent(selection.canonicalIdentifier)}`
     : "";
-  if (id !== concert.slug || query?.ticketType !== selection.canonicalIdentifier) {
+
+  if (
+    id !== concert.slug ||
+    query?.ticketType !== selection.canonicalIdentifier
+  ) {
     permanentRedirect(`/concerts/${concert.slug}${ticketTypeQuery}`);
   }
 
   const selectedTicketType = selection.ticketType;
-  const minPrice = selectedTicketType ? Math.min(...concert.ticketTypes.map((type) => type.price)) : null;
+  const minPrice = selectedTicketType
+    ? Math.min(...concert.ticketTypes.map((type) => type.price))
+    : null;
   const [venueMain, ...venueRest] = concert.venue.split(",");
   const venueSub = venueRest.join(",").trim();
-  const canBuy = concert.status === "selling" && Boolean(selectedTicketType && selectedTicketType.availableApprox > 0);
+  const canBuy =
+    concert.status === "selling" &&
+    Boolean(selectedTicketType && selectedTicketType.availableApprox > 0);
   const heroCtaLabel = !selectedTicketType
-    ? "Chưa có vé"
+    ? "Chua co ve"
     : concert.status === "upcoming"
-      ? "Sắp mở bán"
+      ? "Sap mo ban"
       : concert.status === "soldout"
-        ? "Hết vé"
-        : "Mua vé ngay";
+        ? "Het ve"
+        : "Mua ve ngay";
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Concerts", href: "/concerts" }, { label: concert.title }]} />
+      <Breadcrumbs
+        items={[{ label: "Concerts", href: "/concerts" }, { label: concert.title }]}
+      />
 
       <section className="mb-10 overflow-hidden rounded-[24px] bg-[#111315] text-white shadow-[0_20px_40px_rgba(0,0,0,0.15)]">
         <div className="flex flex-col lg:h-[400px] lg:flex-row">
@@ -60,9 +81,11 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
                     <CalendarIcon className="h-[18px] w-[18px]" />
                   </span>
                   <div className="grid gap-1">
-                    <span className="text-sm font-black text-ticket-green">{formatDateTime(concert.startsAt)}</span>
+                    <span className="text-sm font-black text-ticket-green">
+                      {formatDateTime(concert.startsAt)}
+                    </span>
                     <span className="w-max rounded border border-[#3d4145] bg-[#27292b] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-white">
-                      + 1 ngày khác
+                      + 1 ngay khac
                     </span>
                   </div>
                 </div>
@@ -71,20 +94,28 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
                     <MapPinIcon className="h-[18px] w-[18px]" />
                   </span>
                   <div className="grid gap-1">
-                    <span className="text-sm font-black uppercase tracking-[0.03em] text-ticket-green">{venueMain}</span>
-                    {venueSub ? <span className="text-[12.5px] leading-5 text-slate-400">{venueSub}</span> : null}
+                    <span className="text-sm font-black uppercase tracking-[0.03em] text-ticket-green">
+                      {venueMain}
+                    </span>
+                    {venueSub ? (
+                      <span className="text-[12.5px] leading-5 text-slate-400">
+                        {venueSub}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-8 border-t border-white/10 pt-6">
-              {minPrice !== null ? <div className="flex items-center gap-2">
-                <span className="text-[15px] font-bold text-white">Giá từ</span>
-                <span className="font-display text-[30px] font-black leading-none text-ticket-green md:text-[34px] lg:text-[22px]">
-                  {formatCurrency(minPrice)}
-                </span>
-                <ArrowRightIcon className="h-5 w-5 text-ticket-green" />
-              </div> : null}
+              {minPrice !== null ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[15px] font-bold text-white">Gia tu</span>
+                  <span className="font-display text-[30px] font-black leading-none text-ticket-green md:text-[34px] lg:text-[22px]">
+                    {formatCurrency(minPrice)}
+                  </span>
+                  <ArrowRightIcon className="h-5 w-5 text-ticket-green" />
+                </div>
+              ) : null}
               {canBuy && selectedTicketType ? (
                 <Link
                   href={`/concerts/${concert.slug}/checkout?ticketType=${selectedTicketType.slug}`}
@@ -110,41 +141,82 @@ export default async function ConcertDetailPage({ params, searchParams }: Concer
             <div className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-ticket-alabaster lg:bottom-[-12px] lg:left-1/2 lg:right-auto lg:top-auto lg:-translate-x-1/2 lg:translate-y-0" />
           </div>
           <div className="relative order-1 h-[300px] overflow-hidden bg-black lg:order-3 lg:h-full lg:flex-1">
-            <ConcertPoster src={concert.posterPath} title={concert.title} priority sizes="(max-width: 1024px) 100vw, 800px" />
+            <ConcertPoster
+              src={concert.posterPath}
+              title={concert.title}
+              priority
+              sizes="(max-width: 1024px) 100vw, 800px"
+            />
           </div>
         </div>
       </section>
 
       <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
         <div className="grid gap-10">
-          <InfoSection title="Dàn nghệ sĩ biểu diễn" icon={<UsersIcon className="h-6 w-6 text-ticket-green" />}>
+          <InfoSection
+            title="Dan nghe si bieu dien"
+            icon={<UsersIcon className="h-6 w-6 text-ticket-green" />}
+          >
             <div className="flex flex-wrap gap-3">
               {concert.artists.map((artist) => (
-                <span key={artist} className="inline-flex min-h-11 items-center gap-2 rounded border border-black/10 bg-ticket-stone px-4 text-sm font-black">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-ticket-obsidian text-[10px] text-white">{artist[0]}</span>
+                <span
+                  key={artist}
+                  className="inline-flex min-h-11 items-center gap-2 rounded border border-black/10 bg-ticket-stone px-4 text-sm font-black"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-ticket-obsidian text-[10px] text-white">
+                    {artist[0]}
+                  </span>
                   {artist}
                 </span>
               ))}
             </div>
           </InfoSection>
 
-          <InfoSection title="Sơ đồ khu vực khán đài" icon={<LayersIcon className="h-6 w-6 text-ticket-green" />}>
+          {concert.artistBio ? (
+            <InfoSection
+              title="Artist bio"
+              icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}
+            >
+              <p className="max-w-3xl whitespace-pre-wrap text-base leading-8 text-slate-600">
+                {concert.artistBio}
+              </p>
+            </InfoSection>
+          ) : null}
+
+          <InfoSection
+            title="Seating map"
+            icon={<LayersIcon className="h-6 w-6 text-ticket-green" />}
+          >
             {selectedTicketType ? (
-              <SeatingMap concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+              <SeatingMap
+                concert={concert}
+                selectedTicketTypeId={selectedTicketType.id}
+              />
             ) : (
-              <p className="text-sm font-bold text-slate-500">Sự kiện chưa công bố khu vực vé.</p>
+              <p className="text-sm font-bold text-slate-500">
+                Su kien chua cong bo khu vuc ve.
+              </p>
             )}
           </InfoSection>
 
-          <InfoSection title="Thông tin chi tiết" icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}>
-            <p className="max-w-3xl text-base leading-8 text-slate-600">{concert.description}</p>
+          <InfoSection
+            title="Thong tin chi tiet"
+            icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}
+          >
+            <p className="max-w-3xl text-base leading-8 text-slate-600">
+              {concert.description}
+            </p>
           </InfoSection>
         </div>
+
         {selectedTicketType ? (
-          <TicketTypeSidebar concert={concert} selectedTicketTypeId={selectedTicketType.id} />
+          <TicketTypeSidebar
+            concert={concert}
+            selectedTicketTypeId={selectedTicketType.id}
+          />
         ) : (
           <aside className="rounded-lg border border-black/10 bg-white p-6 text-sm font-bold text-slate-500">
-            Chưa có hạng vé được mở bán.
+            Chua co hang ve duoc mo ban.
           </aside>
         )}
       </div>

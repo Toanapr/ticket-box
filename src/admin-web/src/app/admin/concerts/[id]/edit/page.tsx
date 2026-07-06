@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
+import { ArtistBioManager } from "@/components/artist-bio-manager";
 import { ConcertForm } from "@/components/concert-form";
 import { AdminBackLink, AdminHero, AdminPanel } from "@/components/admin-ui";
-import { Concert } from "@/lib/api";
+import { ArtistBioReviewState, Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
 type EditConcertPageProps = {
@@ -22,6 +23,16 @@ export default async function EditConcertPage({
     notFound();
   }
 
+  const reviewState = await serverApiFetch<ArtistBioReviewState>(
+    `/admin/concerts/${id}/artist-bio/review`,
+  ).catch(() => ({
+    concertId: id,
+    artistName: concert.artistName,
+    publishedArtistBio: concert.publishedArtistBio,
+    latestDraft: null,
+    jobs: [],
+  }));
+
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -36,6 +47,8 @@ export default async function EditConcertPage({
       <AdminPanel className="max-w-3xl">
         <ConcertForm mode="edit" concert={concert} />
       </AdminPanel>
+
+      <ArtistBioManager concert={concert} initialReviewState={reviewState} />
     </div>
   );
 }

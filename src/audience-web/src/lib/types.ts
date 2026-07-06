@@ -69,6 +69,7 @@ export interface ConcertSummary {
   startsAt: string;
   status: ConcertStatus;
   description: string;
+  artistBio: string;
   posterPath?: string;
 }
 

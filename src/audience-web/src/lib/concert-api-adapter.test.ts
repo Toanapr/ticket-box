@@ -55,6 +55,7 @@ describe("concert API adapter", () => {
       startsAt: "2026-09-15T12:00:00.000Z",
       status: "selling",
       description: "Artist biography",
+      artistBio: "Artist biography",
       seatingMapVersion: "concerts/aurora/seating-map.json",
       posterPath: "/api/media/concert-posters/11111111-1111-4111-8111-111111111111-1.png",
       ticketTypes: [
@@ -101,6 +102,19 @@ describe("concert API adapter", () => {
     expect(concert.ticketTypes[0]).toMatchObject({ availableApprox: 80 });
     expect(concert.ticketTypes[0].inventoryCachedAt).toBeUndefined();
     expect(concert.ticketTypes[0].inventoryStaleAt).toBeUndefined();
+  });
+
+  it("keeps manual description while exposing published artist bio separately", () => {
+    const concert = normalizeConcertDetail(
+      concertFixture({
+        description: "Manual concert description",
+        publishedArtistBio: "Generated artist bio",
+      }),
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(concert.description).toBe("Manual concert description");
+    expect(concert.artistBio).toBe("Generated artist bio");
   });
 
   it.each([

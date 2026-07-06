@@ -14,6 +14,8 @@ export const mockConcerts: ConcertDetail[] = [
     status: "selling",
     description:
       "Concert Anh Trai Say Hi 2026 quay trở lại với quy mô sân vận động, dàn nghệ sĩ trẻ và hệ thống âm thanh ánh sáng đầu tư cho đêm diễn lớn.",
+    artistBio:
+      "Dan nghe si tre trung voi nhieu manh ghep noi bat, mang den mot dem dien san van dong nang luong cao.",
     posterPath: "/concert-posters/say-hi-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -34,6 +36,8 @@ export const mockConcerts: ConcertDetail[] = [
     status: "upcoming",
     description:
       "Đại nhạc hội của các Anh Tài với bản phối mới, sân khấu năng lượng cao và cảm xúc tự hào cho khán giả.",
+    artistBio:
+      "Su hop tac cua nhieu giong ca va nghe si gao coi, duoc lam moi cho mot dem concert quy mo lon.",
     posterPath: "/concert-posters/chong-gai-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -54,6 +58,8 @@ export const mockConcerts: ConcertDetail[] = [
     status: "selling",
     description:
       "Đêm concert tôn vinh năng lượng của các Chị Đẹp, kết hợp vũ đạo, band live và sân khấu lấy cảm hứng từ đại dương.",
+    artistBio:
+      "Nhung nghe si nu voi mau sac hien dai, ket hop trinh dien, vu dao va ban live trong khong gian cam hung.",
     posterPath: "/concert-posters/chi-dep-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [
@@ -74,6 +80,8 @@ export const mockConcerts: ConcertDetail[] = [
     status: "soldout",
     description:
       "Showcase cho thế hệ trẻ với năng lượng tươi mới, thời thượng và không gian đứng gần sân khấu.",
+    artistBio:
+      "Dan nghe si tre mang den showcase gan gui, thoi thuong va huong toi trai nghiem gan san khau.",
     posterPath: "/concert-posters/em-xinh-poster.png",
     seatingMapVersion: "mock-map-v1",
     ticketTypes: [

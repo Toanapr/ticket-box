@@ -35,6 +35,9 @@ describe('Checkout flow and invariants (e2e)', () => {
   const webhookSecret = 'checkout-e2e-webhook-secret';
   const previousWebhookSecret = process.env.WEBHOOK_SIGNING_SECRET;
   const previousRedisUrl = process.env.REDIS_URL;
+  const previousMockPaymentMode = process.env.MOCK_PAYMENT_MODE;
+  const previousMockPaymentQueryStatus = process.env.MOCK_PAYMENT_QUERY_STATUS;
+  const previousMockPaymentDelayMs = process.env.MOCK_PAYMENT_DELAY_MS;
   beforeAll(async () => {
     process.env.PAYMENT_PROVIDER_TIMEOUT_MS = '50';
     process.env.WEBHOOK_SIGNING_SECRET = webhookSecret;
@@ -63,6 +66,12 @@ describe('Checkout flow and invariants (e2e)', () => {
     } catch {
       // Redis is optional in tests; the guard falls back to fresh local counters.
     }
+  });
+
+  beforeEach(() => {
+    delete process.env.MOCK_PAYMENT_MODE;
+    delete process.env.MOCK_PAYMENT_QUERY_STATUS;
+    delete process.env.MOCK_PAYMENT_DELAY_MS;
   });
 
   afterAll(async () => {
@@ -154,6 +163,21 @@ describe('Checkout flow and invariants (e2e)', () => {
     } else {
       process.env.REDIS_URL = previousRedisUrl;
     }
+    if (previousMockPaymentMode === undefined) {
+      delete process.env.MOCK_PAYMENT_MODE;
+    } else {
+      process.env.MOCK_PAYMENT_MODE = previousMockPaymentMode;
+    }
+    if (previousMockPaymentQueryStatus === undefined) {
+      delete process.env.MOCK_PAYMENT_QUERY_STATUS;
+    } else {
+      process.env.MOCK_PAYMENT_QUERY_STATUS = previousMockPaymentQueryStatus;
+    }
+    if (previousMockPaymentDelayMs === undefined) {
+      delete process.env.MOCK_PAYMENT_DELAY_MS;
+    } else {
+      process.env.MOCK_PAYMENT_DELAY_MS = previousMockPaymentDelayMs;
+    }
   });
 
   it('keeps reservation idempotent for duplicate requests', async () => {
@@ -197,6 +221,41 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(reservations).toHaveLength(1);
   });
 
+  it('rate limits reservation spam with Retry-After', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Reservation Spam Limit',
+      zoneCode: 'RSL',
+      price: '100000.00',
+      capacity: 100,
+      perUserLimit: 100,
+    });
+
+    const userId = await createTestUser();
+    const responses = [];
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      responses.push(
+        await request(app.getHttpServer())
+          .post('/reservations')
+          .set('Authorization', bearerToken(userId))
+          .set('x-device-id', `device-${userId}`)
+          .set('accept-language', 'vi-VN')
+          .send({
+            ticketTypeId: testTicketType.id,
+            quantity: 1,
+            idempotencyKey: randomUUID(),
+          }),
+      );
+    }
+
+    expect(
+      responses.slice(0, 10).every((response) => response.status === 201),
+    ).toBe(true);
+    expect(responses[10].status).toBe(429);
+    expect(responses[10].headers['retry-after']).toBeDefined();
+    expect(responses[10].body.error).toBe('rate_limited');
+  });
+
   it('completes reservation -> order -> mock success -> issued tickets', async () => {
     const testTicketType = await createTestTicketType({
       name: 'Full Flow CAT',
@@ -229,9 +288,7 @@ describe('Checkout flow and invariants (e2e)', () => {
 
     expect(orderRes.status).toBe(201);
     expect(orderRes.body.status).toBe('pending_payment');
-    expect(orderRes.body.paymentId).toMatch(
-      /^[0-9a-f-]{36}$/i,
-    );
+    expect(orderRes.body.paymentId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(orderRes.body.concertId).toBe(testTicketType.concertId);
     expect(orderRes.body.concertTitle).toBe(
       `Test Concert ${testTicketType.name}`,
@@ -936,11 +993,15 @@ describe('Checkout flow and invariants (e2e)', () => {
       const reservationRes = await request(app.getHttpServer())
         .post('/reservations')
         .set('Authorization', bearerToken(userId))
+        .set('x-forwarded-for', `sig-test-${userId}`)
+        .set('x-device-id', `sig-device-${userId}`)
+        .set('accept-language', 'vi-VN')
         .send({
           ticketTypeId: testTicketType.id,
           quantity: 1,
           idempotencyKey: randomUUID(),
         });
+      expect(reservationRes.status).toBe(201);
 
       const orderRes = await request(app.getHttpServer())
         .post('/orders')
@@ -949,6 +1010,7 @@ describe('Checkout flow and invariants (e2e)', () => {
           reservationId: reservationRes.body.id,
           idempotencyKey: randomUUID(),
         });
+      expect(orderRes.status).toBe(201);
 
       const payload = {
         orderId: orderRes.body.id,

@@ -54,6 +54,10 @@ export class InventoryService {
       );
       return this.toReservationResponse(reservation);
     } catch (error) {
+      if (error instanceof DomainError) {
+        this.logReservationFailure(error.code, dto);
+      }
+
       if (!this.inventoryRepository.isDuplicateReservationError(error)) {
         throw error;
       }
@@ -103,12 +107,26 @@ export class InventoryService {
       reservation.ticketTypeId !== dto.ticketTypeId ||
       reservation.quantity !== dto.quantity
     ) {
+      this.logReservationFailure('duplicate_request_conflict', dto);
       throw new DomainError(
         'Idempotency key was already used with a different reservation payload',
         'duplicate_request_conflict',
         409,
       );
     }
+  }
+
+  private logReservationFailure(
+    reason: string,
+    dto: CreateReservationDto,
+  ): void {
+    this.logger.warn(
+      formatStructuredLog('reservation_failed', {
+        reason,
+        ticketTypeId: dto.ticketTypeId,
+        quantity: dto.quantity,
+      }),
+    );
   }
 
   private getReservationTtlMinutes(): number {

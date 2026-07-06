@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TicketTypesManager } from "@/components/ticket-types-manager";
+import { AdminBackLink, AdminHero } from "@/components/admin-ui";
 import { Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
@@ -23,16 +23,14 @@ export default async function TicketTypesPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/concerts"
-          className="text-sm font-medium text-emerald-700"
-        >
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">Ticket types</h1>
-        <p className="mt-1 text-sm text-slate-600">{concert.title}</p>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Inventory design"
+          title="Ticket types"
+          description={`Configure zones, sale windows, pricing, and limits for ${concert.title}.`}
+        />
       </div>
 
       <TicketTypesManager concert={concert} />

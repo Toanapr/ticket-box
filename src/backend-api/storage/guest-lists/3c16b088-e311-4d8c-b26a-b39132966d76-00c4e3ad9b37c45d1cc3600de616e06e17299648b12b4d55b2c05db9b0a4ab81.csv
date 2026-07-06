@@ -1,0 +1,5 @@
+full_name,email,phone,sponsor_id,zone_code,ticket_type_slug
+Nguyen Minh Anh,minh.anh@example.com,,,VIP,vip
+Le Thanh Son,thanhson.vip@example.com,,,VIP-GUEST,
+Tran Nhu Y,,0911222333,,VIP-GUEST,
+Do Quynh Anh,,,media-guest-009,BACKSTAGE-GUEST,

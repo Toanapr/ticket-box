@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuestListImportManager } from "@/components/guest-list-import-manager";
-import { Concert, GuestListImportBatch } from "@/lib/api";
+import { AdminBackLink, AdminHero } from "@/components/admin-ui";
+import { ActiveGuestList, Concert, GuestListImportBatch } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
 type GuestListPageProps = {
@@ -24,20 +24,30 @@ export default async function GuestListPage({ params }: GuestListPageProps) {
     `/admin/concerts/${id}/guest-list/imports`,
   ).catch(() => []);
 
+  const activeGuestList = await serverApiFetch<ActiveGuestList>(
+    `/admin/concerts/${id}/guest-list/entries`,
+  ).catch(() => ({
+    concertId: id,
+    version: null,
+    entries: [],
+  }));
+
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/concerts"
-          className="text-sm font-medium text-emerald-700"
-        >
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">Guest list</h1>
-        <p className="mt-1 text-sm text-slate-600">{concert.title}</p>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Guest list operations"
+          title="Guest list imports"
+          description={`Upload, validate, and review guest lists for ${concert.title}. Every guest is assigned to one private guest area instead of customer bookable seating zones.`}
+        />
       </div>
 
-      <GuestListImportManager concert={concert} initialImports={imports} />
+      <GuestListImportManager
+        concert={concert}
+        initialImports={imports}
+        initialActiveGuestList={activeGuestList}
+      />
     </div>
   );
 }

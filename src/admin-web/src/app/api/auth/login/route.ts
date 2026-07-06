@@ -4,6 +4,10 @@ import { AUTH_COOKIE_NAME, apiBaseUrl } from "@/lib/auth";
 type LoginResponse = {
   accessToken?: string;
   tokenType?: string;
+  user?: {
+    role?: string;
+  };
+  message?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -21,9 +25,13 @@ export async function POST(request: NextRequest) {
     .json()
     .catch(() => null)) as LoginResponse | null;
 
-  if (!backendResponse.ok || !payload?.accessToken) {
+  if (
+    !backendResponse.ok ||
+    !payload?.accessToken ||
+    payload.user?.role !== "organizer"
+  ) {
     return NextResponse.json(payload ?? { message: "Login failed" }, {
-      status: backendResponse.status || 401,
+      status: backendResponse.status || 403,
     });
   }
 

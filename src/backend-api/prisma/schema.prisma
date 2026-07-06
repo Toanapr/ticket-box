@@ -69,6 +69,8 @@ model Concert {
   ticketTypes         TicketType[]
   guestListBatches    GuestListBatch[]
   guestListVersions   GuestListVersion[]
+  artistBioJobs       ArtistBioJob[]
+  artistBioDrafts     ArtistBioDraft[]
 
   @@index([status, startAt])
   @@index([organizationId])
@@ -134,6 +136,17 @@ enum GuestListOutboxStatus {
   pending
   published
   failed
+}
+
+enum ArtistBioJobStatus {
+  queued
+  processing
+  draft_ready
+  failed
+}
+
+enum ArtistBioDraftReviewStatus {
+  pending_review
 }
 
 model Reservation {
@@ -365,7 +378,7 @@ model GuestListVersion {
 model GuestEntry {
   id             String           @id @default(uuid()) @db.Uuid
   versionId      String           @map("version_id") @db.Uuid
-  ticketTypeId   String           @map("ticket_type_id") @db.Uuid
+  ticketTypeId   String?          @map("ticket_type_id") @db.Uuid
   fullName       String           @map("full_name")
   email          String?
   phone          String?
@@ -374,7 +387,7 @@ model GuestEntry {
   zoneCode       String           @map("zone_code")
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   version        GuestListVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  ticketType     TicketType       @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  ticketType     TicketType?      @relation(fields: [ticketTypeId], references: [id], onDelete: SetNull)
 
   @@unique([versionId, identityKey])
   @@index([versionId, zoneCode])
@@ -393,6 +406,59 @@ model GuestListOutbox {
 
   @@index([status, createdAt])
   @@map("guest_list_outbox")
+}
+
+model ArtistBioJob {
+  id              String             @id @default(uuid()) @db.Uuid
+  concertId       String             @map("concert_id") @db.Uuid
+  fileChecksum    String             @map("file_checksum")
+  pipelineVersion String             @map("pipeline_version")
+  rawObjectKey    String             @map("raw_object_key")
+  originalName    String?            @map("original_name")
+  sourceMimeType  String?            @map("source_mime_type")
+  status          ArtistBioJobStatus
+  attemptCount    Int                @default(0) @map("attempt_count")
+  maxAttempts     Int                @default(3) @map("max_attempts")
+  nextAttemptAt   DateTime           @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  leaseOwner      String?            @map("lease_owner")
+  leaseExpiresAt  DateTime?          @map("lease_expires_at") @db.Timestamptz(6)
+  startedAt       DateTime?          @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?          @map("completed_at") @db.Timestamptz(6)
+  lastError       String?            @map("last_error")
+  lastErrorAt     DateTime?          @map("last_error_at") @db.Timestamptz(6)
+  extractedText   String?            @map("extracted_text")
+  sanitizedText   String?            @map("sanitized_text")
+  providerVersion String?            @map("provider_version")
+  modelVersion    String?            @map("model_version")
+  promptVersion   String?            @map("prompt_version")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert         Concert            @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  draft           ArtistBioDraft?
+
+  @@unique([concertId, fileChecksum, pipelineVersion])
+  @@index([concertId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+  @@map("artist_bio_jobs")
+}
+
+model ArtistBioDraft {
+  id              String                     @id @default(uuid()) @db.Uuid
+  concertId       String                     @map("concert_id") @db.Uuid
+  jobId           String                     @unique @map("job_id") @db.Uuid
+  content         String
+  reviewStatus    ArtistBioDraftReviewStatus @default(pending_review) @map("review_status")
+  providerVersion String                     @map("provider_version")
+  modelVersion    String                     @map("model_version")
+  promptVersion   String                     @map("prompt_version")
+  createdAt       DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert         Concert                    @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  job             ArtistBioJob               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([concertId, createdAt])
+  @@map("artist_bio_drafts")
 }
 
 model InventoryCounter {

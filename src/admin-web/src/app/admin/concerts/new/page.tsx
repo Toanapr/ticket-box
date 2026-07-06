@@ -1,18 +1,21 @@
-import Link from "next/link";
 import { ConcertForm } from "@/components/concert-form";
+import { AdminBackLink, AdminHero, AdminPanel } from "@/components/admin-ui";
 
 export default function NewConcertPage() {
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <Link href="/admin/concerts" className="text-sm font-medium text-emerald-700">
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">Create concert</h1>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Concert setup"
+          title="Create a new concert"
+          description="Set the core event details first. Publishing and poster requirements continue to follow the existing admin workflow."
+        />
       </div>
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+
+      <AdminPanel className="max-w-3xl">
         <ConcertForm mode="create" />
-      </section>
+      </AdminPanel>
     </div>
   );
 }

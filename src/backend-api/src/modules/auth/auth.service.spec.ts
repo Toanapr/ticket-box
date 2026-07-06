@@ -10,21 +10,32 @@ interface CreateUserArgs {
     email: string;
     fullName: string;
     passwordHash: string;
-    role: 'audience';
+    role: 'audience' | 'organizer';
     status: 'active';
-    organizationId: null;
+    organizationId: string | null;
   };
 }
 
 describe('AuthService', () => {
   const userCreate = jest.fn();
   const userFindUnique = jest.fn();
+  const organizationCreate = jest.fn();
+  const transaction = jest.fn((callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      organization: { create: organizationCreate },
+      user: { create: userCreate },
+    }),
+  );
   const sign = jest.fn().mockReturnValue('signed-token');
   const prisma = {
     user: {
       create: userCreate,
       findUnique: userFindUnique,
     },
+    organization: {
+      create: organizationCreate,
+    },
+    $transaction: transaction,
   } as unknown as PrismaService;
   const jwtService = { sign } as unknown as JwtService;
   const service = new AuthService(prisma, jwtService);
@@ -90,6 +101,58 @@ describe('AuthService', () => {
         password: 'Audience123!',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('registers an active organizer with a new organization and returns a token', async () => {
+    organizationCreate.mockResolvedValue({
+      id: 'organization-id',
+      name: 'TicketBox Events',
+    });
+    userCreate.mockResolvedValue({
+      id: 'organizer-id',
+      email: 'organizer@example.com',
+      fullName: 'Organizer User',
+      role: 'organizer',
+      status: 'active',
+      organizationId: 'organization-id',
+      passwordHash: 'stored-password-hash',
+    });
+
+    const result = await service.registerOrganizer({
+      fullName: ' Organizer User ',
+      email: ' Organizer@Example.com ',
+      organizationName: ' TicketBox Events ',
+      password: 'Organizer123!',
+    });
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(organizationCreate).toHaveBeenCalledWith({
+      data: {
+        name: 'TicketBox Events',
+      },
+    });
+    const createCalls = userCreate.mock.calls as unknown as Array<
+      [CreateUserArgs]
+    >;
+    const createdData = createCalls[0][0].data;
+    expect(createdData).toMatchObject({
+      email: 'organizer@example.com',
+      fullName: 'Organizer User',
+      role: 'organizer',
+      status: 'active',
+      organizationId: 'organization-id',
+    });
+    expect(createdData.passwordHash).toMatch(/^scrypt:/);
+    expect(result).toEqual({
+      user: {
+        id: 'organizer-id',
+        email: 'organizer@example.com',
+        fullName: 'Organizer User',
+        role: 'organizer',
+      },
+      accessToken: 'signed-token',
+      tokenType: 'Bearer',
+    });
   });
 
   it('logs in an active audience user', async () => {

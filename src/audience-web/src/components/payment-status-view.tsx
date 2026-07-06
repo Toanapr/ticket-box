@@ -4,7 +4,6 @@ import {
   getPaymentStatusDisplay,
   type PaymentStatusHint,
 } from "@/lib/payment-status-display";
-import { formatCurrency } from "@/lib/format";
 import type { OrderRecord } from "@/lib/types";
 
 const toneClass = {
@@ -16,52 +15,41 @@ const toneClass = {
 
 export function PaymentStatusView({
   order,
-  concertTitle,
-  ticketTypeName,
-  providerName,
   statusHint,
 }: {
   order: OrderRecord;
-  concertTitle: string;
-  ticketTypeName: string;
-  providerName: string;
   statusHint?: PaymentStatusHint;
 }): React.ReactElement {
   const display = getPaymentStatusDisplay(order, statusHint);
   return (
-    <aside className="rounded-lg border border-ticket-obsidian bg-white p-6 text-center shadow-[6px_6px_0_#0d1118]">
-      <div
-        className={`mx-auto grid h-20 w-20 place-items-center rounded-full ${toneClass[display.tone]}`}
-      >
-        {display.canShowTicketLink ? (
-          <CheckIcon className="h-9 w-9" />
-        ) : (
-          <CreditCardIcon className="h-9 w-9" />
-        )}
+    <aside className="rounded-lg border border-ticket-obsidian bg-white p-6 shadow-[6px_6px_0_#0d1118]">
+      <div className="flex items-start gap-4">
+        <div
+          className={`grid h-14 w-14 shrink-0 place-items-center rounded ${toneClass[display.tone]}`}
+        >
+          {display.canShowTicketLink ? (
+            <CheckIcon className="h-7 w-7" />
+          ) : (
+            <CreditCardIcon className="h-7 w-7" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div
+            className={`inline-flex rounded px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${toneClass[display.tone]}`}
+          >
+            {display.displayLabel}
+          </div>
+          <h2 className="mt-3 font-display text-xl font-black leading-tight">
+            {display.title}
+          </h2>
+        </div>
       </div>
-      <div
-        className={`mt-5 inline-flex rounded px-3 py-1 text-xs font-black uppercase tracking-wide ${toneClass[display.tone]}`}
-      >
-        {display.displayLabel}
-      </div>
-      <h2 className="mt-4 font-display text-2xl font-black">{display.title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{display.message}</p>
+      <p className="mt-4 text-sm leading-6 text-slate-600">{display.message}</p>
       {display.returnNotice ? (
         <p className="mt-3 rounded bg-ticket-stone px-3 py-2 text-left text-xs font-bold leading-5 text-slate-600">
           {display.returnNotice}
         </p>
       ) : null}
-      <p className="mt-3 text-sm leading-6 text-slate-600">
-        {concertTitle} - {ticketTypeName} x {order.quantity}
-      </p>
-      <div className="mt-6 border-t border-black/10 pt-5 text-left text-sm">
-        <SummaryLine label="Mã đơn" value={order.orderId} />
-        <SummaryLine label="Thanh toán" value={providerName} />
-        <SummaryLine
-          label="Tổng tiền"
-          value={formatCurrency(order.totalAmount)}
-        />
-      </div>
 
       {display.canShowTicketLink && order.ticketId ? (
         <Link
@@ -82,21 +70,11 @@ export function PaymentStatusView({
           <p>{display.action.description}</p>
         </div>
       )}
+      {display.shouldPoll ? (
+        <div className="mt-4 border-t border-black/10 pt-4 text-xs font-bold leading-5 text-slate-500">
+          Trạng thái sẽ tự cập nhật sau vài giây.
+        </div>
+      ) : null}
     </aside>
-  );
-}
-
-function SummaryLine({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}): React.ReactElement {
-  return (
-    <div className="mb-2 flex justify-between gap-4">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-black">{value}</span>
-    </div>
   );
 }

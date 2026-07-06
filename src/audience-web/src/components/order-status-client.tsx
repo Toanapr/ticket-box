@@ -118,17 +118,18 @@ export function OrderStatusClient({
   const providerName =
     order.paymentIntent?.providerName ??
     (order.paymentIntent?.provider === "mock-bank" ? "Mock bank" : "VNPAY");
+  const displayOrderId = shortenOrderId(order.orderId);
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
+    <div className="grid gap-6">
       <section className="rounded-lg border border-black/10 bg-white p-6 md:p-8">
         <h1 className="flex items-center gap-3 font-display text-2xl font-black">
           <QrIcon className="h-7 w-7 text-ticket-green" />
           Thanh toán qua {providerName}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          Theo dõi trạng thái thanh toán và mở lại cổng thanh toán nếu giao dịch
-          chưa hoàn tất.
+          Theo dõi trạng thái đơn hàng và tiếp tục thanh toán nếu giao dịch chưa
+          hoàn tất.
         </p>
         {showReservationHold && holdCountdown ? (
           <div className="mt-6 flex items-center gap-4 rounded bg-ticket-obsidian p-4 text-white">
@@ -136,12 +137,9 @@ export function OrderStatusClient({
               <CreditCardIcon className="h-6 w-6" />
             </div>
             <div className="flex-1">
-              <h2 className="font-display text-xl font-black">
-                Lượt giữ vé đang áp dụng cho thanh toán này
-              </h2>
+              <h2 className="font-display text-lg font-black">Đang giữ vé</h2>
               <p className="text-sm text-slate-300">
-                Nếu hết thời gian này trước khi thanh toán được xác nhận, lượt
-                giữ vé có thể bị giải phóng.
+                Hoàn tất thanh toán trước khi bộ đếm kết thúc.
               </p>
             </div>
             <span className="font-mono text-xl font-black text-ticket-green">
@@ -149,98 +147,76 @@ export function OrderStatusClient({
             </span>
           </div>
         ) : null}
-        <div className="mt-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="grid gap-4">
-            <div className="rounded-lg border border-black/10 bg-ticket-stone p-5">
-              <div className="flex items-start gap-3">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded bg-ticket-green/10 text-ticket-green">
-                  <CreditCardIcon className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="font-display text-xl font-black">
-                    {display?.title}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {display?.message}
-                  </p>
-                  {display?.returnNotice ? (
-                    <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                      {display.returnNotice}
-                    </p>
-                  ) : null}
-                  {display?.retryAfterLabel ? (
-                    <p className="mt-3 text-xs font-black text-amber-700">
-                      Có thể thử lại sau {display.retryAfterLabel}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+        <section className="rounded-lg border border-black/10 bg-white p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 pb-5">
+            <div>
+              <h2 className="font-display text-xl font-black">
+                Chi tiết đơn hàng
+              </h2>
+              <p className="mt-1 text-sm font-bold text-slate-500">
+                Mã đơn {displayOrderId}
+              </p>
             </div>
-            <TransferRow
+            <div className="rounded bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-ticket-green">
+              {display?.displayLabel}
+            </div>
+          </div>
+          <div className="divide-y divide-black/10">
+            <DetailRow
               label="Concert"
               value={order.concertTitle ?? order.concertId}
             />
-            <TransferRow
+            <DetailRow
               label="Địa điểm"
               value={order.venue ? shortVenue(order.venue) : "-"}
             />
-            <TransferRow
+            <DetailRow
               label="Loại vé"
-              value={order.ticketTypeName ?? order.ticketTypeId}
+              value={`${order.ticketTypeName ?? order.ticketTypeId} x ${order.quantity}`}
             />
-            <TransferRow label="Cổng thanh toán" value={providerName} />
-            <TransferRow
-              label="Số tiền"
+            <DetailRow label="Thanh toán" value={providerName} />
+            <DetailRow
+              label="Tổng tiền"
               value={formatCurrency(order.totalAmount)}
+              strong
             />
           </div>
-          <div className="rounded-lg border border-black/10 bg-ticket-stone p-5">
-            <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Mã đơn hàng
-            </div>
-            <div className="mt-2 break-all font-mono text-sm font-black">
-              {order.orderId}
-            </div>
-            <div className="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">
-              Cập nhật trạng thái
-            </div>
-            <div className="mt-2 text-sm font-bold leading-6 text-slate-700">
-              {display?.shouldPoll
-                ? "Trang này sẽ tự cập nhật sau vài giây."
-                : "Trạng thái đơn hàng đã ổn định."}
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <PaymentStatusView
-        order={order}
-        concertTitle={order.concertTitle ?? order.concertId}
-        ticketTypeName={order.ticketTypeName ?? order.ticketTypeId}
-        providerName={providerName}
-        statusHint={statusHint}
-      />
+        <PaymentStatusView order={order} statusHint={statusHint} />
+      </div>
     </div>
   );
 }
 
-function TransferRow({
+function DetailRow({
   label,
   value,
+  strong = false,
 }: {
   label: string;
   value: string;
+  strong?: boolean;
 }): React.ReactElement {
   return (
-    <div className="rounded border border-black/10 bg-ticket-stone p-4">
-      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+    <div className="grid gap-1 py-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-4">
+      <div className="text-xs font-black uppercase tracking-wide text-slate-500 sm:pt-1">
         {label}
       </div>
-      <div className="mt-1 break-words font-display text-lg font-black">
+      <div
+        className={`break-words text-base ${strong ? "font-display text-xl font-black text-ticket-green" : "font-black text-ticket-obsidian"}`}
+      >
         {value}
       </div>
     </div>
   );
+}
+
+function shortenOrderId(orderId: string): string {
+  return orderId.length > 8 ? `...${orderId.slice(-8)}` : orderId;
 }
 
 function pollIntervalMs(mode: PaymentPollMode): number | null {

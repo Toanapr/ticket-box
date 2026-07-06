@@ -5,7 +5,525 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  audience
+  organizer
+  scanner
+  system_admin
+  service_account
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum ConcertStatus {
+  draft
+  published
+  canceled
+}
+
+model Organization {
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String
+  users               User[]
+  concerts            Concert[]
+  notificationRecords NotificationRecord[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String?           @map("organization_id") @db.Uuid
+  email          String            @unique
+  fullName       String?           @map("full_name")
+  role           UserRole
+  passwordHash   String            @map("password_hash")
+  status         UserStatus        @default(active)
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  quotas         UserTicketQuota[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Concert {
+  id                  String        @id @default(uuid()) @db.Uuid
+  organizationId      String        @map("organization_id") @db.Uuid
+  title               String
+  slug                String        @unique
+  venue               String
+  artistName          String        @map("artist_name")
+  description         String?
+  startAt             DateTime      @map("start_at") @db.Timestamptz(6)
+  status              ConcertStatus @default(draft)
+  seatingMapObjectKey String        @map("seating_map_object_key")
+  publishedArtistBio  String        @map("published_artist_bio")
+  posterObjectKey     String?       @unique @map("poster_object_key")
+  organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  ticketTypes         TicketType[]
+  guestListBatches    GuestListBatch[]
+  guestListVersions   GuestListVersion[]
+  artistBioJobs       ArtistBioJob[]
+  artistBioDrafts     ArtistBioDraft[]
+
+  @@index([status, startAt])
+  @@index([organizationId])
+  @@map("concerts")
+}
+
+enum ReservationStatus {
+  active
+  confirmed
+  released
+  expired
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  issued
+  failed
+  expired
+  refund_required
+}
+
+enum PaymentStatus {
+  created
+  pending
+  pending_reconciliation
+  succeeded
+  failed
+  expired
+}
+
+enum IdempotencyStatus {
+  processing
+  succeeded
+  failed_final
+}
+
+enum PaymentProviderEventStatus {
+  processing
+  processed
+  rejected
+}
+
+enum TicketStatus {
+  issued
+  revoked
+  checked_in
+}
+
+enum GuestListBatchStatus {
+  imported
+  validation_failed
+  published
+  failed
+}
+
+enum GuestEntryStagingStatus {
+  valid
+  invalid
+}
+
+enum GuestListOutboxStatus {
+  pending
+  published
+  failed
+}
+
+enum ArtistBioJobStatus {
+  queued
+  processing
+  draft_ready
+  failed
+}
+
+enum ArtistBioDraftReviewStatus {
+  pending_review
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  ticketTypeId   String            @db.Uuid
+  quantity       Int
+  orderId        String?           @db.Uuid
+  status         ReservationStatus
+  expiresAt      DateTime          @db.Timestamptz(6)
+  idempotencyKey String
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+  ticketType     TicketType        @relation(fields: [ticketTypeId], references: [id])
+  order          Order?            @relation(fields: [orderId], references: [id])
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, expiresAt])
+}
+
+model Order {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @db.Uuid
+  status         OrderStatus
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  idempotencyKey String
+  buyerFullName  String?       @map("buyer_full_name")
+  buyerPhone     String?       @map("buyer_phone")
+  buyerEmail     String?       @map("buyer_email")
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+  reservations   Reservation[]
+  items          OrderItem[]
+  payments       Payment[]
+  tickets        Ticket[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id             String     @id @default(uuid()) @db.Uuid
+  orderId        String     @db.Uuid
+  reservationId  String     @db.Uuid
+  ticketTypeId   String     @db.Uuid
+  quantity       Int
+  unitPrice      Decimal    @db.Decimal(12, 2)
+  subtotalAmount Decimal    @db.Decimal(12, 2)
+  status         String
+  order          Order      @relation(fields: [orderId], references: [id])
+  ticketType     TicketType @relation(fields: [ticketTypeId], references: [id])
+  tickets        Ticket[]
+}
+
+model Payment {
+  id                     String        @id @default(uuid()) @db.Uuid
+  orderId                String        @db.Uuid
+  provider               String
+  providerTxnId          String?
+  providerIntentId       String?
+  providerIdempotencyKey String        @unique
+  checkoutUrl            String?
+  status                 PaymentStatus
+  payloadHash            String?
+  uncertainSince         DateTime?     @db.Timestamptz(6)
+  reconciliationAfter    DateTime?     @db.Timestamptz(6)
+  reconciliationAttempts Int           @default(0)
+  leaseOwner             String?
+  leaseExpiresAt         DateTime?     @db.Timestamptz(6)
+  lastProviderError      String?
+  lastProviderAttemptAt  DateTime?     @db.Timestamptz(6)
+  createdAt              DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime      @updatedAt @db.Timestamptz(6)
+  order                  Order         @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId, provider])
+  @@unique([provider, providerTxnId])
+  @@index([orderId, status])
+  @@index([status, reconciliationAfter])
+}
+
+model IdempotencyRecord {
+  id                 String            @id @default(uuid()) @db.Uuid
+  userId             String            @db.Uuid
+  endpoint           String
+  key                String
+  requestHash        String
+  status             IdempotencyStatus
+  resourceId         String?           @db.Uuid
+  responseStatus     Int?
+  responseBody       Json?
+  processingOwner    String?
+  processingUntil    DateTime?         @db.Timestamptz(6)
+  providerDispatched Boolean           @default(false)
+  retainUntil        DateTime          @db.Timestamptz(6)
+  createdAt          DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, endpoint, key])
+  @@index([status, processingUntil])
+}
+
+model PaymentProviderEvent {
+  id              String                     @id @default(uuid()) @db.Uuid
+  provider        String
+  providerEventId String
+  providerTxnId   String
+  orderId         String                     @db.Uuid
+  payloadHash     String
+  status          PaymentProviderEventStatus
+  responseBody    Json?
+  errorCode       String?
+  receivedAt      DateTime                   @default(now()) @db.Timestamptz(6)
+  processedAt     DateTime?                  @db.Timestamptz(6)
+
+  @@unique([provider, providerEventId])
+  @@index([orderId, receivedAt])
+}
+
+model Ticket {
+  id           String       @id @default(uuid()) @db.Uuid
+  orderId      String       @db.Uuid
+  orderItemId  String       @db.Uuid
+  ticketTypeId String       @db.Uuid
+  ownerUserId  String       @db.Uuid
+  qrToken      String?
+  qrTokenHash  String
+  sequenceNo   Int
+  status       TicketStatus
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(6)
+  order        Order        @relation(fields: [orderId], references: [id])
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id])
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@unique([orderItemId, sequenceNo])
+  @@unique([qrToken])
+  @@unique([qrTokenHash])
+}
+
+model TicketType {
+  id           String   @id @default(uuid()) @db.Uuid
+  concertId    String   @map("concert_id") @db.Uuid
+  slug         String
+  zoneCode     String   @map("zone_code")
+  name         String
+  price        Decimal  @db.Decimal(12, 2)
+  capacity     Int
+  perUserLimit Int      @map("per_user_limit")
+  saleStartAt  DateTime @map("sale_start_at") @db.Timestamptz(6)
+  saleEndAt    DateTime @map("sale_end_at") @db.Timestamptz(6)
+
+  // Relations
+  concert      Concert           @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  inventory    InventoryCounter?
+  quotas       UserTicketQuota[]
+  reservations Reservation[]
+  orderItems   OrderItem[]
+  tickets      Ticket[]
+  guestEntries GuestEntry[]
+
+  @@unique([concertId, slug])
+  @@index([concertId])
+  @@map("ticket_types")
+}
+
+
+model GuestListBatch {
+  id            String               @id @default(uuid()) @db.Uuid
+  concertId     String               @map("concert_id") @db.Uuid
+  fileChecksum  String               @map("file_checksum")
+  schemaVersion String               @map("schema_version")
+  rawObjectKey  String               @map("raw_object_key")
+  originalName  String?              @map("original_name")
+  status        GuestListBatchStatus
+  summary       Json
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert       Concert              @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  stagingRows   GuestEntryStaging[]
+  version       GuestListVersion?
+
+  @@unique([concertId, fileChecksum, schemaVersion])
+  @@index([concertId, createdAt])
+  @@map("guest_list_batches")
+}
+
+model GuestEntryStaging {
+  id             String                  @id @default(uuid()) @db.Uuid
+  batchId        String                  @map("batch_id") @db.Uuid
+  rowNumber      Int                     @map("row_number")
+  fullName       String?                 @map("full_name")
+  email          String?
+  phone          String?
+  sponsorId      String?                 @map("sponsor_id")
+  identityKey    String?                 @map("identity_key")
+  zoneCode       String?                 @map("zone_code")
+  ticketTypeSlug String?                 @map("ticket_type_slug")
+  ticketTypeId   String?                 @map("ticket_type_id") @db.Uuid
+  status         GuestEntryStagingStatus
+  errorReason    String?                 @map("error_reason")
+  rawRow         Json                    @map("raw_row")
+  batch          GuestListBatch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([batchId, identityKey])
+  @@map("guest_entries_staging")
+}
+
+model GuestListVersion {
+  id           String           @id @default(uuid()) @db.Uuid
+  concertId    String           @map("concert_id") @db.Uuid
+  batchId      String           @unique @map("batch_id") @db.Uuid
+  versionNo    Int              @map("version_no")
+  isActive     Boolean          @default(false) @map("is_active")
+  checksum     String
+  entryCount   Int              @map("entry_count")
+  publishedAt  DateTime         @default(now()) @map("published_at") @db.Timestamptz(6)
+  concert      Concert          @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  batch        GuestListBatch   @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  entries      GuestEntry[]
+
+  @@unique([concertId, versionNo])
+  @@index([concertId, isActive])
+  @@map("guest_list_versions")
+}
+
+model GuestEntry {
+  id             String           @id @default(uuid()) @db.Uuid
+  versionId      String           @map("version_id") @db.Uuid
+  ticketTypeId   String?          @map("ticket_type_id") @db.Uuid
+  fullName       String           @map("full_name")
+  email          String?
+  phone          String?
+  sponsorId      String?          @map("sponsor_id")
+  identityKey    String           @map("identity_key")
+  zoneCode       String           @map("zone_code")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  version        GuestListVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  ticketType     TicketType?      @relation(fields: [ticketTypeId], references: [id], onDelete: SetNull)
+
+  @@unique([versionId, identityKey])
+  @@index([versionId, zoneCode])
+  @@index([ticketTypeId])
+  @@map("guest_entries")
+}
+
+model GuestListOutbox {
+  id          String                @id @default(uuid()) @db.Uuid
+  eventType   String                @map("event_type")
+  aggregateId String                @map("aggregate_id") @db.Uuid
+  payload     Json
+  status      GuestListOutboxStatus @default(pending)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt DateTime?             @map("published_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@map("guest_list_outbox")
+}
+
+model ArtistBioJob {
+  id              String             @id @default(uuid()) @db.Uuid
+  concertId       String             @map("concert_id") @db.Uuid
+  fileChecksum    String             @map("file_checksum")
+  pipelineVersion String             @map("pipeline_version")
+  rawObjectKey    String             @map("raw_object_key")
+  originalName    String?            @map("original_name")
+  sourceMimeType  String?            @map("source_mime_type")
+  status          ArtistBioJobStatus
+  attemptCount    Int                @default(0) @map("attempt_count")
+  maxAttempts     Int                @default(3) @map("max_attempts")
+  nextAttemptAt   DateTime           @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  leaseOwner      String?            @map("lease_owner")
+  leaseExpiresAt  DateTime?          @map("lease_expires_at") @db.Timestamptz(6)
+  startedAt       DateTime?          @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?          @map("completed_at") @db.Timestamptz(6)
+  lastError       String?            @map("last_error")
+  lastErrorAt     DateTime?          @map("last_error_at") @db.Timestamptz(6)
+  extractedText   String?            @map("extracted_text")
+  sanitizedText   String?            @map("sanitized_text")
+  providerVersion String?            @map("provider_version")
+  modelVersion    String?            @map("model_version")
+  promptVersion   String?            @map("prompt_version")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert         Concert            @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  draft           ArtistBioDraft?
+
+  @@unique([concertId, fileChecksum, pipelineVersion])
+  @@index([concertId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([leaseExpiresAt])
+  @@map("artist_bio_jobs")
+}
+
+model ArtistBioDraft {
+  id              String                     @id @default(uuid()) @db.Uuid
+  concertId       String                     @map("concert_id") @db.Uuid
+  jobId           String                     @unique @map("job_id") @db.Uuid
+  content         String
+  reviewStatus    ArtistBioDraftReviewStatus @default(pending_review) @map("review_status")
+  providerVersion String                     @map("provider_version")
+  modelVersion    String                     @map("model_version")
+  promptVersion   String                     @map("prompt_version")
+  createdAt       DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert         Concert                    @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  job             ArtistBioJob               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([concertId, createdAt])
+  @@map("artist_bio_drafts")
+}
+
+model InventoryCounter {
+  ticketTypeId  String @id @map("ticket_type_id") @db.Uuid
+  totalCapacity Int    @map("total_capacity")
+  reservedCount Int    @default(0) @map("reserved_count")
+  soldCount     Int    @default(0) @map("sold_count")
+  version       Int    @default(0)
+
+  // Relations
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_counters")
+}
+
+model UserTicketQuota {
+  userId        String @map("user_id") @db.Uuid
+  ticketTypeId  String @map("ticket_type_id") @db.Uuid
+  reservedCount Int    @default(0) @map("reserved_count")
+  paidCount     Int    @default(0) @map("paid_count")
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketTypeId])
+  @@index([ticketTypeId])
+  @@map("user_ticket_quotas")
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+enum NotificationChannel {
+  in_app
+  email
+}
+
+model NotificationRecord {
+  id               String              @id @default(uuid()) @db.Uuid
+  organizationId   String              @map("organization_id") @db.Uuid
+  eventType        String              @map("event_type")
+  notificationType String              @map("notification_type")
+  concertId        String?             @map("concert_id") @db.Uuid
+  orderId          String?             @map("order_id") @db.Uuid
+  ownerUserId      String              @map("owner_user_id") @db.Uuid
+  ticketCount      Int?                @map("ticket_count")
+  channel          NotificationChannel
+  status           NotificationStatus
+  idempotencyKey   String              @unique @map("idempotency_key")
+  message          String
+  error            String?
+  scheduledFor     DateTime            @default(now()) @map("scheduled_for") @db.Timestamptz(6)
+  processedAt      DateTime?           @map("processed_at") @db.Timestamptz(6)
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([orderId])
+  @@index([status, scheduledFor])
+  @@index([concertId])
+  @@map("notification_records")
 }
 
 enum ScannerDeviceStatus {
@@ -27,20 +545,20 @@ enum CheckInResultStatus {
 }
 
 model ScannerDevice {
-  id              String                  @id @default(uuid()) @db.Uuid
-  deviceCode      String                  @unique
-  scannerUserId   String
-  status          ScannerDeviceStatus
-  lastSeenAt      DateTime?               @db.Timestamptz(6)
-  createdAt       DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime                @updatedAt @db.Timestamptz(6)
-  assignments     ScannerAssignment[]
-  checkInEvents   CheckInEvent[]
+  id            String              @id @default(uuid()) @db.Uuid
+  deviceCode    String              @unique
+  scannerUserId String
+  status        ScannerDeviceStatus
+  lastSeenAt    DateTime?           @db.Timestamptz(6)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
+  assignments   ScannerAssignment[]
+  checkInEvents CheckInEvent[]
 }
 
 model ScannerAssignment {
-  id                String                  @id @default(uuid()) @db.Uuid
-  deviceId          String                  @db.Uuid
+  id                String                    @id @default(uuid()) @db.Uuid
+  deviceId          String                    @db.Uuid
   scannerUserId     String
   eventId           String
   concertId         String
@@ -48,11 +566,11 @@ model ScannerAssignment {
   zoneCode          String
   status            ScannerAssignmentStatus
   manifestVersion   Int?
-  manifestIssuedAt  DateTime?               @db.Timestamptz(6)
-  manifestExpiresAt DateTime?               @db.Timestamptz(6)
-  createdAt         DateTime                @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime                @updatedAt @db.Timestamptz(6)
-  device            ScannerDevice           @relation(fields: [deviceId], references: [id])
+  manifestIssuedAt  DateTime?                 @db.Timestamptz(6)
+  manifestExpiresAt DateTime?                 @db.Timestamptz(6)
+  createdAt         DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                  @updatedAt @db.Timestamptz(6)
+  device            ScannerDevice             @relation(fields: [deviceId], references: [id])
   checkInEvents     CheckInEvent[]
   manifestTickets   ScannerManifestTicket[]
   revokedTickets    ScannerRevokedTicket[]
@@ -63,28 +581,28 @@ model ScannerAssignment {
 }
 
 model CheckInEvent {
-  id               String                @id @default(uuid()) @db.Uuid
-  clientEventId    String                @unique
+  id               String              @id @default(uuid()) @db.Uuid
+  clientEventId    String              @unique
   ticketId         String?
   ticketRef        String
   rawToken         String?
   scannerUserId    String
-  deviceId         String                @db.Uuid
-  assignmentId     String                @db.Uuid
+  deviceId         String              @db.Uuid
+  assignmentId     String              @db.Uuid
   eventId          String
   concertId        String?
   gateCode         String
   zoneCode         String
   manifestVersion  Int?
-  clientScannedAt  DateTime              @db.Timestamptz(6)
-  serverRecordedAt DateTime              @default(now()) @db.Timestamptz(6)
+  clientScannedAt  DateTime            @db.Timestamptz(6)
+  serverRecordedAt DateTime            @default(now()) @db.Timestamptz(6)
   result           CheckInResultStatus
   reason           String
   winningEventId   String?
-  createdAt        DateTime              @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime              @updatedAt @db.Timestamptz(6)
-  device           ScannerDevice         @relation(fields: [deviceId], references: [id])
-  assignment       ScannerAssignment     @relation(fields: [assignmentId], references: [id])
+  createdAt        DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(6)
+  device           ScannerDevice       @relation(fields: [deviceId], references: [id])
+  assignment       ScannerAssignment   @relation(fields: [assignmentId], references: [id])
 
   @@index([ticketId, serverRecordedAt])
   @@index([ticketRef, serverRecordedAt])
@@ -93,54 +611,54 @@ model CheckInEvent {
 }
 
 model ScannerManifestTicket {
-  id            String              @id @default(uuid()) @db.Uuid
-  assignmentId  String              @db.Uuid
-  ticketId      String
-  ticketRef     String
-  rawToken      String
-  ticketTypeId  String
-  status        String
-  eventId       String
-  concertId     String
-  gateCode      String
-  zoneCode      String
-  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
-  assignment    ScannerAssignment   @relation(fields: [assignmentId], references: [id])
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  ticketId     String
+  ticketRef    String
+  rawToken     String
+  ticketTypeId String
+  status       String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
 
   @@unique([assignmentId, ticketRef])
   @@index([eventId, gateCode, zoneCode])
 }
 
 model ScannerRevokedTicket {
-  id            String              @id @default(uuid()) @db.Uuid
-  assignmentId  String              @db.Uuid
-  ticketRef     String
-  reason        String
-  eventId       String
-  concertId     String
-  gateCode      String
-  zoneCode      String
-  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
-  assignment    ScannerAssignment   @relation(fields: [assignmentId], references: [id])
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  ticketRef    String
+  reason       String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
 
   @@unique([assignmentId, ticketRef])
   @@index([eventId, gateCode, zoneCode])
 }
 
 model ScannerGuestEntry {
-  id            String              @id @default(uuid()) @db.Uuid
-  assignmentId  String              @db.Uuid
-  guestRef      String
-  displayName   String
-  eventId       String
-  concertId     String
-  gateCode      String
-  zoneCode      String
-  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
-  assignment    ScannerAssignment   @relation(fields: [assignmentId], references: [id])
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  guestRef     String
+  displayName  String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
 
   @@unique([assignmentId, guestRef])
   @@index([eventId, gateCode, zoneCode])

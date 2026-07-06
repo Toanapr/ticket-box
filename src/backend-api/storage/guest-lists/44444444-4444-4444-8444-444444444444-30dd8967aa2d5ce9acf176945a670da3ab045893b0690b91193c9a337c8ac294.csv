@@ -1,0 +1,7 @@
+full_name,email,phone,sponsor_id,zone_code,ticket_type_slug
+Nguyen Minh Anh,minh.anh1@example.com,,,VIP,vip
+Tran Bao Chau,,0901234567,,GA,general-admission
+Le Hoang Duc,,,partner-guest-001,SVIP,svip
+Pham Gia Han,giahan@example.com,,,CAT1,cat-1
+Vo Khanh Linh,,+84981234568,,CAT2,cat-2
+Bui Quoc Nam,,,sponsor-vip-002,VIP,vip

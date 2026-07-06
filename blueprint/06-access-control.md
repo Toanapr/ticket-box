@@ -56,6 +56,9 @@ Ví dụ:
 |---|---|
 | `POST /reservations` | Role `audience`, sale access token hợp lệ, idempotency key, quota/inventory check ở backend. |
 | `PATCH /admin/concerts/{id}` | Role `organizer`, concert thuộc organization của user. |
+| `POST /admin/concerts` | Role `organizer`; user phải có `organization_id`; backend tự gán organization của concert từ authenticated user, không nhận `organization_id` do client tự chọn. |
+| `POST /admin/concerts/{id}/ticket-types` | Role `organizer`; concert thuộc organization của user. |
+| `PATCH /admin/ticket-types/{id}` | Role `organizer`; ticket type thuộc concert của organization của user; quy tắc trường nào được phép sửa thực hiện theo `08-requirements.md`. |
 | `GET /admin/concerts/{id}/revenue` | Role `organizer`, concert thuộc organization, audit log cho truy cập nhạy cảm nếu cần. |
 | `GET /scanner/events/{id}/manifest` | Role `scanner`, assigned event/gate/zone, device binding. |
 | `POST /scanner/checkins/sync` | Role `scanner`, event/device hợp lệ, idempotency key, backend kiểm tra lại ticket status và assignment. |

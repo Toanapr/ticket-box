@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Concert poster workflow
+
+Concert create/edit supports JPEG, PNG, and WebP poster upload through the authenticated backend proxy. Create always persists a recoverable draft first, uploads the poster, then applies the requested status. If upload or publish fails, the form shows the created concert ID and edit link so the draft can be resumed.
+
 ## Getting Started
 
 First, run the development server:

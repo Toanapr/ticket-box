@@ -1,0 +1,147 @@
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Prisma, User } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterAudienceDto } from './dto/register-audience.dto';
+import { RegisterOrganizerDto } from './dto/register-organizer.dto';
+import { JwtService } from './jwt.service';
+import { hashPassword, verifyPassword } from './password';
+
+const DUMMY_PASSWORD_HASH = `scrypt:${'0'.repeat(32)}:${'0'.repeat(128)}`;
+
+type AuthenticatedUser = Pick<
+  User,
+  'id' | 'email' | 'fullName' | 'role' | 'organizationId'
+>;
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
+
+  async registerAudience(dto: RegisterAudienceDto) {
+    const email = this.normalizeEmail(dto.email);
+    const passwordHash = await hashPassword(dto.password);
+
+    let user: User;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          fullName: dto.fullName.trim(),
+          passwordHash,
+          role: 'audience',
+          status: 'active',
+          organizationId: null,
+        },
+      });
+    } catch (error) {
+      if (this.isDuplicateEmailError(error)) {
+        throw new ConflictException('Email is already registered');
+      }
+
+      throw error;
+    }
+
+    return this.createAuthResponse(user);
+  }
+
+  async registerOrganizer(dto: RegisterOrganizerDto) {
+    const email = this.normalizeEmail(dto.email);
+    const passwordHash = await hashPassword(dto.password);
+
+    try {
+      const user = await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: dto.organizationName.trim(),
+          },
+        });
+
+        return tx.user.create({
+          data: {
+            email,
+            fullName: dto.fullName.trim(),
+            passwordHash,
+            role: 'organizer',
+            status: 'active',
+            organizationId: organization.id,
+          },
+        });
+      });
+
+      return this.createAuthResponse(user);
+    } catch (error) {
+      if (this.isDuplicateEmailError(error)) {
+        throw new ConflictException('Email is already registered');
+      }
+
+      throw error;
+    }
+  }
+
+  async login(dto: LoginDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: this.normalizeEmail(dto.email) },
+    });
+    const passwordMatches = await verifyPassword(
+      dto.password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+    );
+
+    if (!user || user.status !== 'active' || !passwordMatches) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.createAuthResponse(user);
+  }
+
+  async getCurrentUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('User is not active');
+    }
+
+    return this.toPublicUser(user);
+  }
+
+  private createAuthResponse(user: AuthenticatedUser) {
+    return {
+      user: this.toPublicUser(user),
+      accessToken: this.jwtService.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        organizationId: user.organizationId,
+      }),
+      tokenType: 'Bearer',
+    };
+  }
+
+  private toPublicUser(user: AuthenticatedUser) {
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private isDuplicateEmailError(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
+  }
+}

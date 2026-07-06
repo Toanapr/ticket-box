@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local Prisma SQLite data
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/memdb*
 
 # vercel
 .vercel
@@ -39,3 +45,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime concert poster storage (runtime files, retain folder)
+storage/concert-posters/*
+!storage/concert-posters/.gitkeep

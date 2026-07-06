@@ -1,0 +1,5 @@
+full_name,email,phone,sponsor_id,zone_code,ticket_type_slug
+Pham Anh Khoa,khoa.reservation@example.com,,,SVIP,svip-early-access
+Nguyen Thu Trang,,0902345678,,CAT1,cat1-standard
+Le Minh Tam,,,reservation-sponsor-001,SVIP,svip-early-access
+Tran Gia Bao,gia.bao@example.com,,,CAT1,cat1-standard

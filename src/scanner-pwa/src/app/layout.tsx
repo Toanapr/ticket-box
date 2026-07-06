@@ -30,8 +30,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full">
+      <body className="min-h-full" suppressHydrationWarning>
         <ScannerAppProvider>
           <ScannerAppShell>{children}</ScannerAppShell>
         </ScannerAppProvider>

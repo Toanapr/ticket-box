@@ -1,0 +1,174 @@
+"use client";
+
+import { useMemo, useSyncExternalStore } from "react";
+import { useAuth } from "./auth-provider";
+import { CreditCardIcon, TicketIcon, UsersIcon } from "./icons";
+import {
+  AccountPanel,
+  EmptyState,
+  HeldReservationCard,
+  Metric,
+  OrderCard,
+  ProfileRow,
+  PurchasedOrderCard,
+  TicketCard,
+} from "./user-account-cards";
+import { formatCurrency } from "@/lib/format";
+import {
+  getFallbackUserAccountSnapshot,
+  getUserAccountSnapshot,
+  getUserAccountStorageVersion,
+  subscribeToUserAccountStorage,
+} from "@/lib/user-account-data";
+
+const pendingStatuses = new Set([
+  "PENDING_PAYMENT",
+  "PAYMENT_DEGRADED",
+  "PAYMENT_PENDING_RECONCILIATION",
+]);
+const boughtStatuses = new Set(["PAID", "TICKET_ISSUED"]);
+
+export function UserAccountClient(): React.ReactElement {
+  const storageVersion = useSyncExternalStore(
+    subscribeToUserAccountStorage,
+    getUserAccountStorageVersion,
+    () => "__server__",
+  );
+  const { user: authUser } = useAuth();
+  const snapshot = useMemo(
+    () =>
+      storageVersion === "__server__"
+        ? getFallbackUserAccountSnapshot()
+        : getUserAccountSnapshot(),
+    [storageVersion],
+  );
+  const profile = authUser
+    ? {
+        fullName: authUser.fullName?.trim() || authUser.email,
+        email: authUser.email,
+      }
+    : { fullName: snapshot.profile.fullName, email: snapshot.profile.email };
+
+  const pendingOrders = useMemo(
+    () =>
+      snapshot?.orders.filter((order) => pendingStatuses.has(order.status)) ??
+      [],
+    [snapshot],
+  );
+  const activeReservations = snapshot.activeReservations;
+  const purchasedOrders = useMemo(
+    () =>
+      snapshot?.orders.filter((order) => boughtStatuses.has(order.status)) ??
+      [],
+    [snapshot],
+  );
+  const ticketOrderIds = useMemo(
+    () => new Set(snapshot.tickets.map((ticket) => ticket.orderId)),
+    [snapshot.tickets],
+  );
+  const purchasedOrdersWithoutTicketRecord = useMemo(
+    () => purchasedOrders.filter((order) => !ticketOrderIds.has(order.orderId)),
+    [purchasedOrders, ticketOrderIds],
+  );
+  const purchasedCount =
+    snapshot.tickets.length + purchasedOrdersWithoutTicketRecord.length;
+  const spentAmount = purchasedOrders.reduce(
+    (total, order) => total + order.totalAmount,
+    0,
+  );
+  const holdingCount = activeReservations.length + pendingOrders.length;
+
+  return (
+    <div className="grid gap-8">
+      <section className="grid gap-6 rounded-lg border border-ticket-obsidian bg-white p-6 shadow-[6px_6px_0_#0d1118] md:grid-cols-[1fr_1.3fr] md:p-8">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-ticket-green">
+            <UsersIcon className="h-4 w-4" />
+            Tài khoản của tôi
+          </div>
+          <h1 className="mt-4 font-display text-3xl font-black tracking-tight md:text-4xl">
+            {profile.fullName}
+          </h1>
+          <div className="mt-5 grid gap-3 text-sm text-slate-600">
+            <ProfileRow label="Email" value={profile.email} />
+            <ProfileRow label="Trạng thái" value="Đã đăng nhập" />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric
+            label="Đang giữ chỗ"
+            value={holdingCount.toString()}
+            tone="amber"
+          />
+          <Metric
+            label="Vé đã mua"
+            value={purchasedCount.toString()}
+            tone="green"
+          />
+          <Metric
+            label="Đã thanh toán"
+            value={formatCurrency(spentAmount)}
+            tone="dark"
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-8 lg:grid-cols-[1fr_1fr]">
+        <AccountPanel
+          title="Vé đang giữ chỗ"
+          description="Các lượt giữ chỗ còn hiệu lực hoặc đơn chưa hoàn tất thanh toán."
+          icon={<CreditCardIcon className="h-5 w-5" />}
+        >
+          {holdingCount > 0 ? (
+            <div className="grid gap-4">
+              {activeReservations.map((reservation) => (
+                <HeldReservationCard
+                  key={reservation.reservationId}
+                  reservation={reservation}
+                />
+              ))}
+              {pendingOrders.map((order) => (
+                <OrderCard
+                  key={order.orderId}
+                  order={order}
+                  actionLabel="Tiếp tục thanh toán"
+                  actionHref={`/orders/${order.orderId}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              text="Hiện chưa có vé nào đang giữ chỗ."
+              href="/concerts"
+              action="Chọn sự kiện"
+            />
+          )}
+        </AccountPanel>
+
+        <AccountPanel
+          title="Vé đã mua"
+          description="E-ticket đã phát hành sau khi thanh toán thành công."
+          icon={<TicketIcon className="h-5 w-5" />}
+        >
+          {purchasedCount > 0 ? (
+            <div className="grid gap-4">
+              {snapshot.tickets.map((ticket) => (
+                <TicketCard key={ticket.ticketId} ticket={ticket} />
+              ))}
+              {purchasedOrdersWithoutTicketRecord.map((order) => (
+                <PurchasedOrderCard key={order.orderId} order={order} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              text="Bạn chưa có e-ticket nào."
+              href="/concerts"
+              action="Mua vé ngay"
+            />
+          )}
+        </AccountPanel>
+      </section>
+    </div>
+  );
+}

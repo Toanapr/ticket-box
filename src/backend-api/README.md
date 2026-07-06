@@ -21,6 +21,60 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## TicketBox backend
+
+### Concert poster storage
+
+Concert posters are stored on backend local disk. Set `CONCERT_POSTER_STORAGE_DIR` to a writable persistent directory; it defaults to `storage/concert-posters` relative to the backend working directory. Run `pnpm exec prisma migrate deploy` and `pnpm run seed` after provisioning the directory.
+
+Organizer uploads use `PUT /admin/concerts/:id/poster` with multipart field `poster`. JPEG, PNG, and WebP are accepted up to 5 MB. Publishing requires the referenced poster file to exist. Public bytes are served from `/media/concert-posters/:objectKey` with immutable cache headers.
+
+Local seed posters are copied from `mock-ui/images`. Those source files use `.png` names but contain JPEG bytes, so seeded object keys intentionally use `.jpg`.
+
+Local storage supports a single backend writer. Mount the directory on persistent storage and back it up together with PostgreSQL; restoring only the database leaves dangling poster keys. Multi-replica deployments require migration to shared object storage.
+
+### Audience authentication
+
+`POST /auth/register` accepts `fullName`, `email`, and `password`. `POST /auth/login` returns the same user shape plus a Bearer access token. Authenticated clients can resolve the current active profile with `GET /auth/me`.
+
+Apply pending Prisma migrations after pulling schema changes:
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
+The backend uses PostgreSQL through Prisma for source-of-truth data and Redis for Phase 2 cache/rate-limit protection.
+
+### Cache and rate limit configuration
+
+Start Redis with the backend compose file before running the API locally:
+
+```bash
+docker compose up -d redis
+```
+
+Relevant environment variables are listed in `.env.example`:
+
+- `REDIS_URL`: Redis connection URL, for example `redis://localhost:6379/0`.
+- `PUBLIC_CONCERT_CACHE_TTL_SECONDS`: TTL for public concert list/detail cache.
+- `INVENTORY_SUMMARY_CACHE_TTL_SECONDS`: short TTL for display-only ticket availability summaries.
+- `CACHE_TTL_JITTER_RATIO`: spreads cache expirations to reduce stampedes.
+- `CACHE_MISS_QUERY_BUDGET`: limits concurrent DB-backed loads when public cache misses happen. Cache values computed from data already loaded by the current request do not consume this budget.
+
+Public `GET /concerts` and `GET /concerts/:slug` use cache-aside reads; legacy concert UUID identifiers remain accepted for compatibility. Concert and ticket type records expose immutable slugs for public Audience URLs, while reservation and payment contracts continue using UUIDs. Ticket availability summaries are cached for display only; reservation and payment flows still read and update PostgreSQL inside transactions. Admin concert/ticket-type updates, reservation changes, expiry cleanup, and payment success invalidate affected cache keys.
+
+Rate-limited endpoints return `429` with `Retry-After`. Rejections are logged with the request correlation id. If Redis is unavailable, the guard falls back to a bounded in-memory counter so reservation throttling remains active instead of failing open.
+
+### Payment resilience
+
+Create the provider intent with `POST /payments/:paymentId/intent`, authenticated by an audience Bearer token and a durable `Idempotency-Key`. The user identity is always read from the token `sub` claim; client-provided identity headers are not trusted. A successful mock call returns the same checkout URL on replay. An ambiguous timeout returns `202` with `status: pending_reconciliation`; an open circuit returns `503`, `degraded: true`, and `Retry-After`. Never create another intent for an uncertain payment.
+
+Payment statuses are `created`, `pending`, `pending_reconciliation`, `succeeded`, `failed`, and `expired`. Order remains `pending_payment` while payment outcome is uncertain. Only a verified webhook or reconciliation result finalizes payment and issues tickets.
+
+`WEBHOOK_SIGNING_SECRET` is required outside test mode. Webhook events are durably deduplicated by provider and event id; payload hashes are retained for audit. Reconciliation claims due rows with a database lease, calls the provider outside database transactions, and uses the same transactional finalization path as webhook handling.
+
+Operational logs include `payment_provider_call`, `payment_circuit_transition`, `payment_pending_reconciliation`, `payment_reconciliation_batch`, and `payment_reconciliation_result`. They contain order/payment correlation and pending age, but no webhook secret or raw payload.
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

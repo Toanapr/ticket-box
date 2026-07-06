@@ -14,7 +14,7 @@ export function deriveInventoryState(ticketType: Pick<TicketType, "inventoryCach
 
 export function formatInventoryFreshness(ticketType: Pick<TicketType, "inventoryCachedAt" | "inventoryStaleAt" | "inventoryState">, now = new Date()): InventoryFreshnessDisplay {
   const state = deriveInventoryState(ticketType, now);
-  if (state === "stale") return { label: "Du lieu co the cham vai giay", tone: "amber" };
-  if (state === "cached") return { label: "Cap nhat gan day", tone: "slate" };
+  if (state === "stale") return { label: "Dữ liệu có thể chậm vài giây", tone: "amber" };
+  if (state === "cached") return { label: "Cập nhật gần đây", tone: "slate" };
   return { label: "Gan realtime", tone: "green" };
 }

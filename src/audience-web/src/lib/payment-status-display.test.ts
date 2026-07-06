@@ -3,16 +3,20 @@ import { getPaymentStatusDisplay } from "./payment-status-display";
 
 describe("payment status display", () => {
   it("keeps pending payment from implying ticket issuance", () => {
-    const display = getPaymentStatusDisplay({ status: "PENDING_PAYMENT", ticketId: undefined, paymentIntent: {} });
+    const display = getPaymentStatusDisplay({
+      status: "PENDING_PAYMENT",
+      ticketId: undefined,
+      paymentIntent: {},
+    });
 
     expect(display.canShowTicketLink).toBe(false);
-    expect(display.message).toContain("Chưa phát hành vé");
+    expect(display.message).toContain("chưa hoàn tất");
     expect(display.pollMode).toBe("fast");
     expect(display.shouldPoll).toBe(true);
     expect(display.action.kind).toBe("wait");
   });
 
-  it("shows backend checkout action when checkoutUrl exists", () => {
+  it("shows checkout action when checkoutUrl exists", () => {
     const display = getPaymentStatusDisplay({
       status: "PENDING_PAYMENT",
       ticketId: undefined,
@@ -34,26 +38,65 @@ describe("payment status display", () => {
     expect(display.statusLabel).toBe("PAYMENT_DEGRADED");
     expect(display.pollMode).toBe("slow");
     expect(display.action.kind).toBe("wait");
-    expect(display.action.description).toContain("Retry-After");
+    expect(display.action.description).toContain("Vui lòng chờ");
     expect(display.retryAfterLabel).toBe("30s");
   });
 
   it("does not offer retry-new-payment wording for reconciliation", () => {
     const display = getPaymentStatusDisplay(
-      { status: "PAYMENT_PENDING_RECONCILIATION", ticketId: undefined, paymentIntent: {} },
+      {
+        status: "PAYMENT_PENDING_RECONCILIATION",
+        ticketId: undefined,
+        paymentIntent: {},
+      },
       { paymentReturn: true },
     );
 
     expect(display.canShowTicketLink).toBe(false);
-    expect(display.message).toContain("Không tạo giao dịch mới");
+    expect(display.displayLabel).toBe("Đang kiểm tra");
+    expect(display.message).toContain("chưa nhận được kết quả cuối cùng");
+    expect(display.action.description).toContain("vui lòng chờ");
     expect(display.pollMode).toBe("slow");
     expect(display.shouldPoll).toBe(true);
     expect(display.returnNotice).toContain("quay lại");
   });
 
-  it("only shows a ticket link when backend issued a ticket id", () => {
-    expect(getPaymentStatusDisplay({ status: "PAID", ticketId: "ticket-1", paymentIntent: {} }).canShowTicketLink).toBe(false);
-    expect(getPaymentStatusDisplay({ status: "TICKET_ISSUED", ticketId: undefined, paymentIntent: {} }).canShowTicketLink).toBe(false);
-    expect(getPaymentStatusDisplay({ status: "TICKET_ISSUED", ticketId: "ticket-1", paymentIntent: {} }).canShowTicketLink).toBe(true);
+  it("lets reconciliation reopen the existing checkout when checkoutUrl exists", () => {
+    const display = getPaymentStatusDisplay({
+      status: "PAYMENT_PENDING_RECONCILIATION",
+      ticketId: undefined,
+      paymentIntent: { checkoutUrl: "https://pay.example/current-intent" },
+    });
+
+    expect(display.action).toMatchObject({
+      kind: "open-checkout",
+      url: "https://pay.example/current-intent",
+      label: "Mở lại trang thanh toán",
+    });
+    expect(display.action.description).toContain("không tạo giao dịch mới");
+  });
+
+  it("only shows a ticket link when a ticket id exists", () => {
+    expect(
+      getPaymentStatusDisplay({
+        status: "PAID",
+        ticketId: "ticket-1",
+        paymentIntent: {},
+      }).canShowTicketLink,
+    ).toBe(false);
+    expect(
+      getPaymentStatusDisplay({
+        status: "TICKET_ISSUED",
+        ticketId: undefined,
+        paymentIntent: {},
+      }).canShowTicketLink,
+    ).toBe(false);
+    expect(
+      getPaymentStatusDisplay({
+        status: "TICKET_ISSUED",
+        ticketId: "ticket-1",
+        paymentIntent: {},
+      }).canShowTicketLink,
+    ).toBe(true);
   });
 });

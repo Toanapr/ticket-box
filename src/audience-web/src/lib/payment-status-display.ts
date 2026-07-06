@@ -16,6 +16,7 @@ export interface PaymentStatusHint {
 
 export interface PaymentStatusDisplay {
   statusLabel: OrderStatus;
+  displayLabel: string;
   title: string;
   message: string;
   tone: "green" | "amber" | "red" | "slate";
@@ -33,119 +34,181 @@ export function getPaymentStatusDisplay(
 ): PaymentStatusDisplay {
   const statusLabel = deriveStatusLabel(order.status, hint);
   const base = displayByStatus[statusLabel] ?? displayByStatus.PENDING_PAYMENT;
-  const retryAfterSeconds = hint?.paymentRetryAfterSeconds ?? order.paymentIntent?.retryAfterSeconds ?? null;
-  const retryAfterLabel = typeof retryAfterSeconds === "number" && retryAfterSeconds > 0 ? formatRetryAfterLabel(retryAfterSeconds) : undefined;
+  const retryAfterSeconds =
+    hint?.paymentRetryAfterSeconds ??
+    order.paymentIntent?.retryAfterSeconds ??
+    null;
+  const retryAfterLabel =
+    typeof retryAfterSeconds === "number" && retryAfterSeconds > 0
+      ? formatRetryAfterLabel(retryAfterSeconds)
+      : undefined;
 
   return {
     ...base,
     statusLabel,
-    canShowTicketLink: order.status === "TICKET_ISSUED" && Boolean(order.ticketId),
+    displayLabel: base.label,
+    canShowTicketLink:
+      order.status === "TICKET_ISSUED" && Boolean(order.ticketId),
     shouldPoll: base.pollMode !== "stopped",
-    action: getPaymentAction(statusLabel, order.paymentIntent?.checkoutUrl ?? null, retryAfterLabel),
-    returnNotice: hint?.paymentReturn ? "Trình duyệt vừa quay lại từ cổng thanh toán. Trang này đang tải lại trạng thái mới từ backend." : undefined,
+    action: getPaymentAction(
+      statusLabel,
+      order.paymentIntent?.checkoutUrl ?? null,
+      retryAfterLabel,
+    ),
+    returnNotice: hint?.paymentReturn
+      ? "Bạn vừa quay lại từ cổng thanh toán. Trạng thái đơn hàng đang được cập nhật."
+      : undefined,
     retryAfterLabel,
   };
 }
 
-const displayByStatus: Record<
-  OrderStatus,
-  Omit<PaymentStatusDisplay, "statusLabel" | "canShowTicketLink" | "shouldPoll" | "action" | "returnNotice" | "retryAfterLabel">
-> = {
+type PaymentStatusDisplayBase = Omit<
+  PaymentStatusDisplay,
+  | "statusLabel"
+  | "displayLabel"
+  | "canShowTicketLink"
+  | "shouldPoll"
+  | "action"
+  | "returnNotice"
+  | "retryAfterLabel"
+> & { label: string };
+
+const displayByStatus: Record<OrderStatus, PaymentStatusDisplayBase> = {
   PENDING_PAYMENT: {
+    label: "Chờ thanh toán",
     title: "Đang chờ xác nhận thanh toán",
-    message: "Hệ thống đang xác nhận với cổng thanh toán. Chưa phát hành vé cho đến khi backend cập nhật trạng thái.",
+    message:
+      "Đơn hàng chưa hoàn tất. Bạn có thể tiếp tục thanh toán bằng nút bên dưới.",
     tone: "amber",
     pollMode: "fast",
   },
   PAYMENT_DEGRADED: {
+    label: "Tạm gián đoạn",
     title: "Cổng thanh toán đang gián đoạn",
-    message: "Backend ghi nhận cổng thanh toán không ổn định. Đơn của bạn chưa được xem là thành công; vui lòng chờ trạng thái mới.",
+    message:
+      "Cổng thanh toán đang không ổn định. Đơn của bạn chưa được xem là thành công; vui lòng chờ trạng thái mới.",
     tone: "amber",
     pollMode: "slow",
   },
   PAYMENT_PENDING_RECONCILIATION: {
-    title: "Đang đợi đối soát thanh toán",
-    message: "Hệ thống đang đối soát kết quả với nhà cung cấp. Không tạo giao dịch mới nếu backend chưa yêu cầu.",
+    label: "Đang kiểm tra",
+    title: "Đang kiểm tra kết quả thanh toán",
+    message:
+      "Chúng tôi chưa nhận được kết quả cuối cùng từ cổng thanh toán. Nếu bạn chưa hoàn tất thanh toán, hãy mở lại đúng giao dịch này.",
     tone: "slate",
     pollMode: "slow",
   },
   PAID: {
+    label: "Đã thanh toán",
     title: "Đã ghi nhận thanh toán",
-    message: "Thanh toán đã được backend ghi nhận. E-ticket chỉ hiển thị khi backend phát hành vé.",
+    message:
+      "Thanh toán đã được ghi nhận. E-ticket sẽ hiển thị khi hệ thống phát hành vé.",
     tone: "green",
     pollMode: "slow",
   },
   PAYMENT_FAILED: {
+    label: "Thanh toán thất bại",
     title: "Thanh toán thất bại",
-    message: "Backend báo giao dịch thanh toán thất bại. Vui lòng làm theo hướng dẫn retry nếu backend cung cấp.",
+    message:
+      "Giao dịch thanh toán thất bại. Vui lòng kiểm tra lại đơn hàng hoặc thử lại nếu còn thời gian giữ vé.",
     tone: "red",
     pollMode: "stopped",
   },
   PAYMENT_EXPIRED: {
+    label: "Hết hạn",
     title: "Thanh toán đã hết hạn",
     message: "Phiên thanh toán hết hạn. Vé chưa được phát hành.",
     tone: "red",
     pollMode: "stopped",
   },
   EXPIRED: {
+    label: "Hết hạn",
     title: "Đơn đã hết hạn",
     message: "Phiên giữ vé hoặc thanh toán hết hạn. Vé chưa được phát hành.",
     tone: "red",
     pollMode: "stopped",
   },
   TICKET_ISSUED: {
+    label: "Đã có vé",
     title: "Đã xuất e-ticket",
-    message: "Backend đã phát hành e-ticket. Bạn có thể mở QR để vào cổng.",
+    message: "E-ticket đã được phát hành. Bạn có thể mở QR để vào cổng.",
     tone: "green",
     pollMode: "stopped",
   },
 };
 
-function deriveStatusLabel(status: OrderStatus, hint: PaymentStatusHint | undefined): OrderStatus {
+function deriveStatusLabel(
+  status: OrderStatus,
+  hint: PaymentStatusHint | undefined,
+): OrderStatus {
   if (status !== "PENDING_PAYMENT") return status;
-  if (hint?.paymentStatus === "pending_reconciliation") return "PAYMENT_PENDING_RECONCILIATION";
+  if (hint?.paymentStatus === "pending_reconciliation")
+    return "PAYMENT_PENDING_RECONCILIATION";
   if (hint?.paymentDegraded) return "PAYMENT_DEGRADED";
   return status;
 }
 
-function getPaymentAction(status: OrderStatus, checkoutUrl: string | null, retryAfterLabel: string | undefined): PaymentAction {
+function getPaymentAction(
+  status: OrderStatus,
+  checkoutUrl: string | null,
+  retryAfterLabel: string | undefined,
+): PaymentAction {
   if (status === "TICKET_ISSUED") {
-    return { kind: "none", description: "E-ticket đã được phát hành. Không cần mở thêm cổng thanh toán." };
+    return {
+      kind: "none",
+      description:
+        "E-ticket đã được phát hành. Không cần mở thêm cổng thanh toán.",
+    };
   }
   if (status === "PENDING_PAYMENT" && checkoutUrl) {
     return {
       kind: "open-checkout",
       url: checkoutUrl,
-      label: "Mở cổng thanh toán",
-      description: "Chỉ mở đường dẫn do backend trả về cho payment intent hiện tại.",
+      label: "Tiếp tục thanh toán",
+      description: "Mở lại cổng thanh toán cho đơn hàng này.",
     };
   }
   if (status === "PENDING_PAYMENT") {
     return {
       kind: "wait",
       label: "Đang chờ liên kết thanh toán",
-      description: "Trang này sẽ tiếp tục tải lại cho đến khi backend trả về đường dẫn thanh toán hoặc trạng thái mới.",
+      description:
+        "Trang này sẽ tự cập nhật cho đến khi có liên kết thanh toán hoặc trạng thái mới.",
     };
   }
   if (status === "PAYMENT_DEGRADED") {
     return {
       kind: "wait",
-      label: retryAfterLabel ? `Thử lại sau ${retryAfterLabel}` : "Cổng thanh toán tạm thời gián đoạn",
-      description: "Không tạo payment intent mới trong lúc backend đang khóa retry. Chờ trạng thái mới hoặc Retry-After hết hạn.",
+      label: retryAfterLabel
+        ? `Thử lại sau ${retryAfterLabel}`
+        : "Cổng thanh toán tạm thời gián đoạn",
+      description:
+        "Cổng thanh toán đang bận. Vui lòng chờ hệ thống mở lại thao tác thanh toán.",
     };
   }
   if (status === "PAYMENT_PENDING_RECONCILIATION") {
+    if (checkoutUrl) {
+      return {
+        kind: "open-checkout",
+        url: checkoutUrl,
+        label: "Mở lại trang thanh toán",
+        description:
+          "Mở lại giao dịch thanh toán hiện tại, không tạo giao dịch mới.",
+      };
+    }
     return {
       kind: "wait",
-      label: "Đang đợi đối soát",
-      description: "Kết quả từ nhà cung cấp đang mơ hồ. Không tạo giao dịch thanh toán mới cho cùng đơn này.",
+      label: "Đang kiểm tra thanh toán",
+      description:
+        "Cổng thanh toán chưa trả kết quả cuối cùng. Nếu bạn đã thanh toán, vui lòng chờ hệ thống cập nhật; nếu chưa thanh toán, hãy quay lại sau ít phút.",
     };
   }
   if (status === "PAID") {
     return {
       kind: "wait",
       label: "Đã thanh toán, chờ phát hành vé",
-      description: "Backend đã ghi nhận thanh toán. Trang này sẽ tiếp tục kiểm tra cho đến khi e-ticket được phát hành.",
+      description:
+        "Thanh toán đã được ghi nhận. Trang này sẽ tiếp tục kiểm tra cho đến khi e-ticket được phát hành.",
     };
   }
   return {
@@ -158,5 +221,7 @@ function formatRetryAfterLabel(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  return remainingSeconds > 0
+    ? `${minutes}m ${remainingSeconds}s`
+    : `${minutes}m`;
 }

@@ -8,7 +8,11 @@ import { getTicket } from "@/lib/client-api";
 import { formatDateTime, shortVenue } from "@/lib/format";
 import type { TicketRecord } from "@/lib/types";
 
-export function TicketClient({ ticketId }: { ticketId: string }): React.ReactElement {
+export function TicketClient({
+  ticketId,
+}: {
+  ticketId: string;
+}): React.ReactElement {
   const [ticket, setTicket] = useState<TicketRecord | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,14 +25,26 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
   }, [ticketId]);
 
   if (loading) {
-    return <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">Đang tải e-ticket...</div>;
+    return (
+      <div className="rounded-lg border border-black/10 bg-white p-8 font-bold text-slate-600">
+        Đang tải e-ticket...
+      </div>
+    );
   }
 
   if (!ticket) {
     return (
-      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-8">
-        <h1 className="font-display text-2xl font-black text-red-900">Không tìm thấy ticket</h1>
-        <p className="mt-2 text-sm text-red-800">E-ticket chỉ xuất hiện sau khi backend xác nhận thanh toán và phát hành vé.</p>
+      <div
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 p-8"
+      >
+        <h1 className="font-display text-2xl font-black text-red-900">
+          Không tìm thấy ticket
+        </h1>
+        <p className="mt-2 text-sm text-red-800">
+          E-ticket chỉ xuất hiện sau khi thanh toán được xác nhận và vé được
+          phát hành.
+        </p>
       </div>
     );
   }
@@ -56,16 +72,29 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
         <div className="grid h-32 place-items-center bg-ticket-obsidian px-6 text-center text-white">
           <div>
             <TicketIcon className="mx-auto mb-2 h-8 w-8 text-ticket-green" />
-            <div className="font-display text-2xl font-black uppercase tracking-[0.18em]">E-Ticket Pass</div>
+            <div className="font-display text-2xl font-black uppercase tracking-[0.18em]">
+              E-Ticket Pass
+            </div>
           </div>
         </div>
 
         <div className="p-6 md:p-8">
-          <h1 className="font-display text-3xl font-black tracking-tight">{ticket.concertTitle ?? "TicketBox Concert"}</h1>
+          <h1 className="font-display text-3xl font-black tracking-tight">
+            {ticket.concertTitle ?? "TicketBox Concert"}
+          </h1>
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            <Meta label="Thời gian" value={ticket.startsAt ? formatDateTime(ticket.startsAt) : "-"} />
-            <Meta label="Địa điểm" value={ticket.venue ? shortVenue(ticket.venue) : "-"} />
-            <Meta label="Khu vé" value={ticket.ticketTypeName ?? ticket.ticketTypeId} />
+            <Meta
+              label="Thời gian"
+              value={ticket.startsAt ? formatDateTime(ticket.startsAt) : "-"}
+            />
+            <Meta
+              label="Địa điểm"
+              value={ticket.venue ? shortVenue(ticket.venue) : "-"}
+            />
+            <Meta
+              label="Khu vé"
+              value={ticket.ticketTypeName ?? ticket.ticketTypeId}
+            />
             <Meta label="Vị trí / ghế" value={ticket.seats.join(", ")} />
             <Meta label="Chủ sở hữu" value={ticket.owner.fullName} />
             <Meta label="Email" value={ticket.owner.email} />
@@ -76,22 +105,36 @@ export function TicketClient({ ticketId }: { ticketId: string }): React.ReactEle
           <div className="mx-auto h-44 w-44 rounded border border-ticket-obsidian bg-white p-3">
             <MockQr payload={ticket.qrPayload} className="h-full w-full" />
           </div>
-          <div className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">Mã số vé điện tử</div>
-          <div className="mt-1 font-mono text-lg font-black tracking-wide">{ticket.ticketId}</div>
+          <div className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">
+            Mã số vé điện tử
+          </div>
+          <div className="mt-1 font-mono text-lg font-black tracking-wide">
+            {ticket.ticketId}
+          </div>
           <div className="mt-4 inline-flex rounded-full bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase text-ticket-green">
             Chưa check-in
           </div>
-          <div className="mt-5 break-all font-mono text-[11px] uppercase text-slate-500">{ticket.signedPayload}</div>
+          <div className="mt-5 break-all font-mono text-[11px] uppercase text-slate-500">
+            {ticket.signedPayload}
+          </div>
         </div>
       </article>
     </section>
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }): React.ReactElement {
+function Meta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}): React.ReactElement {
   return (
     <div>
-      <div className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
       <div className="mt-1 font-bold text-ticket-obsidian">{value}</div>
     </div>
   );

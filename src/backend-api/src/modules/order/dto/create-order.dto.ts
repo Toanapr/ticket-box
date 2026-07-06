@@ -15,6 +15,6 @@ export class CreateOrderDto {
   idempotencyKey!: string;
 
   @IsOptional()
-  @IsIn(['VNPAY', 'MOMO', 'mock'])
-  paymentMethod?: 'VNPAY' | 'MOMO' | 'mock';
+  @IsIn(['VNPAY', 'mock'])
+  paymentMethod?: 'VNPAY' | 'mock';
 }

@@ -83,10 +83,12 @@ export interface BuyerInfo {
   email: string;
 }
 
-export type PaymentMethod = "VNPAY" | "MOMO";
+export type PaymentMethod = "VNPAY";
 export type PaymentProvider = PaymentMethod | "mock" | "mock-bank";
 export type PaymentIntentStatus = "pending" | "pending_reconciliation";
-export type PaymentIntentReason = "provider_unavailable" | "provider_timeout_ambiguous";
+export type PaymentIntentReason =
+  | "provider_unavailable"
+  | "provider_timeout_ambiguous";
 
 export interface PaymentIntentResponse {
   paymentId: string;

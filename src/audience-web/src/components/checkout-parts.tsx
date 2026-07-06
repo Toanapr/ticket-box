@@ -16,7 +16,9 @@ export function CheckoutField({
 }): React.ReactElement {
   return (
     <label className={`grid gap-2 ${className}`}>
-      <span className="text-xs font-black uppercase tracking-wide text-slate-600">{label}</span>
+      <span className="text-xs font-black uppercase tracking-wide text-slate-600">
+        {label}
+      </span>
       <input
         required
         type={type}
@@ -44,14 +46,6 @@ const paymentOptions: Array<{
     logoClassName: "h-16 w-full object-contain p-3",
     accentClassName: "from-sky-50 via-white to-red-50",
   },
-  {
-    value: "MOMO",
-    name: "MOMO",
-    description: "Ví MoMo, quét mã trên ứng dụng",
-    logoSrc: "/payment-logos/momo.svg",
-    logoClassName: "h-20 w-20 object-contain",
-    accentClassName: "from-pink-50 via-white to-fuchsia-50",
-  },
 ];
 
 export function PaymentMethodSelector({
@@ -64,7 +58,7 @@ export function PaymentMethodSelector({
   onChange: (value: PaymentMethod) => void;
 }): React.ReactElement {
   return (
-    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+    <div className="mt-5 grid gap-4">
       {paymentOptions.map((option) => {
         const selected = value === option.value;
         return (
@@ -89,11 +83,15 @@ export function PaymentMethodSelector({
             />
             <span
               className={`absolute right-4 top-4 grid h-6 w-6 place-items-center rounded-full border ${
-                selected ? "border-ticket-green bg-ticket-green" : "border-black/20 bg-white"
+                selected
+                  ? "border-ticket-green bg-ticket-green"
+                  : "border-black/20 bg-white"
               }`}
               aria-hidden="true"
             >
-              <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-transparent"}`} />
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-white" : "bg-transparent"}`}
+              />
             </span>
             <span className="grid gap-4">
               <span className="grid h-20 w-full place-items-center rounded bg-white/85 px-4 ring-1 ring-black/5">
@@ -106,8 +104,12 @@ export function PaymentMethodSelector({
                 />
               </span>
               <span className="grid gap-1">
-                <span className="font-display text-lg font-black text-ticket-obsidian">{option.name}</span>
-                <span className="text-sm font-semibold leading-6 text-slate-600">{option.description}</span>
+                <span className="font-display text-lg font-black text-ticket-obsidian">
+                  {option.name}
+                </span>
+                <span className="text-sm font-semibold leading-6 text-slate-600">
+                  {option.description}
+                </span>
               </span>
             </span>
           </label>
@@ -117,7 +119,13 @@ export function PaymentMethodSelector({
   );
 }
 
-export function SummaryRow({ label, value }: { label: string; value: string }): React.ReactElement {
+export function SummaryRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}): React.ReactElement {
   return (
     <div className="mt-4 flex justify-between gap-4 text-sm font-bold text-slate-600">
       <span>{label}</span>

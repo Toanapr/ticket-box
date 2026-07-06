@@ -28,7 +28,11 @@ interface FetchJsonOptions {
   onResponse?: (response: Response) => void;
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit, options: FetchJsonOptions = {}): Promise<T> {
+async function fetchJson<T>(
+  path: string,
+  init?: RequestInit,
+  options: FetchJsonOptions = {},
+): Promise<T> {
   const response = await fetch(`/api/backend${path}`, {
     ...init,
     headers: {
@@ -67,7 +71,9 @@ export async function createReservation(
       "/reservations",
       {
         method: "POST",
-        headers: payload.saleAccessToken ? { "x-sale-access-token": payload.saleAccessToken } : undefined,
+        headers: payload.saleAccessToken
+          ? { "x-sale-access-token": payload.saleAccessToken }
+          : undefined,
         body: JSON.stringify({
           ticketTypeId: payload.ticketTypeId,
           quantity: payload.quantity,
@@ -76,8 +82,10 @@ export async function createReservation(
       },
       {
         onResponse: (apiResponse) => {
-          saleAccessTokenFromHeader = apiResponse.headers.get("x-sale-access-token") ?? undefined;
-          saleAccessTokenExpiresAtFromHeader = apiResponse.headers.get("x-sale-access-expires-at") ?? undefined;
+          saleAccessTokenFromHeader =
+            apiResponse.headers.get("x-sale-access-token") ?? undefined;
+          saleAccessTokenExpiresAtFromHeader =
+            apiResponse.headers.get("x-sale-access-expires-at") ?? undefined;
         },
       },
     );
@@ -85,7 +93,8 @@ export async function createReservation(
       ...response,
       reservationId: response.id,
       saleAccessToken: response.saleAccessToken ?? saleAccessTokenFromHeader,
-      saleAccessTokenExpiresAt: response.saleAccessTokenExpiresAt ?? saleAccessTokenExpiresAtFromHeader,
+      saleAccessTokenExpiresAt:
+        response.saleAccessTokenExpiresAt ?? saleAccessTokenExpiresAtFromHeader,
     };
   }
 
@@ -143,14 +152,20 @@ export async function createOrder(input: {
   }
 }
 
-export async function createPaymentIntent(input: { paymentId: string; idempotencyKey: string }): Promise<PaymentIntentResponse> {
-  const response = await fetch(`/api/backend/payments/${input.paymentId}/intent`, {
-    method: "POST",
-    headers: {
-      "Idempotency-Key": input.idempotencyKey,
+export async function createPaymentIntent(input: {
+  paymentId: string;
+  idempotencyKey: string;
+}): Promise<PaymentIntentResponse> {
+  const response = await fetch(
+    `/api/backend/payments/${input.paymentId}/intent`,
+    {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": input.idempotencyKey,
+      },
+      cache: "no-store",
     },
-    cache: "no-store",
-  });
+  );
 
   if (response.status === 401) {
     const next = `${window.location.pathname}${window.location.search}`;
@@ -161,17 +176,26 @@ export async function createPaymentIntent(input: { paymentId: string; idempotenc
     throw await createReservationApiError(response);
   }
 
-  const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  const body = (await response.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
   return parsePaymentIntentResponse(body, response);
 }
 
 export async function getOrder(orderId: string): Promise<OrderRecord | null> {
-  const response = await fetchJson<BackendOrder>(`/orders/${orderId}`, { cache: "no-store" });
+  const response = await fetchJson<BackendOrder>(`/orders/${orderId}`, {
+    cache: "no-store",
+  });
   return mapBackendOrder(response);
 }
 
-export async function getTicket(ticketId: string): Promise<TicketRecord | null> {
-  const response = await fetchJson<BackendTicket>(`/tickets/${ticketId}`, { cache: "no-store" });
+export async function getTicket(
+  ticketId: string,
+): Promise<TicketRecord | null> {
+  const response = await fetchJson<BackendTicket>(`/tickets/${ticketId}`, {
+    cache: "no-store",
+  });
   return {
     ticketId: response.id,
     orderId: response.orderId,
@@ -202,7 +226,12 @@ interface BackendOrder {
   ticketTypeId?: string | null;
   ticketTypeName?: string | null;
   quantity?: number | null;
-  reservations: Array<{ id: string; ticketTypeId: string; quantity: number; expiresAt?: string }>;
+  reservations: Array<{
+    id: string;
+    ticketTypeId: string;
+    quantity: number;
+    expiresAt?: string;
+  }>;
   payments: Array<{
     id: string;
     provider: string;
@@ -229,7 +258,9 @@ interface BackendTicket {
 
 function mapBackendOrder(order: BackendOrder): OrderRecord {
   const reservation = order.reservations[0];
-  const payment = order.payments.find((item) => item.id === order.paymentId) ?? order.payments[0];
+  const payment =
+    order.payments.find((item) => item.id === order.paymentId) ??
+    order.payments[0];
   const ticketId = order.tickets[0]?.id;
   return {
     orderId: order.id,
@@ -242,7 +273,11 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
     ticketTypeName: order.ticketTypeName ?? undefined,
     quantity: order.quantity ?? reservation?.quantity ?? 0,
     buyer: { fullName: "Khán giả TicketBox", phone: "", email: "" },
-    status: mapOrderAndPaymentStatus(order.status, payment?.status, Boolean(ticketId)),
+    status: mapOrderAndPaymentStatus(
+      order.status,
+      payment?.status,
+      Boolean(ticketId),
+    ),
     totalAmount: Number(order.totalAmount),
     createdAt: new Date().toISOString(),
     paymentIntent: {
@@ -259,9 +294,15 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
   };
 }
 
-function mapOrderAndPaymentStatus(orderStatus: string, paymentStatus: string | undefined, hasTicket: boolean): OrderRecord["status"] {
+function mapOrderAndPaymentStatus(
+  orderStatus: string,
+  paymentStatus: string | undefined,
+  hasTicket: boolean,
+): OrderRecord["status"] {
   if (hasTicket) return "TICKET_ISSUED";
-  const paymentMapped = paymentStatus ? mapPaymentStatus(paymentStatus) : undefined;
+  const paymentMapped = paymentStatus
+    ? mapPaymentStatus(paymentStatus)
+    : undefined;
   if (paymentMapped && orderStatus === "pending_payment") return paymentMapped;
   return mapOrderStatus(orderStatus);
 }
@@ -299,17 +340,26 @@ function mapPaymentStatus(status: string): OrderRecord["status"] | undefined {
   return statuses[status];
 }
 
-function normalizePaymentProvider(provider: string | undefined): PaymentProvider {
-  if (provider === "VNPAY" || provider === "MOMO" || provider === "mock" || provider === "mock-bank") return provider;
+function normalizePaymentProvider(
+  provider: string | undefined,
+): PaymentProvider {
+  if (provider === "VNPAY" || provider === "mock" || provider === "mock-bank")
+    return provider;
   return "mock";
 }
 
-function parsePaymentIntentResponse(body: Record<string, unknown> | null, response: Response): PaymentIntentResponse {
+function parsePaymentIntentResponse(
+  body: Record<string, unknown> | null,
+  response: Response,
+): PaymentIntentResponse {
   if (!body) throw invalidPaymentIntentResponse(response.status);
 
   const status = body.status;
   const reason = normalizePaymentIntentReason(body.reason);
-  const retryAfterSeconds = normalizeRetryAfterSeconds(body.retryAfterSeconds, response.headers.get("retry-after"));
+  const retryAfterSeconds = normalizeRetryAfterSeconds(
+    body.retryAfterSeconds,
+    response.headers.get("retry-after"),
+  );
 
   if (
     typeof body.paymentId !== "string" ||
@@ -332,27 +382,46 @@ function parsePaymentIntentResponse(body: Record<string, unknown> | null, respon
   };
 }
 
-function normalizePaymentIntentReason(value: unknown): PaymentIntentReason | null {
-  return value === "provider_unavailable" || value === "provider_timeout_ambiguous" ? value : null;
+function normalizePaymentIntentReason(
+  value: unknown,
+): PaymentIntentReason | null {
+  return value === "provider_unavailable" ||
+    value === "provider_timeout_ambiguous"
+    ? value
+    : null;
 }
 
-function normalizeRetryAfterSeconds(bodyValue: unknown, headerValue: string | null): number | null {
-  if (typeof bodyValue === "number" && Number.isFinite(bodyValue) && bodyValue >= 0) return bodyValue;
+function normalizeRetryAfterSeconds(
+  bodyValue: unknown,
+  headerValue: string | null,
+): number | null {
+  if (
+    typeof bodyValue === "number" &&
+    Number.isFinite(bodyValue) &&
+    bodyValue >= 0
+  )
+    return bodyValue;
   const retry = parseRetryAfter(headerValue);
   if (typeof retry.retryAfterMs !== "number") return null;
   return Math.ceil(retry.retryAfterMs / 1000);
 }
 
 function invalidPaymentIntentResponse(status: number): ReservationApiError {
-  return new ReservationApiError("UNKNOWN", "Phan hoi tao payment intent khong hop le.", {
-    kind: "backend-error",
-    status,
-    code: "UNKNOWN",
-    message: "Phan hoi tao payment intent khong hop le.",
-  });
+  return new ReservationApiError(
+    "UNKNOWN",
+    "Phan hoi tao payment intent khong hop le.",
+    {
+      kind: "backend-error",
+      status,
+      code: "UNKNOWN",
+      message: "Phan hoi tao payment intent khong hop le.",
+    },
+  );
 }
 
-export function normalizeErrorCode(code: string | undefined): ReservationErrorCode {
+export function normalizeErrorCode(
+  code: string | undefined,
+): ReservationErrorCode {
   const normalized = code?.toUpperCase();
   return normalized === "SOLD_OUT" ||
     normalized === "QUOTA_EXCEEDED" ||
@@ -369,22 +438,37 @@ export function normalizeErrorCode(code: string | undefined): ReservationErrorCo
     : "UNKNOWN";
 }
 
-export function parseRetryAfter(value: string | null, now = new Date()): Pick<CheckoutTransientError, "retryAfterMs" | "retryAt"> {
+export function parseRetryAfter(
+  value: string | null,
+  now = new Date(),
+): Pick<CheckoutTransientError, "retryAfterMs" | "retryAt"> {
   if (!value) return {};
   const numericSeconds = Number(value);
   if (Number.isFinite(numericSeconds) && numericSeconds >= 0) {
     const retryAfterMs = Math.round(numericSeconds * 1000);
-    return { retryAfterMs, retryAt: new Date(now.getTime() + retryAfterMs).toISOString() };
+    return {
+      retryAfterMs,
+      retryAt: new Date(now.getTime() + retryAfterMs).toISOString(),
+    };
   }
 
   const retryAtMs = Date.parse(value);
   if (Number.isNaN(retryAtMs)) return {};
   const retryAfterMs = Math.max(0, retryAtMs - now.getTime());
-  return { retryAfterMs, retryAt: new Date(now.getTime() + retryAfterMs).toISOString() };
+  return {
+    retryAfterMs,
+    retryAt: new Date(now.getTime() + retryAfterMs).toISOString(),
+  };
 }
 
-async function createReservationApiError(response: Response): Promise<ReservationApiError> {
-  const body = (await response.json().catch(() => ({}))) as { code?: string; error?: string; message?: string };
+async function createReservationApiError(
+  response: Response,
+): Promise<ReservationApiError> {
+  const body = (await response.json().catch(() => ({}))) as {
+    code?: string;
+    error?: string;
+    message?: string;
+  };
   const code = normalizeErrorCode(body.code ?? body.error);
   const retry = parseRetryAfter(response.headers.get("retry-after"));
   const transient: CheckoutTransientError = {
@@ -398,7 +482,10 @@ async function createReservationApiError(response: Response): Promise<Reservatio
   return new ReservationApiError(code, transient.message, transient);
 }
 
-function transientKindFor(status: number, code: ReservationErrorCode): CheckoutTransientError["kind"] {
+function transientKindFor(
+  status: number,
+  code: ReservationErrorCode,
+): CheckoutTransientError["kind"] {
   if (status === 429 || code === "RATE_LIMITED") return "rate-limit";
   if (status === 503 || code === "OVERLOADED") return "overload";
   if (code === "SALE_TOKEN_EXPIRED") return "sale-token-expired";
@@ -407,11 +494,18 @@ function transientKindFor(status: number, code: ReservationErrorCode): CheckoutT
   return "backend-error";
 }
 
-function defaultErrorMessage(status: number, code: ReservationErrorCode): string {
-  if (status === 429 || code === "RATE_LIMITED") return "Bạn thao tác quá nhanh. Vui lòng thử lại sau thời gian backend yêu cầu.";
-  if (status === 503 || code === "OVERLOADED") return "Hệ thống đang quá tải. Đây không phải tín hiệu hết vé.";
-  if (code === "SALE_TOKEN_EXPIRED") return "Token vào sale đã hết hạn. Vui lòng vào lại hàng chờ.";
-  if (code === "SALE_ACCESS_REQUIRED") return "Bạn cần được backend cho vào sale trước khi checkout.";
+function defaultErrorMessage(
+  status: number,
+  code: ReservationErrorCode,
+): string {
+  if (status === 429 || code === "RATE_LIMITED")
+    return "Bạn thao tác quá nhanh. Vui lòng thử lại sau thời gian backend yêu cầu.";
+  if (status === 503 || code === "OVERLOADED")
+    return "Hệ thống đang quá tải. Đây không phải tín hiệu hết vé.";
+  if (code === "SALE_TOKEN_EXPIRED")
+    return "Token vào sale đã hết hạn. Vui lòng vào lại hàng chờ.";
+  if (code === "SALE_ACCESS_REQUIRED")
+    return "Bạn cần được backend cho vào sale trước khi checkout.";
   return "Request failed";
 }
 
@@ -431,7 +525,12 @@ function mockError(code: ReservationErrorCode): ReservationApiError {
     UNKNOWN: "Không thể tạo giao dịch lúc này.",
   };
   return new ReservationApiError(code, messages[code], {
-    kind: code === "OVERLOADED" ? "overload" : code === "RATE_LIMITED" ? "rate-limit" : "backend-error",
+    kind:
+      code === "OVERLOADED"
+        ? "overload"
+        : code === "RATE_LIMITED"
+          ? "rate-limit"
+          : "backend-error",
     status: 400,
     code,
     message: messages[code],

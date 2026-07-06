@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { GuestListImportService } from './guest-list-import.service';
+import { GuestListImportService, GUEST_LIST_DEFAULT_ZONE } from './guest-list-import.service';
 import { GuestListStorageService } from './guest-list-storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUser } from '../auth/current-user';
@@ -15,7 +15,6 @@ const organizer: CurrentUser = {
 };
 
 const concertId = '11111111-1111-4111-8111-111111111111';
-const ticketTypeId = '22222222-2222-4222-8222-222222222222';
 
 function csvFile(csv: string): Express.Multer.File {
   return {
@@ -37,7 +36,6 @@ describe('GuestListImportService', () => {
   const concertFindUnique = jest.fn();
   const batchFindUnique = jest.fn();
   const batchCreate = jest.fn();
-  const ticketTypeFindMany = jest.fn();
   const activeVersionFindFirst = jest.fn();
   const txBatchCreate = jest.fn();
   const txBatchUpdate = jest.fn();
@@ -45,6 +43,7 @@ describe('GuestListImportService', () => {
   const txVersionFindFirst = jest.fn();
   const txVersionUpdateMany = jest.fn();
   const txVersionCreate = jest.fn();
+  const txVersionDelete = jest.fn();
   const txEntryCreateMany = jest.fn();
   const txOutboxCreate = jest.fn();
   const transaction = jest.fn((callback: (tx: unknown) => Promise<unknown>) =>
@@ -55,6 +54,7 @@ describe('GuestListImportService', () => {
         findFirst: txVersionFindFirst,
         updateMany: txVersionUpdateMany,
         create: txVersionCreate,
+        delete: txVersionDelete,
       },
       guestEntry: { createMany: txEntryCreateMany },
       guestListOutbox: { create: txOutboxCreate },
@@ -64,7 +64,6 @@ describe('GuestListImportService', () => {
   const prisma = {
     concert: { findUnique: concertFindUnique },
     guestListBatch: { findUnique: batchFindUnique, create: batchCreate },
-    ticketType: { findMany: ticketTypeFindMany },
     guestListVersion: { findFirst: activeVersionFindFirst },
     $transaction: transaction,
   } as unknown as PrismaService;
@@ -86,9 +85,6 @@ describe('GuestListImportService', () => {
         summary: args.data.summary,
       }),
     );
-    ticketTypeFindMany.mockResolvedValue([
-      { id: ticketTypeId, slug: 'vip', zoneCode: 'VIP' },
-    ]);
     activeVersionFindFirst.mockResolvedValue(null);
     storage.save.mockResolvedValue({ objectKey: 'raw-key.csv' });
     storage.delete.mockResolvedValue(undefined);
@@ -107,17 +103,18 @@ describe('GuestListImportService', () => {
       versionNo: 1,
       entryCount: 1,
     });
+    txVersionDelete.mockResolvedValue({ id: 'version-id' });
     txBatchUpdate.mockResolvedValue({ id: 'batch-id', status: 'published' });
     txStagingCreateMany.mockResolvedValue({ count: 1 });
     txEntryCreateMany.mockResolvedValue({ count: 1 });
     txOutboxCreate.mockResolvedValue({ id: 'outbox-id' });
   });
 
-  it('publishes a valid guest list as a new active version', async () => {
+  it('publishes a valid guest list into the default private guest area', async () => {
     const result = await service.importCsv(
       organizer,
       concertId,
-      csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+      csvFile('full_name,email\nJane Guest,jane@example.com\n'),
     );
 
     expect(result).toMatchObject({ status: 'published', idempotent: false });
@@ -129,10 +126,10 @@ describe('GuestListImportService', () => {
       data: [
         expect.objectContaining({
           versionId: 'version-id',
-          ticketTypeId,
+          ticketTypeId: null,
           fullName: 'Jane Guest',
           identityKey: 'email:jane@example.com',
-          zoneCode: 'VIP',
+          zoneCode: GUEST_LIST_DEFAULT_ZONE,
         }),
       ],
     });
@@ -146,7 +143,7 @@ describe('GuestListImportService', () => {
       organizer,
       concertId,
       csvFile(
-        'full_name,email,zone_code\nJane Guest,jane@example.com,VIP\nJane Guest,jane@example.com,VIP\n',
+        'full_name,email\nJane Guest,jane@example.com\nJane Guest,jane@example.com\n',
       ),
     );
 
@@ -164,12 +161,11 @@ describe('GuestListImportService', () => {
     const result = await service.importCsv(
       organizer,
       concertId,
-      csvFile('full_name,zone_code\nJane Guest,VIP\n'),
+      csvFile('full_name\nJane Guest\n'),
     );
 
     expect(result).toMatchObject({ status: 'failed', idempotent: false });
     expect(storage.save).toHaveBeenCalled();
-    expect(ticketTypeFindMany).not.toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
     expect(txVersionCreate).not.toHaveBeenCalled();
     expect(batchCreate).toHaveBeenCalledWith({
@@ -182,18 +178,108 @@ describe('GuestListImportService', () => {
     });
   });
 
-  it('requires at least one ticket type before importing a guest list', async () => {
-    ticketTypeFindMany.mockResolvedValue([]);
-
+  it('ignores legacy seating columns and still publishes to the private guest area', async () => {
     await expect(
       service.importCsv(
         organizer,
         concertId,
-        csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+        csvFile(
+          'full_name,email,zone_code,ticket_type_slug\nJane Guest,jane@example.com,VIP,vip\n',
+        ),
       ),
-    ).rejects.toThrow('at least one ticket type before importing a guest list');
+    ).resolves.toMatchObject({ status: 'published' });
 
-    expect(transaction).not.toHaveBeenCalled();
+    expect(txEntryCreateMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          fullName: 'Jane Guest',
+          zoneCode: GUEST_LIST_DEFAULT_ZONE,
+          ticketTypeId: null,
+        }),
+      ],
+    });
+  });
+
+  it('lists active guest entries in the private guest area', async () => {
+    activeVersionFindFirst.mockResolvedValue({
+      id: 'version-id',
+      versionNo: 3,
+      entryCount: 1,
+      publishedAt: new Date('2026-07-06T09:00:00.000Z'),
+      entries: [
+        {
+          id: 'entry-1',
+          fullName: 'VIP Guest',
+          email: 'vip@example.com',
+          phone: null,
+          sponsorId: null,
+          identityKey: 'email:vip@example.com',
+          zoneCode: GUEST_LIST_DEFAULT_ZONE,
+          ticketTypeId: null,
+          ticketType: null,
+        },
+      ],
+    });
+
+    await expect(service.listActiveEntries(organizer, concertId)).resolves.toEqual({
+      concertId,
+      version: {
+        id: 'version-id',
+        versionNo: 3,
+        entryCount: 1,
+        publishedAt: new Date('2026-07-06T09:00:00.000Z'),
+      },
+      entries: [
+        {
+          id: 'entry-1',
+          fullName: 'VIP Guest',
+          email: 'vip@example.com',
+          phone: null,
+          sponsorId: null,
+          identityKey: 'email:vip@example.com',
+          zoneCode: GUEST_LIST_DEFAULT_ZONE,
+          ticketTypeId: null,
+          ticketTypeSlug: null,
+          ticketTypeName: null,
+        },
+      ],
+    });
+  });
+
+  it('deletes the active guest list while keeping import history intact', async () => {
+    activeVersionFindFirst.mockResolvedValueOnce({
+      id: 'version-id',
+      versionNo: 4,
+      checksum: 'checksum-123',
+      entryCount: 5,
+    });
+
+    await expect(service.deleteActiveGuestList(organizer, concertId)).resolves.toEqual({
+      concertId,
+      deleted: true,
+      clearedVersionId: 'version-id',
+    });
+
+    expect(txVersionDelete).toHaveBeenCalledWith({
+      where: { id: 'version-id' },
+    });
+    expect(txOutboxCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: 'GuestListUpdated',
+        aggregateId: concertId,
+      }),
+    });
+  });
+
+  it('returns deleted false when there is no active guest list to remove', async () => {
+    activeVersionFindFirst.mockResolvedValueOnce(null);
+
+    await expect(service.deleteActiveGuestList(organizer, concertId)).resolves.toEqual({
+      concertId,
+      deleted: false,
+    });
+
+    expect(txVersionDelete).not.toHaveBeenCalled();
   });
 
   it('returns a schema-ready message when guest list tables are missing', async () => {
@@ -208,7 +294,7 @@ describe('GuestListImportService', () => {
       service.importCsv(
         organizer,
         concertId,
-        csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+        csvFile('full_name,email\nJane Guest,jane@example.com\n'),
       ),
     ).rejects.toThrow('Run the latest backend migrations');
   });
@@ -224,7 +310,7 @@ describe('GuestListImportService', () => {
       service.importCsv(
         organizer,
         concertId,
-        csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+        csvFile('full_name,email\nJane Guest,jane@example.com\n'),
       ),
     ).resolves.toMatchObject({ id: 'existing-batch-id', idempotent: true });
 

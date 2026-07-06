@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { GuestListImportManager } from "@/components/guest-list-import-manager";
 import { AdminBackLink, AdminHero } from "@/components/admin-ui";
-import { Concert, GuestListImportBatch } from "@/lib/api";
+import { ActiveGuestList, Concert, GuestListImportBatch } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
 type GuestListPageProps = {
@@ -24,6 +24,14 @@ export default async function GuestListPage({ params }: GuestListPageProps) {
     `/admin/concerts/${id}/guest-list/imports`,
   ).catch(() => []);
 
+  const activeGuestList = await serverApiFetch<ActiveGuestList>(
+    `/admin/concerts/${id}/guest-list/entries`,
+  ).catch(() => ({
+    concertId: id,
+    version: null,
+    entries: [],
+  }));
+
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -31,11 +39,15 @@ export default async function GuestListPage({ params }: GuestListPageProps) {
         <AdminHero
           eyebrow="Guest list operations"
           title="Guest list imports"
-          description={`Upload and review guest list batches for ${concert.title} without changing the existing import pipeline.`}
+          description={`Upload, validate, and review guest lists for ${concert.title}. Every guest is assigned to one private guest area instead of customer bookable seating zones.`}
         />
       </div>
 
-      <GuestListImportManager concert={concert} initialImports={imports} />
+      <GuestListImportManager
+        concert={concert}
+        initialImports={imports}
+        initialActiveGuestList={activeGuestList}
+      />
     </div>
   );
 }

@@ -1,0 +1,4 @@
+full_name,email,phone,sponsor_id,zone_code,ticket_type_slug
+Tran Loi Email,not-an-email,,,VIP,vip
+Le Short Phone,,12345,,VIP-GUEST,
+Pham No Identity,,,,VIP-GUEST,

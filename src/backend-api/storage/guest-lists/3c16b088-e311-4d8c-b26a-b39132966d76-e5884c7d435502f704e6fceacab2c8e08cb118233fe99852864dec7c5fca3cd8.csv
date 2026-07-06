@@ -1,0 +1,3 @@
+full_name,email,phone,sponsor_id,zone_code,ticket_type_slug
+Nguyen Minh Anh,minh.anh@example.com,,,VIP,vip
+Guest Existing,minh.anh@example.com,,,VIP-GUEST,

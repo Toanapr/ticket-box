@@ -82,6 +82,30 @@ export type GuestListImportErrors = {
   }>;
 };
 
+export type ActiveGuestListEntry = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  sponsorId: string | null;
+  identityKey: string;
+  zoneCode: string;
+  ticketTypeId: string | null;
+  ticketTypeSlug: string | null;
+  ticketTypeName: string | null;
+};
+
+export type ActiveGuestList = {
+  concertId: string;
+  version: {
+    id: string;
+    versionNo: number;
+    entryCount: number;
+    publishedAt: string;
+  } | null;
+  entries: ActiveGuestListEntry[];
+};
+
 export type ConcertPayload = {
   title: string;
   venue: string;
@@ -129,6 +153,23 @@ export async function listGuestListImports(
 ): Promise<GuestListImportBatch[]> {
   return apiFetch<GuestListImportBatch[]>(
     `/admin/concerts/${concertId}/guest-list/imports`,
+  );
+}
+
+export async function listActiveGuestList(
+  concertId: string,
+): Promise<ActiveGuestList> {
+  return apiFetch<ActiveGuestList>(
+    `/admin/concerts/${concertId}/guest-list/entries`,
+  );
+}
+
+export async function deleteActiveGuestList(
+  concertId: string,
+): Promise<{ concertId: string; deleted: boolean; clearedVersionId?: string }> {
+  return apiFetch<{ concertId: string; deleted: boolean; clearedVersionId?: string }>(
+    `/admin/concerts/${concertId}/guest-list`,
+    { method: "DELETE" },
   );
 }
 

@@ -118,6 +118,22 @@ export class AdminController {
     return this.guestListImportService.listImports(user, id);
   }
 
+  @Get('concerts/:id/guest-list/entries')
+  listGuestListEntries(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.guestListImportService.listActiveEntries(user, id);
+  }
+
+  @Delete('concerts/:id/guest-list')
+  deleteGuestList(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.guestListImportService.deleteActiveGuestList(user, id);
+  }
+
   @Get('guest-list/imports/:batchId/errors')
   listGuestListImportErrors(
     @CurrentUser() user: CurrentUser,

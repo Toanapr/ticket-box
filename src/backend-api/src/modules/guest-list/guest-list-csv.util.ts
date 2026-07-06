@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
-export const GUEST_LIST_SCHEMA_VERSION = 'guest-list-v1';
+export const GUEST_LIST_SCHEMA_VERSION = 'guest-list-v2';
 
 export interface ParsedGuestCsvRow {
   rowNumber: number;
@@ -18,15 +18,13 @@ const allowedHeaders = new Set([
   'email',
   'phone',
   'sponsor_id',
+  // Legacy columns are still accepted so older templates do not break,
+  // but guest imports now ignore public seating or ticket mappings.
   'zone_code',
   'ticket_type_slug',
 ]);
 
-const requiredHeaderGroups = [
-  ['full_name'],
-  ['email', 'phone', 'sponsor_id'],
-  ['zone_code', 'ticket_type_slug'],
-];
+const requiredHeaderGroups = [['full_name'], ['email', 'phone', 'sponsor_id']];
 
 export function parseGuestListCsv(buffer: Buffer): ParsedGuestCsv {
   const text = decodeCsv(buffer).replace(/^\uFEFF/, '');

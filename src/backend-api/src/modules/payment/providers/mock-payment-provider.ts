@@ -16,6 +16,7 @@ export class MockPaymentProvider implements PaymentProviderPort {
   constructor(private readonly config: ConfigService) {}
 
   async createIntent(input: {
+    provider: string;
     orderId: string;
     amount: string;
     idempotencyKey: string;
@@ -50,7 +51,11 @@ export class MockPaymentProvider implements PaymentProviderPort {
     return intent;
   }
 
-  async queryIntent(input: { providerIntentId: string; signal: AbortSignal }) {
+  async queryIntent(input: {
+    provider: string;
+    providerIntentId: string;
+    signal: AbortSignal;
+  }) {
     await this.simulate(input.signal);
     const intent = [...this.intents.values()].find(
       (item) => item.providerIntentId === input.providerIntentId,

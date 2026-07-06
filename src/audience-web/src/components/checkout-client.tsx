@@ -171,6 +171,11 @@ export function CheckoutClient({
         });
       }
 
+      if (paymentIntent?.checkoutUrl) {
+        window.location.assign(paymentIntent.checkoutUrl);
+        return;
+      }
+
       router.push(buildOrderUrl(order.orderId, paymentIntent));
     } catch (caught) {
       if (createdOrderId) {

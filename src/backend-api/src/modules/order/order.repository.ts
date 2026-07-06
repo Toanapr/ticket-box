@@ -167,9 +167,9 @@ export class OrderRepository {
       await tx.payment.create({
         data: {
           orderId: order.id,
-          provider: 'mock',
+          provider: dto.paymentMethod ?? 'mock',
           status: PaymentStatus.created,
-          providerIdempotencyKey: `payment:${order.id}:mock`,
+          providerIdempotencyKey: `payment:${order.id}:${dto.paymentMethod ?? 'mock'}`,
         },
       });
 

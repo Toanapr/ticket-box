@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateOrderDto {
   @IsUUID()
@@ -7,4 +13,8 @@ export class CreateOrderDto {
   @IsString()
   @IsNotEmpty()
   idempotencyKey!: string;
+
+  @IsOptional()
+  @IsIn(['VNPAY', 'MOMO', 'mock'])
+  paymentMethod?: 'VNPAY' | 'MOMO' | 'mock';
 }

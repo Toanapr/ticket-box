@@ -5,6 +5,8 @@ import { PaymentRepository } from './payment.repository';
 import { PaymentService } from './payment.service';
 import { PAYMENT_PROVIDER } from './providers/payment-provider.port';
 import { MockPaymentProvider } from './providers/mock-payment-provider';
+import { DelegatingPaymentProvider } from './providers/delegating-payment-provider';
+import { VnpayPaymentProvider } from './providers/vnpay-payment-provider';
 import { PaymentBulkheadService } from './resilience/payment-bulkhead.service';
 import { PaymentCircuitBreakerService } from './resilience/payment-circuit-breaker.service';
 import { ResilientPaymentProvider } from './resilience/resilient-payment-provider';
@@ -21,12 +23,14 @@ import { AuthModule } from '../auth/auth.module';
     PaymentRepository,
     PaymentIntentService,
     MockPaymentProvider,
+    VnpayPaymentProvider,
+    DelegatingPaymentProvider,
     PaymentBulkheadService,
     PaymentCircuitBreakerService,
     ResilientPaymentProvider,
     PaymentReconciliationService,
     PaymentReconciliationWorker,
-    { provide: PAYMENT_PROVIDER, useExisting: MockPaymentProvider },
+    { provide: PAYMENT_PROVIDER, useExisting: DelegatingPaymentProvider },
   ],
   exports: [PaymentService],
 })

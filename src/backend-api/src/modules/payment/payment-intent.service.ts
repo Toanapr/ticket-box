@@ -67,6 +67,7 @@ export class PaymentIntentService {
     await this.idempotency.markProviderDispatched(claim.recordId, claim.owner);
     try {
       const intent = await this.provider.createIntent({
+        provider: payment.provider,
         orderId: payment.orderId,
         amount: payment.order.totalAmount.toString(),
         idempotencyKey: payment.providerIdempotencyKey,

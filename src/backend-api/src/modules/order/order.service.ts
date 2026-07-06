@@ -55,14 +55,19 @@ export class OrderService {
   }
 
   private ensureDuplicatePayloadMatches(
-    order: { items: Array<{ reservationId: string }> },
+    order: {
+      items: Array<{ reservationId: string }>;
+      payments: Array<{ provider: string }>;
+    },
     dto: CreateOrderDto,
   ): void {
     const reservationIds = order.items.map((item) => item.reservationId);
+    const provider = dto.paymentMethod ?? 'mock';
 
     if (
       reservationIds.length !== 1 ||
-      reservationIds[0] !== dto.reservationId
+      reservationIds[0] !== dto.reservationId ||
+      order.payments[0]?.provider !== provider
     ) {
       throw new DomainError(
         'Idempotency key was already used with a different order payload',

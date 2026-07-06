@@ -15,12 +15,14 @@ export type ProviderIntent = {
 
 export interface PaymentProviderPort {
   createIntent(input: {
+    provider: string;
     orderId: string;
     amount: string;
     idempotencyKey: string;
     signal: AbortSignal;
   }): Promise<ProviderIntent>;
   queryIntent(input: {
+    provider: string;
     providerIntentId: string;
     signal: AbortSignal;
   }): Promise<{ status: ProviderPaymentStatus; providerTxnId: string | null }>;

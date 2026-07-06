@@ -81,6 +81,7 @@ export class PaymentReconciliationService {
     );
     try {
       const result = await this.provider.queryIntent({
+        provider: payment.provider,
         providerIntentId:
           payment.providerIntentId ?? payment.providerIdempotencyKey,
       });

@@ -116,6 +116,7 @@ export async function createOrder(input: {
       body: JSON.stringify({
         reservationId: input.reservation.reservationId,
         idempotencyKey: input.idempotencyKey,
+        paymentMethod: input.paymentMethod,
       }),
     });
     return {

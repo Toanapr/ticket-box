@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Param,
+  Query,
   Res,
   UnauthorizedException,
   Post,
@@ -12,6 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { DomainError } from '../../common/errors/domain-error';
 import { verifyWebhookSignature } from '../../common/utils/webhook-signature.util';
 import { MockPaymentSuccessDto } from './dto/mock-payment-success.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
@@ -76,6 +79,27 @@ export class PaymentController {
     return this.paymentService.processWebhook(dto);
   }
 
+  @Get('vnpay/return')
+  async vnpayReturn(
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Res() response: Response,
+  ) {
+    const redirectUrl = await this.paymentService.processVnpayReturn(query);
+    return response.redirect(302, redirectUrl);
+  }
+
+  @Get('vnpay/ipn')
+  async vnpayIpn(
+    @Query() query: Record<string, string | string[] | undefined>,
+  ) {
+    try {
+      await this.paymentService.processVnpayIpn(query);
+      return { RspCode: '00', Message: 'Confirm Success' };
+    } catch (error) {
+      return this.toVnpayIpnError(error);
+    }
+  }
+
   private verifySignatureIfConfigured(
     signature: string | undefined,
     payload: PaymentWebhookDto,
@@ -101,5 +125,24 @@ export class PaymentController {
         message: 'Webhook signature verification failed',
       });
     }
+  }
+
+  private toVnpayIpnError(error: unknown): {
+    RspCode: string;
+    Message: string;
+  } {
+    if (!(error instanceof DomainError)) {
+      return { RspCode: '99', Message: 'Unknown error' };
+    }
+    if (error.code === 'payment_return_invalid_signature') {
+      return { RspCode: '97', Message: 'Invalid signature' };
+    }
+    if (error.code === 'payment_not_found') {
+      return { RspCode: '01', Message: 'Order not found' };
+    }
+    if (error.code === 'payment_amount_mismatch') {
+      return { RspCode: '04', Message: 'Invalid amount' };
+    }
+    return { RspCode: '99', Message: error.message };
   }
 }

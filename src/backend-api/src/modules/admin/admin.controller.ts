@@ -17,6 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ArtistBioService } from '../artist-bio/artist-bio.service';
+import type { ArtistBioDraftBody } from '../artist-bio/dto/artist-bio-review.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user';
 import { Roles } from '../auth/roles.decorator';
@@ -118,6 +119,31 @@ export class AdminController {
   @Get('concerts/:id/artist-bio/jobs')
   listArtistBioJobs(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
     return this.artistBioService.listJobs(user, id);
+  }
+
+  @Get('concerts/:id/artist-bio/review')
+  getArtistBioReviewState(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.artistBioService.getReviewState(user, id);
+  }
+
+  @Patch('artist-bio/drafts/:id')
+  updateArtistBioDraft(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() body: ArtistBioDraftBody,
+  ) {
+    return this.artistBioService.updateDraft(user, id, body);
+  }
+
+  @Post('artist-bio/drafts/:id/publish')
+  publishArtistBioDraft(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.artistBioService.publishDraft(user, id);
   }
 
   @Post('artist-bio/jobs/:id/retry')

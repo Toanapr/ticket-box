@@ -45,14 +45,21 @@ describe('ArtistBioService', () => {
   const artistBioJobCreate = jest.fn();
   const artistBioJobFindMany = jest.fn();
   const artistBioJobUpdate = jest.fn();
+  const artistBioDraftFindUnique = jest.fn();
+  const artistBioDraftUpdate = jest.fn();
+  const concertUpdate = jest.fn();
 
   const prisma = {
-    concert: { findUnique: concertFindUnique },
+    concert: { findUnique: concertFindUnique, update: concertUpdate },
     artistBioJob: {
       findUnique: artistBioJobFindUnique,
       create: artistBioJobCreate,
       findMany: artistBioJobFindMany,
       update: artistBioJobUpdate,
+    },
+    artistBioDraft: {
+      findUnique: artistBioDraftFindUnique,
+      update: artistBioDraftUpdate,
     },
   } as unknown as PrismaService;
 
@@ -89,6 +96,15 @@ describe('ArtistBioService', () => {
       id: 'job-id',
       status: 'queued',
       draft: null,
+    });
+    artistBioDraftFindUnique.mockResolvedValue(null);
+    artistBioDraftUpdate.mockResolvedValue({
+      id: 'draft-id',
+      content: 'Updated artist bio draft',
+    });
+    concertUpdate.mockResolvedValue({
+      id: concertId,
+      publishedArtistBio: 'Published draft content',
     });
     storage.save.mockResolvedValue({ objectKey: 'raw-object-key.pdf' });
     storage.delete.mockResolvedValue(undefined);
@@ -148,5 +164,64 @@ describe('ArtistBioService', () => {
       include: { draft: true },
     });
     expect(queue.publish).toHaveBeenCalledWith('job-id');
+  });
+
+  it('allows an organizer to edit a generated draft before publishing', async () => {
+    artistBioDraftFindUnique.mockResolvedValue({
+      id: 'draft-id',
+      content: 'Old draft content',
+      concert: {
+        id: concertId,
+        organizationId: organizer.organizationId,
+      },
+    });
+
+    await expect(
+      service.updateDraft(organizer, 'draft-id', {
+        content: ' Updated artist bio draft ',
+      }),
+    ).resolves.toMatchObject({
+      id: 'draft-id',
+      content: 'Updated artist bio draft',
+    });
+
+    expect(artistBioDraftUpdate).toHaveBeenCalledWith({
+      where: { id: 'draft-id' },
+      data: { content: 'Updated artist bio draft' },
+    });
+  });
+
+  it('publishes a reviewed draft into the concert public artist bio field', async () => {
+    artistBioDraftFindUnique.mockResolvedValue({
+      id: 'draft-id',
+      jobId: 'job-id',
+      concertId,
+      content: 'Published draft content',
+      concert: {
+        id: concertId,
+        organizationId: organizer.organizationId,
+      },
+      job: {
+        id: 'job-id',
+      },
+    });
+
+    await expect(service.publishDraft(organizer, 'draft-id')).resolves.toEqual({
+      concertId,
+      draftId: 'draft-id',
+      jobId: 'job-id',
+      publishedArtistBio: 'Published draft content',
+    });
+
+    expect(concertUpdate).toHaveBeenCalledWith({
+      where: { id: concertId },
+      data: {
+        publishedArtistBio: 'Published draft content',
+      },
+      select: {
+        id: true,
+        publishedArtistBio: true,
+      },
+    });
   });
 });

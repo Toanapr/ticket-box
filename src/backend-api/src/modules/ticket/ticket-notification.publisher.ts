@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { formatStructuredLog } from '../../common/logging/structured-log.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationDispatchService } from '../notification/notification-dispatch.service';
 
 @Injectable()
 export class TicketNotificationPublisher {
   private readonly logger = new Logger(TicketNotificationPublisher.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly notificationDispatch: NotificationDispatchService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async publishTicketIssued(
     orderId: string,
@@ -36,37 +39,20 @@ export class TicketNotificationPublisher {
       }
 
       const message = `Issued ${ticketCount} ticket(s) for order ${orderId}`;
-
-      await this.prisma.notificationRecord.createMany({
-        data: [
-          {
-            organizationId,
-            eventType: 'TicketIssued',
-            orderId,
-            ownerUserId,
-            ticketCount,
-            channel: NotificationChannel.in_app,
-            status: NotificationStatus.sent,
-            message,
-          },
-          {
-            organizationId,
-            eventType: 'TicketIssued',
-            orderId,
-            ownerUserId,
-            ticketCount,
-            channel: NotificationChannel.email_mock,
-            status: NotificationStatus.sent,
-            message: `Mock email queued. ${message}`,
-          },
-        ],
+      await this.notificationDispatch.dispatch({
+        organizationId,
+        eventType: 'TicketIssued',
+        orderId,
+        ownerUserId,
+        ticketCount,
+        message,
       });
 
       this.logger.log(
         formatStructuredLog('ticket_notification_recorded', {
           orderId,
           organizationId,
-          channels: ['in_app', 'email_mock'],
+          eventType: 'TicketIssued',
         }),
       );
     } catch (error) {

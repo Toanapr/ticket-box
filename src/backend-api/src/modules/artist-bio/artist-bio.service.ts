@@ -17,6 +17,7 @@ import {
 } from './artist-bio.constants';
 import { ArtistBioQueueService } from './artist-bio-queue.service';
 import { ArtistBioStorageService } from './artist-bio-storage.service';
+import { requireArtistBioDraftContent } from './dto/artist-bio-review.dto';
 
 @Injectable()
 export class ArtistBioService {
@@ -161,6 +162,88 @@ export class ArtistBioService {
 
     await this.queue.publish(updated.id);
     return updated;
+  }
+
+  async getReviewState(user: CurrentUser, concertId: string) {
+    const concert = await this.findOwnedConcert(user, concertId);
+    const jobs = await this.prisma.artistBioJob.findMany({
+      where: { concertId },
+      include: { draft: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    const latestDraft = jobs.find((job) => job.draft)?.draft ?? null;
+
+    return {
+      concertId,
+      artistName: concert.artistName,
+      publishedArtistBio: concert.publishedArtistBio,
+      latestDraft,
+      jobs,
+    };
+  }
+
+  async updateDraft(
+    user: CurrentUser,
+    draftId: string,
+    body: { content?: unknown },
+  ) {
+    const draft = await this.prisma.artistBioDraft.findUnique({
+      where: { id: draftId },
+      include: { concert: true },
+    });
+
+    if (!draft) {
+      throw new NotFoundException('Artist bio draft not found');
+    }
+
+    this.assertOrganizerOwnsConcert(user, draft.concert.organizationId);
+    const content = requireArtistBioDraftContent(body);
+
+    return this.prisma.artistBioDraft.update({
+      where: { id: draftId },
+      data: { content },
+    });
+  }
+
+  async publishDraft(user: CurrentUser, draftId: string) {
+    const draft = await this.prisma.artistBioDraft.findUnique({
+      where: { id: draftId },
+      include: { concert: true, job: true },
+    });
+
+    if (!draft) {
+      throw new NotFoundException('Artist bio draft not found');
+    }
+
+    this.assertOrganizerOwnsConcert(user, draft.concert.organizationId);
+
+    const updatedConcert = await this.prisma.concert.update({
+      where: { id: draft.concertId },
+      data: {
+        publishedArtistBio: draft.content,
+      },
+      select: {
+        id: true,
+        publishedArtistBio: true,
+      },
+    });
+
+    this.logger.log(
+      formatStructuredLog('artist_bio_draft_published', {
+        artistBioJobId: draft.jobId,
+        concertId: draft.concertId,
+        draftId: draft.id,
+      }),
+    );
+
+    return {
+      concertId: updatedConcert.id,
+      draftId: draft.id,
+      jobId: draft.jobId,
+      publishedArtistBio: updatedConcert.publishedArtistBio,
+    };
   }
 
   async findJobForProcessing(jobId: string) {

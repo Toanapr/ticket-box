@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationModule } from '../notification/notification.module';
 import { TicketController } from './ticket.controller';
 import { TicketIssuanceService } from './ticket-issuance.service';
 import { TicketNotificationPublisher } from './ticket-notification.publisher';
@@ -7,7 +8,7 @@ import { TicketService } from './ticket.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationModule],
   controllers: [TicketController],
   providers: [
     TicketService,

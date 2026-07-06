@@ -5,6 +5,7 @@ const BUSINESS_ID_ALIASES: Record<string, string> = {
   paymentId: 'payment_id',
   ticketId: 'ticket_id',
   reservationId: 'reservation_id',
+  artistBioJobId: 'artist_bio_job_id',
 };
 
 const SENSITIVE_KEY_PATTERN =

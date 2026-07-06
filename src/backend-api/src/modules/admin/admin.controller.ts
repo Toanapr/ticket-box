@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { ArtistBioService } from '../artist-bio/artist-bio.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user';
 import { Roles } from '../auth/roles.decorator';
@@ -30,6 +31,7 @@ import type { ConcertBody, TicketTypeBody } from './dto/admin.dto';
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly artistBioService: ArtistBioService,
     private readonly guestListImportService: GuestListImportService,
   ) {}
 
@@ -88,6 +90,39 @@ export class AdminController {
     file: Express.Multer.File,
   ) {
     return this.adminService.uploadPoster(user, id, file);
+  }
+
+  @Post('concerts/:id/artist-bio/jobs')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    }),
+  )
+  uploadArtistBioPdf(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: '.pdf' }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.artistBioService.createJob(user, id, file);
+  }
+
+  @Get('concerts/:id/artist-bio/jobs')
+  listArtistBioJobs(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
+    return this.artistBioService.listJobs(user, id);
+  }
+
+  @Post('artist-bio/jobs/:id/retry')
+  retryArtistBioJob(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
+    return this.artistBioService.retryJob(user, id);
   }
 
   @Post('concerts/:id/guest-list/import')

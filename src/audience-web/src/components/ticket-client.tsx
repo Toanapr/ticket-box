@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
 import { PrinterIcon, TicketIcon } from "./icons";
-import { MockQr } from "./mock-qr";
 import { getTicket } from "@/lib/client-api";
 import { formatDateTime, shortVenue } from "@/lib/format";
 import type { TicketRecord } from "@/lib/types";
@@ -103,7 +103,14 @@ export function TicketClient({
 
         <div className="border-t-2 border-dashed border-slate-300 bg-ticket-alabaster p-6 text-center md:p-8">
           <div className="mx-auto h-44 w-44 rounded border border-ticket-obsidian bg-white p-3">
-            <MockQr payload={ticket.qrPayload} className="h-full w-full" />
+            <QRCodeSVG
+              value={ticket.qrPayload}
+              size={152}
+              level="M"
+              marginSize={2}
+              className="h-full w-full"
+              title="E-ticket QR code"
+            />
           </div>
           <div className="mt-4 text-xs font-black uppercase tracking-wide text-slate-500">
             Mã số vé điện tử

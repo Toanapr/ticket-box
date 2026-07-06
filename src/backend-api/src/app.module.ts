@@ -16,6 +16,7 @@ import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { ScannerModule } from './modules/scanner/scanner.module';
 import { TicketModule } from './modules/ticket/ticket.module';
 
 import { PrismaModule } from './prisma/prisma.module';
@@ -45,6 +46,7 @@ const backendEnvFilePath = resolve(__dirname, '..', '.env');
     InventoryModule,
     OrderModule,
     PaymentModule,
+    ScannerModule,
     TicketModule,
   ],
   controllers: [],

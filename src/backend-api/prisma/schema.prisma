@@ -448,3 +448,140 @@ model NotificationRecord {
   @@index([orderId])
   @@map("notification_records")
 }
+enum ScannerDeviceStatus {
+  active
+  inactive
+  revoked
+}
+
+enum ScannerAssignmentStatus {
+  active
+  inactive
+  revoked
+}
+
+enum CheckInResultStatus {
+  accepted
+  conflict
+  rejected
+}
+
+model ScannerDevice {
+  id            String              @id @default(uuid()) @db.Uuid
+  deviceCode    String              @unique
+  scannerUserId String
+  status        ScannerDeviceStatus
+  lastSeenAt    DateTime?           @db.Timestamptz(6)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(6)
+  assignments   ScannerAssignment[]
+  checkInEvents CheckInEvent[]
+}
+
+model ScannerAssignment {
+  id                String                    @id @default(uuid()) @db.Uuid
+  deviceId          String                    @db.Uuid
+  scannerUserId     String
+  eventId           String
+  concertId         String
+  gateCode          String
+  zoneCode          String
+  status            ScannerAssignmentStatus
+  manifestVersion   Int?
+  manifestIssuedAt  DateTime?                 @db.Timestamptz(6)
+  manifestExpiresAt DateTime?                 @db.Timestamptz(6)
+  createdAt         DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                  @updatedAt @db.Timestamptz(6)
+  device            ScannerDevice             @relation(fields: [deviceId], references: [id])
+  checkInEvents     CheckInEvent[]
+  manifestTickets   ScannerManifestTicket[]
+  revokedTickets    ScannerRevokedTicket[]
+  guestEntries      ScannerGuestEntry[]
+
+  @@index([eventId, gateCode, zoneCode, status])
+  @@index([deviceId, status])
+}
+
+model CheckInEvent {
+  id               String              @id @default(uuid()) @db.Uuid
+  clientEventId    String              @unique
+  ticketId         String?
+  ticketRef        String
+  rawToken         String?
+  scannerUserId    String
+  deviceId         String              @db.Uuid
+  assignmentId     String              @db.Uuid
+  eventId          String
+  concertId        String?
+  gateCode         String
+  zoneCode         String
+  manifestVersion  Int?
+  clientScannedAt  DateTime            @db.Timestamptz(6)
+  serverRecordedAt DateTime            @default(now()) @db.Timestamptz(6)
+  result           CheckInResultStatus
+  reason           String
+  winningEventId   String?
+  createdAt        DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(6)
+  device           ScannerDevice       @relation(fields: [deviceId], references: [id])
+  assignment       ScannerAssignment   @relation(fields: [assignmentId], references: [id])
+
+  @@index([ticketId, serverRecordedAt])
+  @@index([ticketRef, serverRecordedAt])
+  @@index([assignmentId, serverRecordedAt])
+  @@index([eventId, gateCode, zoneCode, result])
+}
+
+model ScannerManifestTicket {
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  ticketId     String
+  ticketRef    String
+  rawToken     String
+  ticketTypeId String
+  status       String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
+
+  @@unique([assignmentId, ticketRef])
+  @@index([eventId, gateCode, zoneCode])
+}
+
+model ScannerRevokedTicket {
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  ticketRef    String
+  reason       String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
+
+  @@unique([assignmentId, ticketRef])
+  @@index([eventId, gateCode, zoneCode])
+}
+
+model ScannerGuestEntry {
+  id           String            @id @default(uuid()) @db.Uuid
+  assignmentId String            @db.Uuid
+  guestRef     String
+  displayName  String
+  eventId      String
+  concertId    String
+  gateCode     String
+  zoneCode     String
+  createdAt    DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(6)
+  assignment   ScannerAssignment @relation(fields: [assignmentId], references: [id])
+
+  @@unique([assignmentId, guestRef])
+  @@index([eventId, gateCode, zoneCode])
+}

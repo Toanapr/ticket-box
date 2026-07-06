@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { GuestListImportService } from './guest-list-import.service';
 import { GuestListStorageService } from './guest-list-storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -159,7 +160,6 @@ describe('GuestListImportService', () => {
     });
   });
 
-
   it('records file-level CSV errors as failed batches without publishing', async () => {
     const result = await service.importCsv(
       organizer,
@@ -180,6 +180,37 @@ describe('GuestListImportService', () => {
         }),
       }),
     });
+  });
+
+  it('requires at least one ticket type before importing a guest list', async () => {
+    ticketTypeFindMany.mockResolvedValue([]);
+
+    await expect(
+      service.importCsv(
+        organizer,
+        concertId,
+        csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+      ),
+    ).rejects.toThrow('at least one ticket type before importing a guest list');
+
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('returns a schema-ready message when guest list tables are missing', async () => {
+    batchFindUnique.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('table missing', {
+        code: 'P2021',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(
+      service.importCsv(
+        organizer,
+        concertId,
+        csvFile('full_name,email,zone_code\nJane Guest,jane@example.com,VIP\n'),
+      ),
+    ).rejects.toThrow('Run the latest backend migrations');
   });
 
   it('returns an existing batch for idempotent re-upload', async () => {

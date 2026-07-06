@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
@@ -63,177 +64,197 @@ export class GuestListImportService {
     concertId: string,
     file: Express.Multer.File,
   ) {
-    await this.findOwnedConcert(user, concertId);
-
-    if (!file.buffer || file.buffer.length === 0) {
-      throw new BadRequestException('CSV file is required');
-    }
-
-    const checksum = createHash('sha256').update(file.buffer).digest('hex');
-    const existing = await this.prisma.guestListBatch.findUnique({
-      where: {
-        concertId_fileChecksum_schemaVersion: {
-          concertId,
-          fileChecksum: checksum,
-          schemaVersion: GUEST_LIST_SCHEMA_VERSION,
-        },
-      },
-      include: { version: true },
-    });
-
-    if (existing) {
-      return { ...existing, idempotent: true };
-    }
-
-    const { objectKey } = await this.storage.save(concertId, checksum, file.buffer);
-
-    let parsed: ReturnType<typeof parseGuestListCsv>;
     try {
-      parsed = parseGuestListCsv(file.buffer);
-    } catch (error) {
-      try {
-        const summary = this.failedSummary(error);
-        const batch = await this.prisma.guestListBatch.create({
-          data: {
-            concertId,
-            fileChecksum: checksum,
-            schemaVersion: GUEST_LIST_SCHEMA_VERSION,
-            rawObjectKey: objectKey,
-            originalName: file.originalname,
-            status: 'failed',
-            summary: summary as unknown as Prisma.InputJsonValue,
-          },
-        });
-        return { ...batch, idempotent: false };
-      } catch (createError) {
-        await this.storage.delete(objectKey);
-        throw createError;
+      await this.findOwnedConcert(user, concertId);
+
+      if (!file.buffer || file.buffer.length === 0) {
+        throw new BadRequestException('CSV file is required');
       }
-    }
 
-    const ticketTypes = await this.prisma.ticketType.findMany({
-      where: { concertId },
-      select: { id: true, slug: true, zoneCode: true },
-      orderBy: { price: 'asc' },
-    });
-
-    const activeIdentityKeys = await this.getActiveIdentityKeys(concertId);
-    const { rows, summary } = this.validateRows(
-      parsed.rows,
-      parsed.delimiter,
-      ticketTypes,
-      activeIdentityKeys,
-    );
-
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const batch = await tx.guestListBatch.create({
-          data: {
+      const checksum = createHash('sha256').update(file.buffer).digest('hex');
+      const existing = await this.prisma.guestListBatch.findUnique({
+        where: {
+          concertId_fileChecksum_schemaVersion: {
             concertId,
             fileChecksum: checksum,
             schemaVersion: GUEST_LIST_SCHEMA_VERSION,
-            rawObjectKey: objectKey,
-            originalName: file.originalname,
-            status:
-              summary.invalidRows > 0 ? 'validation_failed' : 'imported',
-            summary: summary as unknown as Prisma.InputJsonValue,
           },
-        });
-
-        await tx.guestEntryStaging.createMany({
-          data: rows.map((row) => ({
-            batchId: batch.id,
-            rowNumber: row.rowNumber,
-            fullName: row.fullName,
-            email: row.email,
-            phone: row.phone,
-            sponsorId: row.sponsorId,
-            identityKey: row.identityKey,
-            zoneCode: row.zoneCode,
-            ticketTypeSlug: row.ticketTypeSlug,
-            ticketTypeId: row.ticketTypeId,
-            status: row.status,
-            errorReason: row.errorReason,
-            rawRow: row.rawRow as Prisma.InputJsonValue,
-          })),
-        });
-
-        if (summary.invalidRows > 0) {
-          return { ...batch, idempotent: false };
-        }
-
-        const nextVersion = await this.nextVersionNo(tx, concertId);
-        await tx.guestListVersion.updateMany({
-          where: { concertId, isActive: true },
-          data: { isActive: false },
-        });
-
-        const version = await tx.guestListVersion.create({
-          data: {
-            concertId,
-            batchId: batch.id,
-            versionNo: nextVersion,
-            isActive: true,
-            checksum,
-            entryCount: summary.validRows,
-          },
-        });
-
-        const validRows = rows.filter(
-          (row): row is ValidatedRow & {
-            fullName: string;
-            identityKey: string;
-            ticketTypeId: string;
-            zoneCode: string;
-          } =>
-            row.status === 'valid' &&
-            row.fullName !== null &&
-            row.identityKey !== null &&
-            row.ticketTypeId !== null &&
-            row.zoneCode !== null,
-        );
-
-        await tx.guestEntry.createMany({
-          data: validRows.map((row) => ({
-            versionId: version.id,
-            ticketTypeId: row.ticketTypeId,
-            fullName: row.fullName,
-            email: row.email,
-            phone: row.phone,
-            sponsorId: row.sponsorId,
-            identityKey: row.identityKey,
-            zoneCode: row.zoneCode,
-          })),
-        });
-
-        await tx.guestListBatch.update({
-          where: { id: batch.id },
-          data: { status: 'published' },
-        });
-
-        await tx.guestListOutbox.create({
-          data: {
-            eventType: 'GuestListUpdated',
-            aggregateId: version.id,
-            payload: {
-              concertId,
-              versionId: version.id,
-              versionNo: version.versionNo,
-              checksum,
-              entryCount: version.entryCount,
-            },
-          },
-        });
-
-        return {
-          ...batch,
-          status: 'published',
-          version,
-          idempotent: false,
-        };
+        },
+        include: { version: true },
       });
+
+      if (existing) {
+        return { ...existing, idempotent: true };
+      }
+
+      const { objectKey } = await this.storage.save(
+        concertId,
+        checksum,
+        file.buffer,
+      );
+
+      let parsed: ReturnType<typeof parseGuestListCsv>;
+      try {
+        parsed = parseGuestListCsv(file.buffer);
+      } catch (error) {
+        try {
+          const summary = this.failedSummary(error);
+          const batch = await this.prisma.guestListBatch.create({
+            data: {
+              concertId,
+              fileChecksum: checksum,
+              schemaVersion: GUEST_LIST_SCHEMA_VERSION,
+              rawObjectKey: objectKey,
+              originalName: file.originalname,
+              status: 'failed',
+              summary: summary as unknown as Prisma.InputJsonValue,
+            },
+          });
+          return { ...batch, idempotent: false };
+        } catch (createError) {
+          await this.storage.delete(objectKey);
+          throw createError;
+        }
+      }
+
+      const ticketTypes = await this.prisma.ticketType.findMany({
+        where: { concertId },
+        select: { id: true, slug: true, zoneCode: true },
+        orderBy: { price: 'asc' },
+      });
+
+      if (ticketTypes.length === 0) {
+        throw new BadRequestException(
+          'Concert must have at least one ticket type before importing a guest list.',
+        );
+      }
+
+      const activeIdentityKeys = await this.getActiveIdentityKeys(concertId);
+      const { rows, summary } = this.validateRows(
+        parsed.rows,
+        parsed.delimiter,
+        ticketTypes,
+        activeIdentityKeys,
+      );
+
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const batch = await tx.guestListBatch.create({
+            data: {
+              concertId,
+              fileChecksum: checksum,
+              schemaVersion: GUEST_LIST_SCHEMA_VERSION,
+              rawObjectKey: objectKey,
+              originalName: file.originalname,
+              status:
+                summary.invalidRows > 0 ? 'validation_failed' : 'imported',
+              summary: summary as unknown as Prisma.InputJsonValue,
+            },
+          });
+
+          await tx.guestEntryStaging.createMany({
+            data: rows.map((row) => ({
+              batchId: batch.id,
+              rowNumber: row.rowNumber,
+              fullName: row.fullName,
+              email: row.email,
+              phone: row.phone,
+              sponsorId: row.sponsorId,
+              identityKey: row.identityKey,
+              zoneCode: row.zoneCode,
+              ticketTypeSlug: row.ticketTypeSlug,
+              ticketTypeId: row.ticketTypeId,
+              status: row.status,
+              errorReason: row.errorReason,
+              rawRow: row.rawRow as Prisma.InputJsonValue,
+            })),
+          });
+
+          if (summary.invalidRows > 0) {
+            return { ...batch, idempotent: false };
+          }
+
+          const nextVersion = await this.nextVersionNo(tx, concertId);
+          await tx.guestListVersion.updateMany({
+            where: { concertId, isActive: true },
+            data: { isActive: false },
+          });
+
+          const version = await tx.guestListVersion.create({
+            data: {
+              concertId,
+              batchId: batch.id,
+              versionNo: nextVersion,
+              isActive: true,
+              checksum,
+              entryCount: summary.validRows,
+            },
+          });
+
+          const validRows = rows.filter(
+            (row): row is ValidatedRow & {
+              fullName: string;
+              identityKey: string;
+              ticketTypeId: string;
+              zoneCode: string;
+            } =>
+              row.status === 'valid' &&
+              row.fullName !== null &&
+              row.identityKey !== null &&
+              row.ticketTypeId !== null &&
+              row.zoneCode !== null,
+          );
+
+          await tx.guestEntry.createMany({
+            data: validRows.map((row) => ({
+              versionId: version.id,
+              ticketTypeId: row.ticketTypeId,
+              fullName: row.fullName,
+              email: row.email,
+              phone: row.phone,
+              sponsorId: row.sponsorId,
+              identityKey: row.identityKey,
+              zoneCode: row.zoneCode,
+            })),
+          });
+
+          await tx.guestListBatch.update({
+            where: { id: batch.id },
+            data: { status: 'published' },
+          });
+
+          await tx.guestListOutbox.create({
+            data: {
+              eventType: 'GuestListUpdated',
+              aggregateId: version.id,
+              payload: {
+                concertId,
+                versionId: version.id,
+                versionNo: version.versionNo,
+                checksum,
+                entryCount: version.entryCount,
+              },
+            },
+          });
+
+          return {
+            ...batch,
+            status: 'published',
+            version,
+            idempotent: false,
+          };
+        });
+      } catch (error) {
+        await this.storage.delete(objectKey);
+        throw error;
+      }
     } catch (error) {
-      await this.storage.delete(objectKey);
+      if (isGuestListSchemaError(error)) {
+        throw new ServiceUnavailableException(
+          'Guest list import database schema is not ready. Run the latest backend migrations and try again.',
+        );
+      }
+
       throw error;
     }
   }
@@ -488,3 +509,15 @@ function sanitizeRawRow(value: Prisma.JsonValue): Prisma.JsonValue {
     ]),
   ) as Prisma.JsonObject;
 }
+
+function isGuestListSchemaError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === 'P2021' || error.code === 'P2022')
+  );
+}
+
+
+

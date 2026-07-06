@@ -39,6 +39,7 @@ export function GuestListImportManager({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!file) {
       setError("Choose a CSV file first.");
       return;
@@ -60,7 +61,7 @@ export function GuestListImportManager({
             ? "Guest list version published."
             : "CSV staged with validation errors.",
       );
-      event.currentTarget.reset();
+      form.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -160,3 +161,6 @@ export function GuestListImportManager({
     </div>
   );
 }
+
+
+

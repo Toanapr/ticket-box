@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user';
 import { LoginDto } from './dto/login.dto';
 import { RegisterAudienceDto } from './dto/register-audience.dto';
+import { RegisterOrganizerDto } from './dto/register-organizer.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -12,6 +13,11 @@ export class AuthController {
   @Post('register')
   register(@Body() body: RegisterAudienceDto) {
     return this.authService.registerAudience(body);
+  }
+
+  @Post('admin/register')
+  registerOrganizer(@Body() body: RegisterOrganizerDto) {
+    return this.authService.registerOrganizer(body);
   }
 
   @Post('login')

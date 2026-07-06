@@ -7,6 +7,7 @@ import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterAudienceDto } from './dto/register-audience.dto';
+import { RegisterOrganizerDto } from './dto/register-organizer.dto';
 import { JwtService } from './jwt.service';
 import { hashPassword, verifyPassword } from './password';
 
@@ -49,6 +50,40 @@ export class AuthService {
     }
 
     return this.createAuthResponse(user);
+  }
+
+  async registerOrganizer(dto: RegisterOrganizerDto) {
+    const email = this.normalizeEmail(dto.email);
+    const passwordHash = await hashPassword(dto.password);
+
+    try {
+      const user = await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: dto.organizationName.trim(),
+          },
+        });
+
+        return tx.user.create({
+          data: {
+            email,
+            fullName: dto.fullName.trim(),
+            passwordHash,
+            role: 'organizer',
+            status: 'active',
+            organizationId: organization.id,
+          },
+        });
+      });
+
+      return this.createAuthResponse(user);
+    } catch (error) {
+      if (this.isDuplicateEmailError(error)) {
+        throw new ConflictException('Email is already registered');
+      }
+
+      throw error;
+    }
   }
 
   async login(dto: LoginDto) {

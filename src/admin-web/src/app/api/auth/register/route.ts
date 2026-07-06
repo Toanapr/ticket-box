@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME, apiBaseUrl } from "@/lib/auth";
 
-type LoginResponse = {
+type RegisterResponse = {
   accessToken?: string;
   tokenType?: string;
   user?: {
@@ -13,7 +13,7 @@ type LoginResponse = {
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
 
-  const backendResponse = await fetch(`${apiBaseUrl}/auth/login`, {
+  const backendResponse = await fetch(`${apiBaseUrl}/auth/admin/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -23,15 +23,15 @@ export async function POST(request: NextRequest) {
 
   const payload = (await backendResponse
     .json()
-    .catch(() => null)) as LoginResponse | null;
+    .catch(() => null)) as RegisterResponse | null;
 
   if (
     !backendResponse.ok ||
     !payload?.accessToken ||
     payload.user?.role !== "organizer"
   ) {
-    return NextResponse.json(payload ?? { message: "Login failed" }, {
-      status: backendResponse.status || 403,
+    return NextResponse.json(payload ?? { message: "Registration failed" }, {
+      status: backendResponse.status || 400,
     });
   }
 

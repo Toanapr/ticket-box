@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ConcertPosterModule } from './modules/concert-poster/concert-poster.module';
 import { ConcertsModule } from './modules/concert/concerts.module';
 
+import { GuestListModule } from './modules/guest-list/guest-list.module';
 import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { OrderModule } from './modules/order/order.module';
@@ -39,6 +40,7 @@ const backendEnvFilePath = resolve(__dirname, '..', '.env');
     ConcertPosterModule,
     ConcertsModule,
     AdminModule,
+    GuestListModule,
     HealthModule,
     InventoryModule,
     OrderModule,

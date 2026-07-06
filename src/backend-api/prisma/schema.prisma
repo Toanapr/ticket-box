@@ -67,6 +67,8 @@ model Concert {
   posterObjectKey     String?       @unique @map("poster_object_key")
   organization        Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   ticketTypes         TicketType[]
+  guestListBatches    GuestListBatch[]
+  guestListVersions   GuestListVersion[]
 
   @@index([status, startAt])
   @@index([organizationId])
@@ -114,6 +116,24 @@ enum TicketStatus {
   issued
   revoked
   checked_in
+}
+
+enum GuestListBatchStatus {
+  imported
+  validation_failed
+  published
+  failed
+}
+
+enum GuestEntryStagingStatus {
+  valid
+  invalid
+}
+
+enum GuestListOutboxStatus {
+  pending
+  published
+  failed
 }
 
 model Reservation {
@@ -270,10 +290,106 @@ model TicketType {
   reservations Reservation[]
   orderItems   OrderItem[]
   tickets      Ticket[]
+  guestEntries GuestEntry[]
 
   @@unique([concertId, slug])
   @@index([concertId])
   @@map("ticket_types")
+}
+
+
+model GuestListBatch {
+  id            String               @id @default(uuid()) @db.Uuid
+  concertId     String               @map("concert_id") @db.Uuid
+  fileChecksum  String               @map("file_checksum")
+  schemaVersion String               @map("schema_version")
+  rawObjectKey  String               @map("raw_object_key")
+  originalName  String?              @map("original_name")
+  status        GuestListBatchStatus
+  summary       Json
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  concert       Concert              @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  stagingRows   GuestEntryStaging[]
+  version       GuestListVersion?
+
+  @@unique([concertId, fileChecksum, schemaVersion])
+  @@index([concertId, createdAt])
+  @@map("guest_list_batches")
+}
+
+model GuestEntryStaging {
+  id             String                  @id @default(uuid()) @db.Uuid
+  batchId        String                  @map("batch_id") @db.Uuid
+  rowNumber      Int                     @map("row_number")
+  fullName       String?                 @map("full_name")
+  email          String?
+  phone          String?
+  sponsorId      String?                 @map("sponsor_id")
+  identityKey    String?                 @map("identity_key")
+  zoneCode       String?                 @map("zone_code")
+  ticketTypeSlug String?                 @map("ticket_type_slug")
+  ticketTypeId   String?                 @map("ticket_type_id") @db.Uuid
+  status         GuestEntryStagingStatus
+  errorReason    String?                 @map("error_reason")
+  rawRow         Json                    @map("raw_row")
+  batch          GuestListBatch          @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([batchId, identityKey])
+  @@map("guest_entries_staging")
+}
+
+model GuestListVersion {
+  id           String           @id @default(uuid()) @db.Uuid
+  concertId    String           @map("concert_id") @db.Uuid
+  batchId      String           @unique @map("batch_id") @db.Uuid
+  versionNo    Int              @map("version_no")
+  isActive     Boolean          @default(false) @map("is_active")
+  checksum     String
+  entryCount   Int              @map("entry_count")
+  publishedAt  DateTime         @default(now()) @map("published_at") @db.Timestamptz(6)
+  concert      Concert          @relation(fields: [concertId], references: [id], onDelete: Cascade)
+  batch        GuestListBatch   @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  entries      GuestEntry[]
+
+  @@unique([concertId, versionNo])
+  @@index([concertId, isActive])
+  @@map("guest_list_versions")
+}
+
+model GuestEntry {
+  id             String           @id @default(uuid()) @db.Uuid
+  versionId      String           @map("version_id") @db.Uuid
+  ticketTypeId   String           @map("ticket_type_id") @db.Uuid
+  fullName       String           @map("full_name")
+  email          String?
+  phone          String?
+  sponsorId      String?          @map("sponsor_id")
+  identityKey    String           @map("identity_key")
+  zoneCode       String           @map("zone_code")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  version        GuestListVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  ticketType     TicketType       @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, identityKey])
+  @@index([versionId, zoneCode])
+  @@index([ticketTypeId])
+  @@map("guest_entries")
+}
+
+model GuestListOutbox {
+  id          String                @id @default(uuid()) @db.Uuid
+  eventType   String                @map("event_type")
+  aggregateId String                @map("aggregate_id") @db.Uuid
+  payload     Json
+  status      GuestListOutboxStatus @default(pending)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  publishedAt DateTime?             @map("published_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt])
+  @@map("guest_list_outbox")
 }
 
 model InventoryCounter {

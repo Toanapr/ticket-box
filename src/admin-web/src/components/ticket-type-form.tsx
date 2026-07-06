@@ -3,6 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, TicketType, TicketTypePayload } from "@/lib/api";
+import {
+  AdminButton,
+  AdminField,
+  AdminNotice,
+  inputClassName,
+} from "./admin-ui";
 
 type TicketTypeFormProps = {
   concertId: string;
@@ -115,103 +121,87 @@ export function TicketTypeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Zone code</span>
+    <form onSubmit={handleSubmit} className="grid gap-5 md:grid-cols-2">
+      <AdminField label="Zone code">
         <input
           value={zoneCode}
           onChange={(event) => setZoneCode(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Price</span>
+      <AdminField label="Price">
         <input
           type="number"
           min="1"
           value={price}
           onChange={(event) => setPrice(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Capacity</span>
+      <AdminField label="Capacity">
         <input
           type="number"
           min="1"
           value={capacity}
           onChange={(event) => setCapacity(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">
-          Per-user limit
-        </span>
+      <AdminField label="Per-user limit">
         <input
           type="number"
           min="1"
           value={perUserLimit}
           onChange={(event) => setPerUserLimit(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Sale start</span>
+      <AdminField label="Sale start">
         <input
           type="datetime-local"
           value={saleStartAt}
           onChange={(event) => setSaleStartAt(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Sale end</span>
+      <AdminField label="Sale end">
         <input
           type="datetime-local"
           value={saleEndAt}
           onChange={(event) => setSaleEndAt(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
       {error ? (
-        <p className="text-sm font-medium text-red-700 md:col-span-2">
-          {error}
-        </p>
+        <div className="md:col-span-2">
+          <AdminNotice tone="error">{error}</AdminNotice>
+        </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 md:col-span-2">
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="h-11 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-        >
+      <div className="flex flex-wrap gap-3 md:col-span-2">
+        <AdminButton type="submit" disabled={isSaving}>
           {isSaving
             ? "Saving..."
             : isEditing
               ? "Save ticket type"
               : "Create ticket type"}
-        </button>
+        </AdminButton>
         {isEditing ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="h-11 rounded-md border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
+          <AdminButton type="button" onClick={onCancel} variant="secondary">
             Cancel
-          </button>
+          </AdminButton>
         ) : null}
       </div>
     </form>

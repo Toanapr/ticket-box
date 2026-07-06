@@ -1,7 +1,16 @@
-import Link from "next/link";
 import { Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 import { formatDateTime } from "@/lib/format";
+import {
+  AdminDataTable,
+  AdminEmptyState,
+  AdminHero,
+  AdminLinkButton,
+  AdminStatusBadge,
+  AdminTable,
+  AdminTableBody,
+  AdminTableHead,
+} from "@/components/admin-ui";
 
 async function getConcerts() {
   try {
@@ -15,85 +24,75 @@ export default async function ConcertsPage() {
   const concerts = await getConcerts();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-950">Concerts</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Minimal organizer data for Phase 1 ticket sales.
-          </p>
-        </div>
-        <Link
-          href="/admin/concerts/new"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
-        >
-          New concert
-        </Link>
-      </div>
+    <div className="space-y-8">
+      <AdminHero
+        eyebrow="Organizer workspace"
+        title="Concert operations"
+        description="Manage the event catalog, monitor readiness, and keep ticketing setup aligned with the public TicketBox experience."
+        action={<AdminLinkButton href="/admin/concerts/new">New concert</AdminLinkButton>}
+      />
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+      <AdminDataTable>
+        <AdminTable minWidthClassName="min-w-[920px]">
+          <AdminTableHead>
             <tr>
-              <th className="px-4 py-3">Title</th>
-              <th className="px-4 py-3">Venue</th>
-              <th className="px-4 py-3">Start time</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Ticket types</th>
-              <th className="px-4 py-3">Actions</th>
+              <th className="px-6 py-4">Title</th>
+              <th className="px-6 py-4">Venue</th>
+              <th className="px-6 py-4">Start time</th>
+              <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Ticket types</th>
+              <th className="px-6 py-4">Actions</th>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+          </AdminTableHead>
+          <AdminTableBody>
             {concerts.map((concert) => (
-              <tr key={concert.id}>
-                <td className="px-4 py-3 font-medium text-slate-950">
-                  {concert.title}
+              <tr key={concert.id} className="align-top">
+                <td className="px-6 py-5">
+                  <div>
+                    <p className="font-display text-xl font-black tracking-tight text-ticket-obsidian">
+                      {concert.title}
+                    </p>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
+                      {concert.artistName}
+                    </p>
+                  </div>
                 </td>
-                <td className="px-4 py-3 text-slate-700">{concert.venue}</td>
-                <td className="px-4 py-3 text-slate-700">
+                <td className="px-6 py-5 text-sm font-semibold text-slate-700">
+                  {concert.venue}
+                </td>
+                <td className="px-6 py-5 text-sm font-semibold text-slate-700">
                   {formatDateTime(concert.startAt)}
                 </td>
-                <td className="px-4 py-3">
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold capitalize text-slate-700">
-                    {concert.status}
-                  </span>
+                <td className="px-6 py-5">
+                  <AdminStatusBadge status={concert.status} />
                 </td>
-                <td className="px-4 py-3 text-slate-700">
+                <td className="px-6 py-5 text-sm font-semibold text-slate-700">
                   {concert.ticketTypes.length}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-5">
                   <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/admin/concerts/${concert.id}/edit`}
-                      className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    <AdminLinkButton href={`/admin/concerts/${concert.id}/edit`} variant="secondary">
                       Edit
-                    </Link>
-                    <Link
-                      href={`/admin/concerts/${concert.id}/ticket-types`}
-                      className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    </AdminLinkButton>
+                    <AdminLinkButton href={`/admin/concerts/${concert.id}/ticket-types`} variant="secondary">
                       Ticket types
-                    </Link>
-                    <Link
-                      href={`/admin/concerts/${concert.id}/guest-list`}
-                      className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    </AdminLinkButton>
+                    <AdminLinkButton href={`/admin/concerts/${concert.id}/guest-list`} variant="secondary">
                       Guest list
-                    </Link>
+                    </AdminLinkButton>
                   </div>
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+          </AdminTableBody>
+        </AdminTable>
 
         {concerts.length === 0 ? (
-          <div className="border-t border-slate-200 px-4 py-10 text-center text-sm text-slate-600">
+          <AdminEmptyState>
             No concerts found. Start the backend API, then create a concert.
-          </div>
+          </AdminEmptyState>
         ) : null}
-      </div>
+      </AdminDataTable>
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConcertForm } from "@/components/concert-form";
+import { AdminBackLink, AdminHero, AdminPanel } from "@/components/admin-ui";
 import { Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
@@ -23,19 +23,19 @@ export default async function EditConcertPage({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <Link
-          href="/admin/concerts"
-          className="text-sm font-medium text-emerald-700"
-        >
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">Edit concert</h1>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Concert setup"
+          title={`Edit ${concert.title}`}
+          description="Update public-facing event details while keeping all current publishing rules and save behavior intact."
+        />
       </div>
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+
+      <AdminPanel className="max-w-3xl">
         <ConcertForm mode="edit" concert={concert} />
-      </section>
+      </AdminPanel>
     </div>
   );
 }

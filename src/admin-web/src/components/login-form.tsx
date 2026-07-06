@@ -2,6 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  AdminButton,
+  AdminField,
+  AdminNotice,
+  inputClassName,
+} from "./admin-ui";
 
 export function LoginForm() {
   const router = useRouter();
@@ -50,41 +56,33 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Email</span>
+      <AdminField label="Email">
         <input
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           autoComplete="email"
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Password</span>
+      <AdminField label="Password">
         <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           autoComplete="current-password"
           required
         />
-      </label>
+      </AdminField>
 
-      {error ? (
-        <p className="text-sm font-medium text-red-700">{error}</p>
-      ) : null}
+      {error ? <AdminNotice tone="error">{error}</AdminNotice> : null}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="h-11 w-full rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-      >
+      <AdminButton type="submit" disabled={isSubmitting} className="w-full">
         {isSubmitting ? "Signing in..." : "Sign in"}
-      </button>
+      </AdminButton>
     </form>
   );
 }

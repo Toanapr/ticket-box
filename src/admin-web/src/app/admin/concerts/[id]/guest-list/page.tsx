@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuestListImportManager } from "@/components/guest-list-import-manager";
+import { AdminBackLink, AdminHero } from "@/components/admin-ui";
 import { Concert, GuestListImportBatch } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
@@ -25,16 +25,14 @@ export default async function GuestListPage({ params }: GuestListPageProps) {
   ).catch(() => []);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/concerts"
-          className="text-sm font-medium text-emerald-700"
-        >
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">Guest list</h1>
-        <p className="mt-1 text-sm text-slate-600">{concert.title}</p>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Guest list operations"
+          title="Guest list imports"
+          description={`Upload and review guest list batches for ${concert.title} without changing the existing import pipeline.`}
+        />
       </div>
 
       <GuestListImportManager concert={concert} initialImports={imports} />

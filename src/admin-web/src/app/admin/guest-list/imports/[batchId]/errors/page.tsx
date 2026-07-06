@@ -1,5 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  AdminBackLink,
+  AdminDataTable,
+  AdminEmptyState,
+  AdminHero,
+  AdminTable,
+  AdminTableBody,
+  AdminTableHead,
+} from "@/components/admin-ui";
 import { GuestListImportErrors } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
@@ -22,54 +30,48 @@ export default async function ImportErrorsPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/admin/concerts"
-          className="text-sm font-medium text-emerald-700"
-        >
-          Back to concerts
-        </Link>
-        <h1 className="mt-3 text-2xl font-bold text-slate-950">
-          Import errors
-        </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {report.summary.invalidRows} invalid rows in batch {batchId}
-        </p>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminHero
+          eyebrow="Validation report"
+          title="Import errors"
+          description={`${report.summary.invalidRows} invalid rows were recorded for batch ${batchId}.`}
+        />
       </div>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[860px] border-collapse text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+      <AdminDataTable>
+        <AdminTable minWidthClassName="min-w-[960px]">
+          <AdminTableHead>
             <tr>
-              <th className="px-4 py-3">Row</th>
-              <th className="px-4 py-3">Reason</th>
-              <th className="px-4 py-3">Raw row</th>
+              <th className="px-6 py-4">Row</th>
+              <th className="px-6 py-4">Reason</th>
+              <th className="px-6 py-4">Raw row</th>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+          </AdminTableHead>
+          <AdminTableBody>
             {report.errors.map((error) => (
-              <tr key={error.rowNumber}>
-                <td className="px-4 py-3 font-semibold text-slate-950">
+              <tr key={error.rowNumber} className="align-top">
+                <td className="px-6 py-5 font-black text-ticket-obsidian">
                   {error.rowNumber}
                 </td>
-                <td className="px-4 py-3 text-red-700">
+                <td className="px-6 py-5 text-sm font-bold text-red-700">
                   {error.errorReason}
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                <td className="px-6 py-5 font-mono text-xs text-slate-700">
                   {JSON.stringify(error.rawRow)}
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+          </AdminTableBody>
+        </AdminTable>
 
         {report.errors.length === 0 ? (
-          <div className="border-t border-slate-200 px-4 py-10 text-center text-sm text-slate-600">
+          <AdminEmptyState>
             No row errors recorded for this batch.
-          </div>
+          </AdminEmptyState>
         ) : null}
-      </section>
+      </AdminDataTable>
     </div>
   );
 }

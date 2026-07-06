@@ -6,6 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch, Concert, ConcertPayload, uploadPoster } from "@/lib/api";
 import { getPostCreateStatusPatch } from "@/lib/concert-form-orchestration";
+import {
+  AdminButton,
+  AdminField,
+  AdminNotice,
+  fileInputClassName,
+  inputClassName,
+} from "./admin-ui";
 
 type ConcertFormProps = {
   mode: "create" | "edit";
@@ -128,118 +135,113 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Title</span>
+      <AdminField label="Title">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Venue</span>
+      <AdminField label="Venue">
         <input
           value={venue}
           onChange={(event) => setVenue(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Start time</span>
+      <AdminField label="Start time">
         <input
           type="datetime-local"
           value={startAt}
           onChange={(event) => setStartAt(event.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
           required
         />
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Status</span>
+      <AdminField label="Status">
         <select
           value={status}
           onChange={(event) =>
             setStatus(event.target.value as ConcertPayload["status"])
           }
-          className="mt-1 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-slate-950 shadow-sm outline-none focus:border-emerald-600"
+          className={inputClassName}
         >
           <option value="draft">Draft</option>
           <option value="published">Published</option>
           <option value="canceled">Canceled</option>
         </select>
-      </label>
+      </AdminField>
 
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">
-          Poster{mode === "create" ? " (required for publish)" : ""}
-        </span>
+      <AdminField
+        label={`Poster${mode === "create" ? " (required for publish)" : ""}`}
+      >
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={handlePosterChange}
-          className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:rounded file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
+          className={fileInputClassName}
         />
         {mode === "edit" && !posterFile && existingPosterUrl ? (
-          <div className="mt-2">
-            <p className="mb-1 text-xs text-slate-500">Current poster:</p>
+          <div className="mt-4 rounded-lg border border-black/10 bg-ticket-stone p-4">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+              Current poster
+            </p>
             <Image
               src={existingPosterUrl}
               alt="Current poster"
               width={256}
               height={128}
-              className="h-32 w-auto rounded border object-contain"
+              className="h-32 w-auto rounded border border-black/10 object-contain"
             />
           </div>
         ) : null}
         {posterPreview ? (
-          <div className="mt-2">
-            <p className="mb-1 text-xs text-slate-500">New poster preview:</p>
+          <div className="mt-4 rounded-lg border border-black/10 bg-ticket-stone p-4">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+              New poster preview
+            </p>
             <Image
               src={posterPreview}
               alt="Poster preview"
               width={256}
               height={128}
               unoptimized
-              className="h-32 w-auto rounded border object-contain"
+              className="h-32 w-auto rounded border border-black/10 object-contain"
             />
           </div>
         ) : null}
-      </label>
+      </AdminField>
 
       {error ? (
-        <div className="space-y-1 text-sm font-medium text-red-700">
-          <p>{error}</p>
+        <div className="space-y-3">
+          <AdminNotice tone="error">{error}</AdminNotice>
           {recoveryConcertId ? (
-            <p>
+            <AdminNotice>
               Draft created. Continue editing at{" "}
               <Link
                 href={`/admin/concerts/${recoveryConcertId}/edit`}
-                className="underline"
+                className="text-ticket-green underline-offset-4 hover:underline"
               >
                 concert {recoveryConcertId}
               </Link>
               .
-            </p>
+            </AdminNotice>
           ) : null}
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={isSaving}
-        className="h-11 rounded-md bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-      >
+      <AdminButton type="submit" disabled={isSaving}>
         {isSaving
           ? "Saving..."
           : mode === "create"
             ? "Create concert"
             : "Save concert"}
-      </button>
+      </AdminButton>
     </form>
   );
 }

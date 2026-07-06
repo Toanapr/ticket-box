@@ -24,7 +24,7 @@ export function CheckoutField({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-12 border-0 border-b-2 border-ticket-stone bg-transparent px-0 text-base font-semibold outline-none transition focus:border-ticket-green"
+        className="min-h-12 rounded border border-black/15 bg-white px-4 text-base font-semibold text-ticket-obsidian outline-none transition hover:border-ticket-obsidian focus:border-ticket-green focus:ring-2 focus:ring-ticket-green/20"
       />
     </label>
   );

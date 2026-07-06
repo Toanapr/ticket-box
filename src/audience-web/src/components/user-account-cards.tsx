@@ -207,6 +207,45 @@ export function TicketCard({
   );
 }
 
+export function PurchasedOrderCard({
+  order,
+}: {
+  order: OrderRecord;
+}): React.ReactElement {
+  return (
+    <article className="rounded-lg border border-ticket-green/30 bg-ticket-green/5 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded bg-white px-2 py-1 text-[11px] font-black uppercase tracking-wide text-ticket-green">
+            <CheckIcon className="h-3.5 w-3.5" />
+            Đã phát hành
+          </div>
+          <h3 className="mt-3 font-display text-lg font-black">
+            {order.concertTitle ?? order.concertId}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-700">
+            {order.ticketTypeName ?? order.ticketTypeId}
+            {order.venue ? ` - ${shortVenue(order.venue)}` : ""}
+          </p>
+        </div>
+        <div className="text-right text-sm font-black">{order.quantity} vé</div>
+      </div>
+      <div className="mt-4 grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-2">
+        <span>Thanh toán: {formatCurrency(order.totalAmount)}</span>
+        <span>Sẵn sàng sử dụng</span>
+      </div>
+      {order.ticketId ? (
+        <Link
+          href={`/tickets/${order.ticketId}`}
+          className="mt-4 flex min-h-11 items-center justify-center rounded bg-ticket-green px-4 text-sm font-black uppercase tracking-wide text-white"
+        >
+          Xem e-ticket
+        </Link>
+      ) : null}
+    </article>
+  );
+}
+
 export function EmptyState({
   text,
   href,

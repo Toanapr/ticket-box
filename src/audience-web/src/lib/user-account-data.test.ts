@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { clearActiveReservation, getUserAccountSnapshot, upsertActiveReservation, upsertOrderRecord } from "./user-account-data";
+import {
+  clearActiveReservation,
+  getUserAccountSnapshot,
+  upsertActiveReservation,
+  upsertOrderRecord,
+} from "./user-account-data";
 import type { ActiveReservationRecord, OrderRecord } from "./types";
 
 describe("user account storage snapshot", () => {
@@ -52,6 +57,22 @@ describe("user account storage snapshot", () => {
     ]);
   });
 
+  it("keeps issued orders with ticket ids available for purchased ticket views", () => {
+    upsertOrderRecord({
+      ...createOrderRecord("reservation-1"),
+      status: "TICKET_ISSUED",
+      ticketId: "ticket-1",
+    });
+
+    expect(getUserAccountSnapshot().orders).toEqual([
+      expect.objectContaining({
+        orderId: "order-1",
+        status: "TICKET_ISSUED",
+        ticketId: "ticket-1",
+      }),
+    ]);
+  });
+
   it("clears an active reservation explicitly", () => {
     const reservation = createReservationRecord();
     upsertActiveReservation(reservation);
@@ -73,7 +94,11 @@ function createReservationRecord(): ActiveReservationRecord {
     ticketTypeSlug: "vip",
     ticketTypeName: "VIP",
     quantity: 2,
-    buyer: { fullName: "Khán giả TicketBox", phone: "0909", email: "fan@test.local" },
+    buyer: {
+      fullName: "Khán giả TicketBox",
+      phone: "0909",
+      email: "fan@test.local",
+    },
     totalAmount: 510000,
     createdAt: "2026-07-15T00:00:00.000Z",
     expiresAt: "2026-07-15T00:10:00.000Z",
@@ -90,7 +115,11 @@ function createOrderRecord(reservationId: string): OrderRecord {
     ticketTypeId: "ticket-1",
     ticketTypeName: "VIP",
     quantity: 2,
-    buyer: { fullName: "Khán giả TicketBox", phone: "0909", email: "fan@test.local" },
+    buyer: {
+      fullName: "Khán giả TicketBox",
+      phone: "0909",
+      email: "fan@test.local",
+    },
     status: "PENDING_PAYMENT",
     totalAmount: 510000,
     createdAt: "2026-07-15T00:00:30.000Z",

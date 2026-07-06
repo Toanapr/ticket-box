@@ -3,7 +3,16 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { useAuth } from "./auth-provider";
 import { CreditCardIcon, TicketIcon, UsersIcon } from "./icons";
-import { AccountPanel, EmptyState, HeldReservationCard, Metric, OrderCard, ProfileRow, TicketCard } from "./user-account-cards";
+import {
+  AccountPanel,
+  EmptyState,
+  HeldReservationCard,
+  Metric,
+  OrderCard,
+  ProfileRow,
+  PurchasedOrderCard,
+  TicketCard,
+} from "./user-account-cards";
 import { formatCurrency } from "@/lib/format";
 import {
   getFallbackUserAccountSnapshot,
@@ -12,30 +21,61 @@ import {
   subscribeToUserAccountStorage,
 } from "@/lib/user-account-data";
 
-const pendingStatuses = new Set(["PENDING_PAYMENT", "PAYMENT_DEGRADED", "PAYMENT_PENDING_RECONCILIATION"]);
+const pendingStatuses = new Set([
+  "PENDING_PAYMENT",
+  "PAYMENT_DEGRADED",
+  "PAYMENT_PENDING_RECONCILIATION",
+]);
 const boughtStatuses = new Set(["PAID", "TICKET_ISSUED"]);
 
 export function UserAccountClient(): React.ReactElement {
-  const storageVersion = useSyncExternalStore(subscribeToUserAccountStorage, getUserAccountStorageVersion, () => "__server__");
+  const storageVersion = useSyncExternalStore(
+    subscribeToUserAccountStorage,
+    getUserAccountStorageVersion,
+    () => "__server__",
+  );
   const { user: authUser } = useAuth();
   const snapshot = useMemo(
-    () => (storageVersion === "__server__" ? getFallbackUserAccountSnapshot() : getUserAccountSnapshot()),
+    () =>
+      storageVersion === "__server__"
+        ? getFallbackUserAccountSnapshot()
+        : getUserAccountSnapshot(),
     [storageVersion],
   );
   const profile = authUser
-    ? { fullName: authUser.fullName?.trim() || authUser.email, email: authUser.email }
+    ? {
+        fullName: authUser.fullName?.trim() || authUser.email,
+        email: authUser.email,
+      }
     : { fullName: snapshot.profile.fullName, email: snapshot.profile.email };
 
   const pendingOrders = useMemo(
-    () => snapshot?.orders.filter((order) => pendingStatuses.has(order.status)) ?? [],
+    () =>
+      snapshot?.orders.filter((order) => pendingStatuses.has(order.status)) ??
+      [],
     [snapshot],
   );
   const activeReservations = snapshot.activeReservations;
   const purchasedOrders = useMemo(
-    () => snapshot?.orders.filter((order) => boughtStatuses.has(order.status)) ?? [],
+    () =>
+      snapshot?.orders.filter((order) => boughtStatuses.has(order.status)) ??
+      [],
     [snapshot],
   );
-  const spentAmount = purchasedOrders.reduce((total, order) => total + order.totalAmount, 0);
+  const ticketOrderIds = useMemo(
+    () => new Set(snapshot.tickets.map((ticket) => ticket.orderId)),
+    [snapshot.tickets],
+  );
+  const purchasedOrdersWithoutTicketRecord = useMemo(
+    () => purchasedOrders.filter((order) => !ticketOrderIds.has(order.orderId)),
+    [purchasedOrders, ticketOrderIds],
+  );
+  const purchasedCount =
+    snapshot.tickets.length + purchasedOrdersWithoutTicketRecord.length;
+  const spentAmount = purchasedOrders.reduce(
+    (total, order) => total + order.totalAmount,
+    0,
+  );
   const holdingCount = activeReservations.length + pendingOrders.length;
 
   return (
@@ -46,7 +86,9 @@ export function UserAccountClient(): React.ReactElement {
             <UsersIcon className="h-4 w-4" />
             Tài khoản của tôi
           </div>
-          <h1 className="mt-4 font-display text-3xl font-black tracking-tight md:text-4xl">{profile.fullName}</h1>
+          <h1 className="mt-4 font-display text-3xl font-black tracking-tight md:text-4xl">
+            {profile.fullName}
+          </h1>
           <div className="mt-5 grid gap-3 text-sm text-slate-600">
             <ProfileRow label="Email" value={profile.email} />
             <ProfileRow label="Trạng thái" value="Đã đăng nhập" />
@@ -54,9 +96,21 @@ export function UserAccountClient(): React.ReactElement {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="Đang giữ chỗ" value={holdingCount.toString()} tone="amber" />
-          <Metric label="Vé đã mua" value={snapshot.tickets.length.toString()} tone="green" />
-          <Metric label="Đã thanh toán" value={formatCurrency(spentAmount)} tone="dark" />
+          <Metric
+            label="Đang giữ chỗ"
+            value={holdingCount.toString()}
+            tone="amber"
+          />
+          <Metric
+            label="Vé đã mua"
+            value={purchasedCount.toString()}
+            tone="green"
+          />
+          <Metric
+            label="Đã thanh toán"
+            value={formatCurrency(spentAmount)}
+            tone="dark"
+          />
         </div>
       </section>
 
@@ -69,14 +123,26 @@ export function UserAccountClient(): React.ReactElement {
           {holdingCount > 0 ? (
             <div className="grid gap-4">
               {activeReservations.map((reservation) => (
-                <HeldReservationCard key={reservation.reservationId} reservation={reservation} />
+                <HeldReservationCard
+                  key={reservation.reservationId}
+                  reservation={reservation}
+                />
               ))}
               {pendingOrders.map((order) => (
-                <OrderCard key={order.orderId} order={order} actionLabel="Tiếp tục thanh toán" actionHref={`/orders/${order.orderId}`} />
+                <OrderCard
+                  key={order.orderId}
+                  order={order}
+                  actionLabel="Tiếp tục thanh toán"
+                  actionHref={`/orders/${order.orderId}`}
+                />
               ))}
             </div>
           ) : (
-            <EmptyState text="Hiện chưa có vé nào đang giữ chỗ." href="/concerts" action="Chọn sự kiện" />
+            <EmptyState
+              text="Hiện chưa có vé nào đang giữ chỗ."
+              href="/concerts"
+              action="Chọn sự kiện"
+            />
           )}
         </AccountPanel>
 
@@ -85,14 +151,21 @@ export function UserAccountClient(): React.ReactElement {
           description="E-ticket đã phát hành sau khi thanh toán thành công."
           icon={<TicketIcon className="h-5 w-5" />}
         >
-          {snapshot.tickets.length > 0 ? (
+          {purchasedCount > 0 ? (
             <div className="grid gap-4">
               {snapshot.tickets.map((ticket) => (
                 <TicketCard key={ticket.ticketId} ticket={ticket} />
               ))}
+              {purchasedOrdersWithoutTicketRecord.map((order) => (
+                <PurchasedOrderCard key={order.orderId} order={order} />
+              ))}
             </div>
           ) : (
-            <EmptyState text="Bạn chưa có e-ticket nào." href="/concerts" action="Mua vé ngay" />
+            <EmptyState
+              text="Bạn chưa có e-ticket nào."
+              href="/concerts"
+              action="Mua vé ngay"
+            />
           )}
         </AccountPanel>
       </section>

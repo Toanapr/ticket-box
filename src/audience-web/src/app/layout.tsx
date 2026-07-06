@@ -22,7 +22,7 @@ export default async function RootLayout({
       className="h-full scroll-smooth antialiased"
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <AuthProvider initialUser={initialUser}>
           <SiteHeader />
           {children}

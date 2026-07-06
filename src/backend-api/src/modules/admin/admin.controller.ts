@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   FileTypeValidator,
   Get,
   MaxFileSizeValidator,
@@ -61,6 +62,11 @@ export class AdminController {
     return this.adminService.updateConcert(user, id, body);
   }
 
+  @Delete('concerts/:id')
+  deleteConcert(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
+    return this.adminService.deleteConcert(user, id);
+  }
+
   @Put('concerts/:id/poster')
   @UseInterceptors(
     FileInterceptor('poster', {
@@ -83,7 +89,6 @@ export class AdminController {
   ) {
     return this.adminService.uploadPoster(user, id, file);
   }
-
 
   @Post('concerts/:id/guest-list/import')
   @UseInterceptors(

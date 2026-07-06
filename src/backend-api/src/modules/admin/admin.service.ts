@@ -193,6 +193,37 @@ export class AdminService {
     return concert;
   }
 
+  async deleteConcert(user: CurrentUser, id: string) {
+    const concert = await this.findOwnedConcert(user, id);
+
+    try {
+      await this.prisma.concert.delete({
+        where: { id: concert.id },
+      });
+    } catch (error) {
+      if (isDeleteBlockedError(error)) {
+        throw new ConflictException(
+          'Cannot delete a concert with dependent sales, orders, tickets, or guest list data.',
+        );
+      }
+      throw error;
+    }
+
+    await this.cacheInvalidationService.invalidateConcert(concert.id);
+
+    if (concert.posterObjectKey) {
+      this.concertPosterStorage
+        .delete(concert.posterObjectKey)
+        .catch((cleanupError) => {
+          this.logger.warn(
+            `Failed to clean up deleted concert poster ${concert.posterObjectKey}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+          );
+        });
+    }
+
+    return { id: concert.id };
+  }
+
   async createTicketType(
     user: CurrentUser,
     concertId: string,
@@ -475,5 +506,14 @@ function isUniqueConstraintError(
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === 'P2002'
+  );
+}
+
+function isDeleteBlockedError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === 'P2003' || error.code === 'P2014')
   );
 }

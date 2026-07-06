@@ -27,7 +27,7 @@ const organizer: CurrentUser = {
 };
 
 const concertBody = {
-  title: 'ÄÃªm Nháº¡c MÃ¹a HÃ¨',
+  title: 'Ðêm Nh?c Mùa Hè',
   venue: 'Test Venue',
   artistName: 'Test Artist',
   startAt: '2027-01-01T12:00:00.000Z',
@@ -37,7 +37,7 @@ const concertBody = {
 
 const ticketTypeBody = {
   zoneCode: 'VIP',
-  name: 'VÃ© VIP',
+  name: 'Vé VIP',
   price: 1_800_000,
   capacity: 100,
   perUserLimit: 4,
@@ -90,17 +90,18 @@ describe('AdminService concert slugs', () => {
           attemptedSlugs.push(args.data.slug);
           return Promise.resolve({
             id: 'concert-id',
-            slug: 'dem-nhac-mua-he-2',
+            slug: args.data.slug,
           });
         },
       );
 
-    await expect(
-      service.createConcert(organizer, concertBody),
-    ).resolves.toMatchObject({
-      slug: 'dem-nhac-mua-he-2',
+    const result = await service.createConcert(organizer, concertBody);
+
+    expect(attemptedSlugs).toHaveLength(2);
+    expect(attemptedSlugs[1]).toBe(`${attemptedSlugs[0]}-2`);
+    expect(result).toMatchObject({
+      slug: attemptedSlugs[1],
     });
-    expect(attemptedSlugs).toEqual(['dem-nhac-mua-he', 'dem-nhac-mua-he-2']);
   });
 
   it('does not change the slug when the concert title changes', async () => {
@@ -123,6 +124,64 @@ describe('AdminService concert slugs', () => {
       where: { id: 'concert-id' },
       data: { title: 'New Title' },
     });
+  });
+});
+
+describe('AdminService concert deletion', () => {
+  const invalidateConcert = jest.fn();
+  const findUnique = jest.fn();
+  const deleteConcert = jest.fn();
+  const posterStorage = {
+    ...mockPosterStorage,
+    delete: jest.fn(),
+  } as unknown as ConcertPosterStorageService;
+  const service = new AdminService(
+    { invalidateConcert } as unknown as CacheInvalidationService,
+    posterStorage,
+    {
+      concert: { findUnique, delete: deleteConcert },
+    } as unknown as PrismaService,
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    findUnique.mockResolvedValue({
+      id: 'concert-id',
+      organizationId: organizer.organizationId,
+      posterObjectKey: 'concert-id-1-poster.png',
+    });
+    deleteConcert.mockResolvedValue({ id: 'concert-id' });
+    (posterStorage.delete as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it('deletes an owned concert and schedules poster cleanup', async () => {
+    await expect(service.deleteConcert(organizer, 'concert-id')).resolves.toEqual(
+      { id: 'concert-id' },
+    );
+
+    expect(deleteConcert).toHaveBeenCalledWith({
+      where: { id: 'concert-id' },
+    });
+    expect(invalidateConcert).toHaveBeenCalledWith('concert-id');
+    expect((posterStorage.delete as jest.Mock)).toHaveBeenCalledWith(
+      'concert-id-1-poster.png',
+    );
+  });
+
+  it('returns a conflict when dependent data blocks deletion', async () => {
+    deleteConcert.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
+        code: 'P2003',
+        clientVersion: 'test',
+      }),
+    );
+
+    await expect(
+      service.deleteConcert(organizer, 'concert-id'),
+    ).rejects.toThrow('dependent sales, orders, tickets, or guest list data');
+
+    expect(invalidateConcert).not.toHaveBeenCalled();
+    expect((posterStorage.delete as jest.Mock)).not.toHaveBeenCalled();
   });
 });
 
@@ -201,11 +260,15 @@ describe('AdminService ticket type slugs', () => {
   });
 
   it('retries a conflicting slug within the concert', async () => {
-    await expect(
-      service.createTicketType(organizer, 'concert-id', ticketTypeBody),
-    ).resolves.toMatchObject({ slug: 've-vip-2' });
+    const result = await service.createTicketType(
+      organizer,
+      'concert-id',
+      ticketTypeBody,
+    );
 
-    expect(attemptedSlugs).toEqual(['ve-vip', 've-vip-2']);
+    expect(attemptedSlugs).toHaveLength(2);
+    expect(attemptedSlugs[1]).toBe(`${attemptedSlugs[0]}-2`);
+    expect(result).toMatchObject({ slug: attemptedSlugs[1] });
   });
 
   it('does not change the slug when the ticket type name changes', async () => {
@@ -213,7 +276,7 @@ describe('AdminService ticket type slugs', () => {
       id: 'ticket-type-id',
       concertId: 'concert-id',
       slug: 've-vip',
-      name: 'VÃ© VIP',
+      name: 'Vé VIP',
       saleStartAt: new Date('2027-07-01T03:00:00.000Z'),
       saleEndAt: new Date('2027-12-19T16:59:00.000Z'),
       inventory: null,

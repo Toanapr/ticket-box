@@ -40,7 +40,6 @@ export type NotificationRecord = {
   createdAt: string;
 };
 
-
 export type GuestListImportSummary = {
   totalRows: number;
   validRows: number;
@@ -104,6 +103,13 @@ export type TicketTypePayload = {
   perUserLimit: number;
 };
 
+export async function deleteConcert(
+  concertId: string,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/admin/concerts/${concertId}`, {
+    method: "DELETE",
+  });
+}
 
 export async function uploadGuestListCsv(
   concertId: string,

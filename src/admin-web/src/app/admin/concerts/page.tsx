@@ -1,3 +1,4 @@
+import { DeleteConcertButton } from "@/components/delete-concert-button";
 import { Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 import { formatDateTime } from "@/lib/format";
@@ -33,7 +34,7 @@ export default async function ConcertsPage() {
       />
 
       <AdminDataTable>
-        <AdminTable minWidthClassName="min-w-[920px]">
+        <AdminTable minWidthClassName="min-w-[980px]">
           <AdminTableHead>
             <tr>
               <th className="px-6 py-4">Title</th>
@@ -80,6 +81,10 @@ export default async function ConcertsPage() {
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/guest-list`} variant="secondary">
                       Guest list
                     </AdminLinkButton>
+                    <DeleteConcertButton
+                      concertId={concert.id}
+                      concertTitle={concert.title}
+                    />
                   </div>
                 </td>
               </tr>

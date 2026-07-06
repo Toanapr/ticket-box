@@ -122,7 +122,7 @@ export function AdminButton({
   variant = "primary",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
 }): React.ReactElement {
   return (
     <button
@@ -135,6 +135,8 @@ export function AdminButton({
           "border border-black/10 bg-ticket-alabaster text-ticket-obsidian hover:bg-white",
         variant === "ghost" &&
           "text-slate-600 hover:bg-ticket-stone hover:text-ticket-obsidian",
+        variant === "danger" &&
+          "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
         className,
       )}
     >

@@ -5,9 +5,10 @@ import { TicketNotificationPublisher } from './ticket-notification.publisher';
 import { TicketRepository } from './ticket.repository';
 import { TicketService } from './ticket.service';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationModule],
   controllers: [TicketController],
   providers: [
     TicketService,

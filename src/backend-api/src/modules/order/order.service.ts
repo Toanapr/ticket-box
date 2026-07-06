@@ -56,6 +56,7 @@ export class OrderService {
 
   private ensureDuplicatePayloadMatches(
     order: {
+      buyerEmail: string | null;
       items: Array<{ reservationId: string }>;
       payments: Array<{ provider: string }>;
     },
@@ -63,11 +64,13 @@ export class OrderService {
   ): void {
     const reservationIds = order.items.map((item) => item.reservationId);
     const provider = dto.paymentMethod ?? 'mock';
+    const buyerEmail = dto.buyer.email.trim().toLowerCase();
 
     if (
       reservationIds.length !== 1 ||
       reservationIds[0] !== dto.reservationId ||
-      order.payments[0]?.provider !== provider
+      order.payments[0]?.provider !== provider ||
+      order.buyerEmail !== buyerEmail
     ) {
       throw new DomainError(
         'Idempotency key was already used with a different order payload',
@@ -82,6 +85,9 @@ export class OrderService {
     userId: string;
     status: string;
     totalAmount: { toString(): string };
+    buyerFullName: string | null;
+    buyerPhone: string | null;
+    buyerEmail: string | null;
     payments: Array<{
       id: string;
     }>;
@@ -112,6 +118,11 @@ export class OrderService {
       ticketTypeId: primaryItem?.ticketTypeId ?? null,
       ticketTypeName: primaryItem?.ticketType.name ?? null,
       quantity: primaryItem?.quantity ?? null,
+      buyer: {
+        fullName: order.buyerFullName,
+        phone: order.buyerPhone,
+        email: order.buyerEmail,
+      },
     };
   }
 
@@ -120,6 +131,9 @@ export class OrderService {
     userId: string;
     status: string;
     totalAmount: { toString(): string };
+    buyerFullName: string | null;
+    buyerPhone: string | null;
+    buyerEmail: string | null;
     payments: Array<{
       id: string;
       provider: string;
@@ -163,6 +177,11 @@ export class OrderService {
       ticketTypeId: primaryReservation?.ticketTypeId ?? null,
       ticketTypeName: primaryReservation?.ticketType.name ?? null,
       quantity: primaryReservation?.quantity ?? null,
+      buyer: {
+        fullName: order.buyerFullName,
+        phone: order.buyerPhone,
+        email: order.buyerEmail,
+      },
       payments: order.payments.map((payment) => ({
         id: payment.id,
         provider: payment.provider,

@@ -284,6 +284,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     expect(orderRes.status).toBe(201);
@@ -349,6 +350,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservation.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
     const payment = await prisma.payment.findFirstOrThrow({
       where: { orderId: order.body.id },
@@ -419,6 +421,7 @@ describe('Checkout flow and invariants (e2e)', () => {
         .send({
           reservationId: reservation.body.id,
           idempotencyKey: randomUUID(),
+          buyer: testBuyer(userId),
         });
       const payment = await prisma.payment.findFirstOrThrow({
         where: { orderId: order.body.id },
@@ -471,6 +474,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservation.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
     const payment = await prisma.payment.findFirstOrThrow({
       where: { orderId: order.body.id },
@@ -529,6 +533,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     const providerTxnId = `txn-${randomUUID()}`;
@@ -602,6 +607,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     const failedWebhookBody = {
@@ -657,6 +663,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     await prisma.reservation.update({
@@ -829,6 +836,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     await request(app.getHttpServer())
@@ -887,6 +895,7 @@ describe('Checkout flow and invariants (e2e)', () => {
       .send({
         reservationId: reservationRes.body.id,
         idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
       });
 
     await prisma.reservation.update({
@@ -1009,6 +1018,7 @@ describe('Checkout flow and invariants (e2e)', () => {
         .send({
           reservationId: reservationRes.body.id,
           idempotencyKey: randomUUID(),
+          buyer: testBuyer(userId),
         });
       expect(orderRes.status).toBe(201);
 
@@ -1070,6 +1080,15 @@ describe('Checkout flow and invariants (e2e)', () => {
       organizationId: null,
     })}`;
   }
+
+  function testBuyer(userId: string) {
+    return {
+      fullName: 'Checkout E2E Buyer',
+      phone: '0900000000',
+      email: `ticket-${userId}@test.local`,
+    };
+  }
+
   async function createTestTicketType(
     input: Omit<TestTicketType, 'id' | 'concertId'>,
   ) {

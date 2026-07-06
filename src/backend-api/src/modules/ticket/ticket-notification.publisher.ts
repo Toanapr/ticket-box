@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { formatStructuredLog } from '../../common/logging/structured-log.util';
-import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class TicketNotificationPublisher {
   private readonly logger = new Logger(TicketNotificationPublisher.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly notificationService: NotificationService) {}
 
   async publishTicketIssued(
     orderId: string,
@@ -23,50 +22,16 @@ export class TicketNotificationPublisher {
     );
 
     try {
-      const organizationId = await this.findOrderOrganizationId(orderId);
-
-      if (!organizationId) {
-        this.logger.warn(
-          formatStructuredLog('ticket_notification_skipped', {
-            orderId,
-            reason: 'organization_not_found',
-          }),
-        );
-        return;
-      }
-
-      const message = `Issued ${ticketCount} ticket(s) for order ${orderId}`;
-
-      await this.prisma.notificationRecord.createMany({
-        data: [
-          {
-            organizationId,
-            eventType: 'TicketIssued',
-            orderId,
-            ownerUserId,
-            ticketCount,
-            channel: NotificationChannel.in_app,
-            status: NotificationStatus.sent,
-            message,
-          },
-          {
-            organizationId,
-            eventType: 'TicketIssued',
-            orderId,
-            ownerUserId,
-            ticketCount,
-            channel: NotificationChannel.email_mock,
-            status: NotificationStatus.sent,
-            message: `Mock email queued. ${message}`,
-          },
-        ],
-      });
+      await this.notificationService.createTicketIssuedTasks(
+        orderId,
+        ownerUserId,
+        ticketCount,
+      );
 
       this.logger.log(
-        formatStructuredLog('ticket_notification_recorded', {
+        formatStructuredLog('ticket_notification_tasks_recorded', {
           orderId,
-          organizationId,
-          channels: ['in_app', 'email_mock'],
+          channels: ['in_app', 'email'],
         }),
       );
     } catch (error) {
@@ -75,31 +40,5 @@ export class TicketNotificationPublisher {
         error instanceof Error ? error.stack : undefined,
       );
     }
-  }
-
-  private async findOrderOrganizationId(
-    orderId: string,
-  ): Promise<string | null> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        tickets: {
-          take: 1,
-          select: {
-            ticketType: {
-              select: {
-                concert: {
-                  select: {
-                    organizationId: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    return order?.tickets[0]?.ticketType.concert.organizationId ?? null;
   }
 }

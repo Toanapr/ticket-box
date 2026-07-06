@@ -29,14 +29,19 @@ export type Concert = {
 
 export type NotificationRecord = {
   id: string;
-  eventType: "TicketIssued";
-  orderId: string;
+  eventType: string;
+  notificationType: "TicketIssued" | "ConcertReminder24h" | string;
+  concertId?: string | null;
+  orderId?: string | null;
   ownerUserId: string;
-  ticketCount: number;
-  channel: "in_app" | "email_mock";
-  status: "sent" | "failed";
+  ticketCount?: number | null;
+  channel: "in_app" | "email";
+  status: "pending" | "sent" | "failed";
+  idempotencyKey: string;
   message: string;
   error?: string | null;
+  scheduledFor: string;
+  processedAt?: string | null;
   createdAt: string;
 };
 

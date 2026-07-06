@@ -158,6 +158,12 @@ export function CheckoutClient({
 
   async function submit(): Promise<void> {
     if (submitting || retryActive) return;
+    const buyerValidationError = validateBuyer(buyer);
+    if (buyerValidationError) {
+      setError(buyerValidationError);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     let createdOrderId: string | null = null;
@@ -169,6 +175,7 @@ export function CheckoutClient({
         ticketTypeId: ticketType.id,
         quantity,
         userKey,
+        buyerEmail: buyer.email.trim().toLowerCase(),
       };
       const intent = getCheckoutIntent(intentInput);
       const reservation = await createReservation(
@@ -464,6 +471,31 @@ export function CheckoutClient({
           value={formatCurrency(totals.fee)}
         />
         <SummaryRow label="Phương thức" value={paymentMethod} />
+        <div className="mt-5 rounded border border-black/10 bg-ticket-alabaster p-4 text-sm">
+          <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Thông tin nhận vé
+          </div>
+          <div className="mt-3 grid gap-2 font-bold text-slate-700">
+            <div className="flex justify-between gap-3">
+              <span>Họ tên</span>
+              <span className="text-right text-ticket-obsidian">
+                {buyer.fullName.trim() || "-"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span>SĐT</span>
+              <span className="text-right text-ticket-obsidian">
+                {buyer.phone.trim() || "-"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span>Email</span>
+              <span className="text-right text-ticket-obsidian">
+                {buyer.email.trim() || "Chưa nhập"}
+              </span>
+            </div>
+          </div>
+        </div>
         <div className="mt-5 flex justify-between border-t border-dashed border-black/20 pt-5 font-black">
           <span>Tổng thanh toán</span>
           <span className="font-display text-xl text-ticket-green">
@@ -488,6 +520,28 @@ export function CheckoutClient({
       </aside>
     </div>
   );
+}
+
+function validateBuyer(
+  buyer: BuyerInfo,
+): { title: string; message: string } | null {
+  const email = buyer.email.trim();
+
+  if (!email) {
+    return {
+      title: "Thiếu email nhận vé",
+      message: "Vui lòng nhập email nhận e-ticket trước khi thanh toán.",
+    };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return {
+      title: "Email nhận vé không hợp lệ",
+      message: "Vui lòng kiểm tra lại email nhận e-ticket.",
+    };
+  }
+
+  return null;
 }
 
 function buildOrderUrl(

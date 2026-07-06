@@ -149,7 +149,7 @@ export interface OrderRecord {
   createdAt: string;
   paymentIntent?: {
     paymentId?: string;
-    provider: PaymentProvider;
+    provider?: PaymentProvider;
     providerName?: string;
     status?: string;
     providerTxnId?: string | null;
@@ -160,8 +160,8 @@ export interface OrderRecord {
     accountNo?: string;
     accountName?: string;
     qrPayload?: string;
-    memo: string;
-    amount: number;
+    memo?: string;
+    amount?: number;
   };
   ticketId?: string;
 }

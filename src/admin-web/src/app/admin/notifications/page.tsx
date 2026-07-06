@@ -18,7 +18,7 @@ export default async function NotificationsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-950">Notifications</h1>
         <p className="mt-1 text-sm text-slate-600">
-          TicketIssued records for in-app and mock email delivery.
+          Notification tasks for in-app and email delivery.
         </p>
       </div>
 
@@ -27,7 +27,7 @@ export default async function NotificationsPage() {
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3">Event</th>
+              <th className="px-4 py-3">Type</th>
               <th className="px-4 py-3">Channel</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Order</th>
@@ -42,7 +42,7 @@ export default async function NotificationsPage() {
                   {formatDateTime(notification.createdAt)}
                 </td>
                 <td className="px-4 py-3 font-medium text-slate-950">
-                  {notification.eventType}
+                  {notification.notificationType}
                 </td>
                 <td className="px-4 py-3 text-slate-700">
                   {notification.channel}
@@ -53,10 +53,10 @@ export default async function NotificationsPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-slate-700">
-                  {notification.orderId}
+                  {notification.orderId ?? "-"}
                 </td>
                 <td className="px-4 py-3 text-slate-700">
-                  {notification.ticketCount}
+                  {notification.ticketCount ?? "-"}
                 </td>
                 <td className="px-4 py-3 text-slate-700">
                   {notification.error ?? notification.message}

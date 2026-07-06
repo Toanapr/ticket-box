@@ -120,12 +120,14 @@ export async function createOrder(input: {
       ticketTypeId: string | null;
       ticketTypeName: string | null;
       quantity: number | null;
+      buyer?: BackendBuyer | null;
     }>("/orders", {
       method: "POST",
       body: JSON.stringify({
         reservationId: input.reservation.reservationId,
         idempotencyKey: input.idempotencyKey,
         paymentMethod: input.paymentMethod,
+        buyer: input.buyer,
       }),
     });
     return {
@@ -137,7 +139,7 @@ export async function createOrder(input: {
       ticketTypeId: response.ticketTypeId ?? input.reservation.ticketTypeId,
       ticketTypeName: response.ticketTypeName ?? undefined,
       quantity: response.quantity ?? input.reservation.quantity,
-      buyer: input.buyer,
+      buyer: normalizeBuyer(response.buyer, input.buyer),
       status: mapOrderStatus(response.status),
       totalAmount: Number(response.totalAmount),
       createdAt: new Date().toISOString(),
@@ -205,7 +207,7 @@ export async function getTicket(
     startsAt: response.startsAt ?? undefined,
     ticketTypeId: response.ticketTypeId,
     ticketTypeName: response.ticketTypeName ?? undefined,
-    owner: { fullName: "Khán giả TicketBox", phone: "", email: "" },
+    owner: normalizeBuyer(response.owner),
     quantity: 1,
     seats: [`Vé #${response.sequenceNo}`],
     qrPayload: response.qrCode.value,
@@ -226,6 +228,7 @@ interface BackendOrder {
   ticketTypeId?: string | null;
   ticketTypeName?: string | null;
   quantity?: number | null;
+  buyer?: BackendBuyer | null;
   reservations: Array<{
     id: string;
     ticketTypeId: string;
@@ -242,6 +245,12 @@ interface BackendOrder {
   tickets: Array<{ id: string }>;
 }
 
+interface BackendBuyer {
+  fullName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
 interface BackendTicket {
   id: string;
   orderId: string;
@@ -251,6 +260,7 @@ interface BackendTicket {
   startsAt?: string | null;
   ticketTypeId: string;
   ticketTypeName?: string | null;
+  owner?: BackendBuyer | null;
   sequenceNo: number;
   status: "issued" | "revoked" | "checked_in";
   qrCode: { value: string };
@@ -272,7 +282,7 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
     ticketTypeId: order.ticketTypeId ?? reservation?.ticketTypeId ?? "",
     ticketTypeName: order.ticketTypeName ?? undefined,
     quantity: order.quantity ?? reservation?.quantity ?? 0,
-    buyer: { fullName: "Khán giả TicketBox", phone: "", email: "" },
+    buyer: normalizeBuyer(order.buyer),
     status: mapOrderAndPaymentStatus(
       order.status,
       payment?.status,
@@ -291,6 +301,17 @@ function mapBackendOrder(order: BackendOrder): OrderRecord {
       amount: Number(order.totalAmount),
     },
     ticketId,
+  };
+}
+
+function normalizeBuyer(
+  buyer: BackendBuyer | null | undefined,
+  fallback?: BuyerInfo,
+): BuyerInfo {
+  return {
+    fullName: buyer?.fullName ?? fallback?.fullName ?? "",
+    phone: buyer?.phone ?? fallback?.phone ?? "",
+    email: buyer?.email ?? fallback?.email ?? "",
   };
 }
 

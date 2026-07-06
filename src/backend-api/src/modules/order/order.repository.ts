@@ -149,6 +149,9 @@ export class OrderRepository {
           status: OrderStatus.pending_payment,
           totalAmount: totalAmountDecimal,
           idempotencyKey: dto.idempotencyKey,
+          buyerFullName: normalizeOptionalString(dto.buyer.fullName),
+          buyerPhone: normalizeOptionalString(dto.buyer.phone),
+          buyerEmail: dto.buyer.email.trim().toLowerCase(),
         },
       });
 
@@ -190,4 +193,9 @@ export class OrderRepository {
       });
     });
   }
+}
+
+function normalizeOptionalString(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }

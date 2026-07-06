@@ -27,6 +27,11 @@ export class TicketService {
       ticketTypeId: ticket.ticketTypeId,
       ticketTypeName: ticket.ticketType.name,
       ownerUserId: ticket.ownerUserId,
+      owner: {
+        fullName: ticket.order.buyerFullName,
+        phone: ticket.order.buyerPhone,
+        email: ticket.order.buyerEmail,
+      },
       status: ticket.status,
       sequenceNo: ticket.sequenceNo,
       paymentStatus: ticket.order.payments[0]?.status ?? null,

@@ -9,6 +9,7 @@ export interface CheckoutIntentInput {
   ticketTypeId: string;
   quantity: number;
   userKey: string;
+  buyerEmail?: string;
 }
 
 export interface CheckoutIntent extends CheckoutIntentInput {
@@ -21,7 +22,8 @@ export interface CheckoutIntent extends CheckoutIntentInput {
 export function getCheckoutIntent(input: CheckoutIntentInput): CheckoutIntent {
   const signature = checkoutIntentSignature(input);
   const existing = readStoredIntent(signature);
-  if (existing && checkoutIntentSignature(existing) === signature) return existing;
+  if (existing && checkoutIntentSignature(existing) === signature)
+    return existing;
 
   const next: CheckoutIntent = {
     ...input,
@@ -40,7 +42,13 @@ export function clearCheckoutIntent(input: CheckoutIntentInput): void {
 }
 
 export function checkoutIntentSignature(input: CheckoutIntentInput): string {
-  return [input.concertId, input.ticketTypeId, input.quantity.toString(), input.userKey || "anonymous"].join(":");
+  return [
+    input.concertId,
+    input.ticketTypeId,
+    input.quantity.toString(),
+    input.userKey || "anonymous",
+    input.buyerEmail?.trim().toLowerCase() ?? "",
+  ].join(":");
 }
 
 function readStoredIntent(signature: string): CheckoutIntent | null {
@@ -54,6 +62,8 @@ function readStoredIntent(signature: string): CheckoutIntent | null {
       typeof value.ticketTypeId === "string" &&
       typeof value.quantity === "number" &&
       typeof value.userKey === "string" &&
+      (value.buyerEmail === undefined ||
+        typeof value.buyerEmail === "string") &&
       typeof value.reservationIdempotencyKey === "string" &&
       typeof value.orderIdempotencyKey === "string" &&
       typeof value.paymentIntentIdempotencyKey === "string" &&
@@ -77,5 +87,8 @@ function storageKey(signature: string): string {
 }
 
 function hasSessionStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+  return (
+    typeof window !== "undefined" &&
+    typeof window.sessionStorage !== "undefined"
+  );
 }

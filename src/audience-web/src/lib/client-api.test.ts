@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createOrder, createPaymentIntent, createReservation, getOrder, getTicket, normalizeErrorCode, parseRetryAfter, ReservationApiError } from "./client-api";
+import {
+  createOrder,
+  createPaymentIntent,
+  createReservation,
+  getOrder,
+  getTicket,
+  normalizeErrorCode,
+  parseRetryAfter,
+  ReservationApiError,
+} from "./client-api";
 
 describe("client API transient errors", () => {
   afterEach(() => {
@@ -7,18 +16,30 @@ describe("client API transient errors", () => {
   });
 
   it("parses Retry-After seconds into an absolute retry timestamp", () => {
-    expect(parseRetryAfter("30", new Date("2026-07-15T00:00:00.000Z"))).toEqual({
-      retryAfterMs: 30_000,
-      retryAt: "2026-07-15T00:00:30.000Z",
-    });
+    expect(parseRetryAfter("30", new Date("2026-07-15T00:00:00.000Z"))).toEqual(
+      {
+        retryAfterMs: 30_000,
+        retryAt: "2026-07-15T00:00:30.000Z",
+      },
+    );
   });
 
   it("parses Retry-After HTTP dates and clamps past dates", () => {
-    expect(parseRetryAfter("Wed, 15 Jul 2026 00:01:00 GMT", new Date("2026-07-15T00:00:00.000Z"))).toEqual({
+    expect(
+      parseRetryAfter(
+        "Wed, 15 Jul 2026 00:01:00 GMT",
+        new Date("2026-07-15T00:00:00.000Z"),
+      ),
+    ).toEqual({
       retryAfterMs: 60_000,
       retryAt: "2026-07-15T00:01:00.000Z",
     });
-    expect(parseRetryAfter("Wed, 15 Jul 2026 00:00:00 GMT", new Date("2026-07-15T00:01:00.000Z"))).toEqual({
+    expect(
+      parseRetryAfter(
+        "Wed, 15 Jul 2026 00:00:00 GMT",
+        new Date("2026-07-15T00:01:00.000Z"),
+      ),
+    ).toEqual({
       retryAfterMs: 0,
       retryAt: "2026-07-15T00:01:00.000Z",
     });
@@ -33,12 +54,17 @@ describe("client API transient errors", () => {
   it("exposes status, retry metadata, and backend code for 429 reservation responses", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        Response.json(
-          { code: "RATE_LIMITED", message: "Too many reservation attempts" },
-          { status: 429, headers: { "retry-after": "45", "x-correlation-id": "corr-1" } },
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { code: "RATE_LIMITED", message: "Too many reservation attempts" },
+            {
+              status: 429,
+              headers: { "retry-after": "45", "x-correlation-id": "corr-1" },
+            },
+          ),
         ),
-      ),
     );
 
     await expect(
@@ -48,7 +74,7 @@ describe("client API transient errors", () => {
         quantity: 1,
         idempotencyKey: "reservation-key",
       }),
-    ).rejects.toMatchObject<Partial<ReservationApiError>>({
+    ).rejects.toMatchObject({
       code: "RATE_LIMITED",
       transient: expect.objectContaining({
         kind: "rate-limit",
@@ -81,29 +107,39 @@ describe("client API transient errors", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/backend/reservations",
       expect.objectContaining({
-        headers: expect.objectContaining({ "x-sale-access-token": "sale-token" }),
+        headers: expect.objectContaining({
+          "x-sale-access-token": "sale-token",
+        }),
       }),
     );
   });
 
-  it("captures paymentId and order metadata from create order response", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        Response.json({
-          id: "order-1",
-          status: "pending_payment",
-          totalAmount: "250000",
-          paymentId: "payment-1",
-          concertId: "concert-1",
-          concertTitle: "Summer Tour",
-          venue: "TicketBox Arena, Ho Chi Minh City",
-          ticketTypeId: "ticket-1",
-          ticketTypeName: "VIP",
-          quantity: 2,
-        }),
-      ),
+  it("sends buyer contact and captures order metadata from create order response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        id: "order-1",
+        status: "pending_payment",
+        totalAmount: "250000",
+        paymentId: "payment-1",
+        concertId: "concert-1",
+        concertTitle: "Summer Tour",
+        venue: "TicketBox Arena, Ho Chi Minh City",
+        ticketTypeId: "ticket-1",
+        ticketTypeName: "VIP",
+        quantity: 2,
+        buyer: {
+          fullName: "Nguyen Van A",
+          phone: "0909",
+          email: "ticket-recipient@test.local",
+        },
+      }),
     );
+    vi.stubGlobal("fetch", fetchMock);
+    const buyer = {
+      fullName: "Nguyen Van A",
+      phone: "0909",
+      email: "ticket-recipient@test.local",
+    };
 
     await expect(
       createOrder({
@@ -114,7 +150,7 @@ describe("client API transient errors", () => {
           quantity: 2,
         },
         concertId: "concert-1",
-        buyer: { fullName: "Khán giả TicketBox", phone: "0909", email: "fan@test.local" },
+        buyer,
         paymentMethod: "VNPAY",
         idempotencyKey: "order-key",
       }),
@@ -126,10 +162,23 @@ describe("client API transient errors", () => {
       ticketTypeId: "ticket-1",
       ticketTypeName: "VIP",
       quantity: 2,
+      buyer,
       paymentIntent: {
         paymentId: "payment-1",
       },
     });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/backend/orders",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          reservationId: "reservation-1",
+          idempotencyKey: "order-key",
+          paymentMethod: "VNPAY",
+          buyer,
+        }),
+      }),
+    );
   });
 
   it("sends Idempotency-Key and preserves degraded payment intent retry metadata", async () => {
@@ -149,7 +198,12 @@ describe("client API transient errors", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(createPaymentIntent({ paymentId: "payment-1", idempotencyKey: "payment-intent-key" })).resolves.toEqual({
+    await expect(
+      createPaymentIntent({
+        paymentId: "payment-1",
+        idempotencyKey: "payment-intent-key",
+      }),
+    ).resolves.toEqual({
       paymentId: "payment-1",
       orderId: "order-1",
       status: "pending",
@@ -163,7 +217,9 @@ describe("client API transient errors", () => {
       "/api/backend/payments/payment-1/intent",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({ "Idempotency-Key": "payment-intent-key" }),
+        headers: expect.objectContaining({
+          "Idempotency-Key": "payment-intent-key",
+        }),
         cache: "no-store",
       }),
     );
@@ -188,7 +244,12 @@ describe("client API transient errors", () => {
       ),
     );
 
-    await expect(createPaymentIntent({ paymentId: "payment-success", idempotencyKey: "payment-intent-key" })).resolves.toEqual({
+    await expect(
+      createPaymentIntent({
+        paymentId: "payment-success",
+        idempotencyKey: "payment-intent-key",
+      }),
+    ).resolves.toEqual({
       paymentId: "payment-success",
       orderId: "order-success",
       status: "pending",
@@ -215,7 +276,12 @@ describe("client API transient errors", () => {
       ),
     );
 
-    await expect(createPaymentIntent({ paymentId: "payment-2", idempotencyKey: "payment-intent-key" })).resolves.toMatchObject({
+    await expect(
+      createPaymentIntent({
+        paymentId: "payment-2",
+        idempotencyKey: "payment-intent-key",
+      }),
+    ).resolves.toMatchObject({
       paymentId: "payment-2",
       status: "pending_reconciliation",
       degraded: true,
@@ -232,7 +298,14 @@ describe("client API transient errors", () => {
           id: "11111111-1111-4111-8111-111111111111",
           status: "pending_payment",
           totalAmount: "2000000",
-          reservations: [{ id: "reservation-1", ticketTypeId: "ticket-1", quantity: 2, expiresAt: "2026-07-15T00:10:00.000Z" }],
+          reservations: [
+            {
+              id: "reservation-1",
+              ticketTypeId: "ticket-1",
+              quantity: 2,
+              expiresAt: "2026-07-15T00:10:00.000Z",
+            },
+          ],
           payments: [
             {
               id: "22222222-2222-4222-8222-222222222222",
@@ -250,11 +323,18 @@ describe("client API transient errors", () => {
           ticketTypeId: "ticket-1",
           ticketTypeName: "SVIP",
           quantity: 2,
+          buyer: {
+            fullName: "Tran Thi B",
+            phone: "0912",
+            email: "tran@example.com",
+          },
         }),
       ),
     );
 
-    await expect(getOrder("11111111-1111-4111-8111-111111111111")).resolves.toMatchObject({
+    await expect(
+      getOrder("11111111-1111-4111-8111-111111111111"),
+    ).resolves.toMatchObject({
       status: "PAYMENT_PENDING_RECONCILIATION",
       reservationExpiresAt: "2026-07-15T00:10:00.000Z",
       concertId: "concert-1",
@@ -263,6 +343,11 @@ describe("client API transient errors", () => {
       ticketTypeId: "ticket-1",
       ticketTypeName: "SVIP",
       quantity: 2,
+      buyer: {
+        fullName: "Tran Thi B",
+        phone: "0912",
+        email: "tran@example.com",
+      },
       paymentIntent: {
         paymentId: "22222222-2222-4222-8222-222222222222",
         provider: "mock",
@@ -288,6 +373,11 @@ describe("client API transient errors", () => {
           ticketTypeName: "SVIP",
           sequenceNo: 7,
           status: "issued",
+          owner: {
+            fullName: "Tran Thi B",
+            phone: "0912",
+            email: "tran@example.com",
+          },
           qrCode: { value: "opaque-qr-token" },
         }),
       ),
@@ -305,6 +395,11 @@ describe("client API transient errors", () => {
       seats: ["Vé #7"],
       qrPayload: "opaque-qr-token",
       signedPayload: "opaque-qr-token",
+      owner: {
+        fullName: "Tran Thi B",
+        phone: "0912",
+        email: "tran@example.com",
+      },
       status: "issued",
     });
   });

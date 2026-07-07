@@ -83,6 +83,7 @@ export class ScannerApiClient {
         "content-type": "application/json",
         authorization: `Bearer ${this.accessToken}`,
         "x-device-id": this.deviceId,
+        "Cache-Control": "no-cache",
         ...(this.correlationId
           ? {
               "x-correlation-id": this.correlationId,
@@ -90,7 +91,6 @@ export class ScannerApiClient {
           : {}),
         ...init?.headers,
       },
-      cache: "no-store",
     });
 
     if (!response.ok) {

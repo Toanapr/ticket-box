@@ -4,6 +4,7 @@ import type {
   ScannerManifest,
   ScannerManifestTicket,
 } from "@/lib/scanner/types";
+import { randomUUID } from 'expo-crypto';
 
 export type ParsedQrPayload = {
   ticketRef: string;
@@ -177,7 +178,7 @@ export function buildPendingQueueEvent(input: {
   payload: ParsedQrPayload;
 }): ScannerCheckInSyncEvent {
   return {
-    clientEventId: crypto.randomUUID(),
+    clientEventId: randomUUID(),
     ticketRef: input.payload.ticketRef,
     rawToken: input.payload.rawToken,
     scannerUserId: input.assignment.scannerUserId,

@@ -339,6 +339,7 @@ describe('Checkout flow and invariants (e2e)', () => {
     const reservation = await request(app.getHttpServer())
       .post('/reservations')
       .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', `intent-replay-${userId}`)
       .send({
         ticketTypeId: testTicketType.id,
         quantity: 1,
@@ -394,6 +395,124 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(orderDetail.body.payments[0]?.checkoutUrl).toBe(
       first.body.checkoutUrl,
     );
+  });
+
+  it('does not create a payment intent for an expired order', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Expired Intent Guard',
+      zoneCode: 'EIG',
+      price: '225000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const reservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', `expired-intent-${userId}`)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const order = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: reservation.body.id,
+        idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
+      });
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.body.id },
+    });
+
+    await prisma.reservation.update({
+      where: { id: reservation.body.id },
+      data: {
+        status: 'expired',
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+    await prisma.inventoryCounter.update({
+      where: { ticketTypeId: testTicketType.id },
+      data: { reservedCount: { decrement: 1 } },
+    });
+    await prisma.userTicketQuota.update({
+      where: {
+        userId_ticketTypeId: {
+          userId,
+          ticketTypeId: testTicketType.id,
+        },
+      },
+      data: { reservedCount: { decrement: 1 } },
+    });
+    await prisma.order.update({
+      where: { id: order.body.id },
+      data: { status: 'expired' },
+    });
+
+    const intent = await request(app.getHttpServer())
+      .post(`/payments/${payment.id}/intent`)
+      .set('Authorization', bearerToken(userId))
+      .set('Idempotency-Key', randomUUID());
+
+    expect(intent.status).toBe(200);
+    expect(intent.body.status).toBe('expired');
+    expect(intent.body.orderStatus).toBe('expired');
+    expect(intent.body.checkoutUrl).toBeNull();
+
+    const persisted = await prisma.payment.findUniqueOrThrow({
+      where: { id: payment.id },
+    });
+    expect(persisted.status).toBe('expired');
+    expect(persisted.checkoutUrl).toBeNull();
+  });
+
+  it('returns terminal payment intent state without creating a new provider intent', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Terminal Intent Guard',
+      zoneCode: 'TIG',
+      price: '235000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const reservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', `terminal-intent-${userId}`)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const order = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: reservation.body.id,
+        idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
+      });
+
+    await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('Authorization', bearerToken(userId))
+      .send({ orderId: order.body.id });
+
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.body.id },
+    });
+    const intent = await request(app.getHttpServer())
+      .post(`/payments/${payment.id}/intent`)
+      .set('Authorization', bearerToken(userId))
+      .set('Idempotency-Key', randomUUID());
+
+    expect(intent.status).toBe(200);
+    expect(intent.body.status).toBe('succeeded');
+    expect(intent.body.orderStatus).toBe('issued');
+    expect(intent.body.checkoutUrl).toBeNull();
   });
 
   it('moves an ambiguous timeout to reconciliation without breaking public reads', async () => {
@@ -579,6 +698,164 @@ describe('Checkout flow and invariants (e2e)', () => {
         },
       }),
     ).toBe(1);
+  });
+
+  it('rejects non-mock webhook success when amount does not match', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Webhook Amount Mismatch',
+      zoneCode: 'WAM',
+      price: '310000.00',
+      capacity: 10,
+      perUserLimit: 3,
+    });
+    const userId = await createTestUser();
+    const reservationRes = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', `amount-mismatch-${userId}`)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const orderRes = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: reservationRes.body.id,
+        idempotencyKey: randomUUID(),
+        paymentMethod: 'VNPAY',
+        buyer: testBuyer(userId),
+      });
+    const webhookBody = {
+      orderId: orderRes.body.id,
+      provider: 'VNPAY',
+      providerTxnId: `txn-${randomUUID()}`,
+      providerEventId: `event-${randomUUID()}`,
+      amount: 1,
+      currency: 'VND',
+      status: 'succeeded' as const,
+      payload: { eventType: 'payment.succeeded' },
+    };
+
+    const webhookRes = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, webhookBody),
+      )
+      .send(webhookBody);
+
+    expect(webhookRes.status).toBe(409);
+    expect(webhookRes.body.error).toBe('payment_amount_mismatch');
+
+    const [event, payment, ticketCount] = await Promise.all([
+      prisma.paymentProviderEvent.findUniqueOrThrow({
+        where: {
+          provider_providerEventId: {
+            provider: 'VNPAY',
+            providerEventId: webhookBody.providerEventId,
+          },
+        },
+      }),
+      prisma.payment.findFirstOrThrow({ where: { orderId: orderRes.body.id } }),
+      prisma.ticket.count({ where: { orderId: orderRes.body.id } }),
+    ]);
+    expect(event.status).toBe('rejected');
+    expect(event.errorCode).toBe('payment_amount_mismatch');
+    expect(payment.status).toBe('created');
+    expect(ticketCount).toBe(0);
+  });
+
+  it('rejects provider transaction reuse across different orders', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Webhook Txn Conflict',
+      zoneCode: 'WTC',
+      price: '320000.00',
+      capacity: 10,
+      perUserLimit: 3,
+    });
+    const [firstUserId, secondUserId] = await Promise.all([
+      createTestUser(),
+      createTestUser(),
+    ]);
+
+    async function createVnpayOrder(userId: string) {
+      const reservationRes = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', bearerToken(userId))
+        .set('x-forwarded-for', `txn-conflict-${userId}`)
+        .send({
+          ticketTypeId: testTicketType.id,
+          quantity: 1,
+          idempotencyKey: randomUUID(),
+        });
+      return request(app.getHttpServer())
+        .post('/orders')
+        .set('Authorization', bearerToken(userId))
+        .send({
+          reservationId: reservationRes.body.id,
+          idempotencyKey: randomUUID(),
+          paymentMethod: 'VNPAY',
+          buyer: testBuyer(userId),
+        });
+    }
+
+    const firstOrder = await createVnpayOrder(firstUserId);
+    const secondOrder = await createVnpayOrder(secondUserId);
+    const providerTxnId = `txn-${randomUUID()}`;
+    const firstWebhookBody = {
+      orderId: firstOrder.body.id,
+      provider: 'VNPAY',
+      providerTxnId,
+      providerEventId: `event-${randomUUID()}`,
+      amount: 32000000,
+      currency: 'VND',
+      status: 'succeeded' as const,
+      payload: { eventType: 'payment.succeeded' },
+    };
+    const secondWebhookBody = {
+      ...firstWebhookBody,
+      orderId: secondOrder.body.id,
+      providerEventId: `event-${randomUUID()}`,
+    };
+
+    const firstWebhook = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, firstWebhookBody),
+      )
+      .send(firstWebhookBody);
+    const secondWebhook = await request(app.getHttpServer())
+      .post('/payments/webhook')
+      .set(
+        'x-webhook-signature',
+        createWebhookSignature(webhookSecret, secondWebhookBody),
+      )
+      .send(secondWebhookBody);
+
+    expect(firstWebhook.status).toBe(201);
+    expect(secondWebhook.status).toBe(409);
+    expect(secondWebhook.body.error).toBe('provider_transaction_conflict');
+
+    const secondEvent = await prisma.paymentProviderEvent.findUniqueOrThrow({
+      where: {
+        provider_providerEventId: {
+          provider: 'VNPAY',
+          providerEventId: secondWebhookBody.providerEventId,
+        },
+      },
+    });
+    const secondOrderAfter = await prisma.order.findUniqueOrThrow({
+      where: { id: secondOrder.body.id },
+      include: { payments: true, tickets: true },
+    });
+    expect(secondEvent.status).toBe('rejected');
+    expect(secondEvent.errorCode).toBe('provider_transaction_conflict');
+    expect(secondOrderAfter.status).toBe('pending_payment');
+    expect(secondOrderAfter.payments[0]?.status).toBe('created');
+    expect(secondOrderAfter.tickets).toHaveLength(0);
   });
 
   it('marks order as failed for failed payment webhook without issuing tickets', async () => {

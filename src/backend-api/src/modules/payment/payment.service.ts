@@ -55,6 +55,8 @@ export class PaymentService {
       provider: dto.provider ?? 'mock',
       providerTxnId: dto.providerTxnId,
       status: dto.status,
+      amount: dto.amount ?? null,
+      currency: dto.currency ?? null,
       payload: dto.payload ?? null,
       providerEventId: dto.providerEventId ?? null,
       eventTimestamp: dto.eventTimestamp ?? null,
@@ -65,6 +67,8 @@ export class PaymentService {
       provider: dto.provider ?? 'mock',
       providerTxnId: dto.providerTxnId,
       status: dto.status,
+      amount: dto.amount ?? null,
+      currency: dto.currency ?? null,
       payloadHash,
       providerEventId:
         dto.providerEventId ?? `${dto.providerTxnId}:${dto.status}`,
@@ -142,6 +146,8 @@ export class PaymentService {
       providerEventId: `vnpay-${source}:${providerTxnId}:${params.vnp_ResponseCode}:${params.vnp_TransactionStatus}`,
       eventTimestamp: params.vnp_PayDate,
       status,
+      amount: Number(params.vnp_Amount),
+      currency: 'VND',
       payload: {
         eventType: `vnpay.${source}.${status}`,
       },

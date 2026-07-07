@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsIn,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -32,6 +33,15 @@ export class PaymentWebhookDto {
   @IsOptional()
   @IsString()
   provider?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  amount?: number;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
 
   @IsIn(['succeeded', 'failed'])
   status!: 'succeeded' | 'failed';

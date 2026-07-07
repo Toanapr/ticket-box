@@ -85,7 +85,13 @@ export interface BuyerInfo {
 
 export type PaymentMethod = "VNPAY";
 export type PaymentProvider = PaymentMethod | "mock" | "mock-bank";
-export type PaymentIntentStatus = "pending" | "pending_reconciliation";
+export type PaymentIntentStatus =
+  | "created"
+  | "pending"
+  | "pending_reconciliation"
+  | "succeeded"
+  | "failed"
+  | "expired";
 export type PaymentIntentReason =
   | "provider_unavailable"
   | "provider_timeout_ambiguous";
@@ -93,6 +99,7 @@ export type PaymentIntentReason =
 export interface PaymentIntentResponse {
   paymentId: string;
   orderId: string;
+  orderStatus?: string;
   status: PaymentIntentStatus;
   checkoutUrl: string | null;
   degraded: boolean;

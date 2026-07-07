@@ -1,7 +1,14 @@
 export type PaymentIntentBody = {
   paymentId: string;
   orderId: string;
-  status: 'pending' | 'pending_reconciliation';
+  orderStatus: string;
+  status:
+    | 'created'
+    | 'pending'
+    | 'pending_reconciliation'
+    | 'succeeded'
+    | 'failed'
+    | 'expired';
   checkoutUrl: string | null;
   degraded: boolean;
   reason: 'provider_unavailable' | 'provider_timeout_ambiguous' | null;

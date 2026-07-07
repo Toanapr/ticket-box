@@ -24,6 +24,9 @@ export interface PaymentProviderPort {
   queryIntent(input: {
     provider: string;
     providerIntentId: string;
+    orderId?: string;
+    providerTxnId?: string | null;
+    createdAt?: Date;
     signal: AbortSignal;
   }): Promise<{ status: ProviderPaymentStatus; providerTxnId: string | null }>;
 }

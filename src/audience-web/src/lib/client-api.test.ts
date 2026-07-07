@@ -233,6 +233,7 @@ describe("client API transient errors", () => {
           {
             paymentId: "payment-success",
             orderId: "order-success",
+            orderStatus: "pending_payment",
             status: "pending",
             checkoutUrl: "https://pay.example/checkout/payment-success",
             degraded: false,
@@ -252,11 +253,43 @@ describe("client API transient errors", () => {
     ).resolves.toEqual({
       paymentId: "payment-success",
       orderId: "order-success",
+      orderStatus: "pending_payment",
       status: "pending",
       checkoutUrl: "https://pay.example/checkout/payment-success",
       degraded: false,
       reason: null,
       retryAfterSeconds: null,
+    });
+  });
+
+  it("accepts terminal payment intent states from guarded backend responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          paymentId: "payment-expired",
+          orderId: "order-expired",
+          orderStatus: "expired",
+          status: "expired",
+          checkoutUrl: null,
+          degraded: false,
+          reason: null,
+          retryAfterSeconds: null,
+        }),
+      ),
+    );
+
+    await expect(
+      createPaymentIntent({
+        paymentId: "payment-expired",
+        idempotencyKey: "payment-intent-key",
+      }),
+    ).resolves.toMatchObject({
+      paymentId: "payment-expired",
+      orderId: "order-expired",
+      orderStatus: "expired",
+      status: "expired",
+      checkoutUrl: null,
     });
   });
 

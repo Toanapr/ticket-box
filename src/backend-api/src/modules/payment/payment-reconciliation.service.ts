@@ -84,16 +84,25 @@ export class PaymentReconciliationService {
         provider: payment.provider,
         providerIntentId:
           payment.providerIntentId ?? payment.providerIdempotencyKey,
+        orderId: payment.orderId,
+        providerTxnId: payment.providerTxnId,
+        createdAt: payment.createdAt,
       });
       if (result.status === 'succeeded' || result.status === 'failed') {
         const providerTxnId =
           result.providerTxnId ?? `reconciled-${payment.id}`;
         const status = result.status;
+        const order = await this.prisma.order.findUniqueOrThrow({
+          where: { id: payment.orderId },
+          select: { totalAmount: true },
+        });
         const finalized = await this.paymentRepository.processWebhook({
           orderId: payment.orderId,
           provider: payment.provider,
           providerTxnId,
           status,
+          amount: Math.round(Number(order.totalAmount) * 100),
+          currency: 'VND',
           providerEventId: `reconciliation:${payment.id}:${status}`,
           payloadHash: createStableHash({
             paymentId: payment.id,

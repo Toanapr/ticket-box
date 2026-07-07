@@ -385,9 +385,10 @@ function parsePaymentIntentResponse(
   if (
     typeof body.paymentId !== "string" ||
     typeof body.orderId !== "string" ||
-    (status !== "pending" && status !== "pending_reconciliation") ||
+    !isPaymentIntentStatus(status) ||
     (body.checkoutUrl !== null && typeof body.checkoutUrl !== "string") ||
-    typeof body.degraded !== "boolean"
+    typeof body.degraded !== "boolean" ||
+    (body.orderStatus !== undefined && typeof body.orderStatus !== "string")
   ) {
     throw invalidPaymentIntentResponse(response.status);
   }
@@ -395,12 +396,24 @@ function parsePaymentIntentResponse(
   return {
     paymentId: body.paymentId,
     orderId: body.orderId,
+    orderStatus: body.orderStatus,
     status,
     checkoutUrl: body.checkoutUrl,
     degraded: body.degraded,
     reason,
     retryAfterSeconds,
   };
+}
+
+function isPaymentIntentStatus(value: unknown): value is PaymentIntentResponse["status"] {
+  return (
+    value === "created" ||
+    value === "pending" ||
+    value === "pending_reconciliation" ||
+    value === "succeeded" ||
+    value === "failed" ||
+    value === "expired"
+  );
 }
 
 function normalizePaymentIntentReason(

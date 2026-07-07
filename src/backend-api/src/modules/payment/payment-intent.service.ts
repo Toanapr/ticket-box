@@ -4,6 +4,7 @@ import { DomainError } from '../../common/errors/domain-error';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { formatStructuredLog } from '../../common/logging/structured-log.util';
 import { createStableHash } from '../../common/utils/hash.util';
+import { OrderStatus, PaymentStatus, ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentIntentResult } from './payment.contract';
 import { PaymentProviderError } from './providers/payment-provider.port';
@@ -32,13 +33,39 @@ export class PaymentIntentService {
   ): Promise<PaymentIntentResult> {
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, order: { userId } },
-      include: { order: true },
+      include: {
+        order: {
+          include: {
+            reservations: {
+              orderBy: {
+                createdAt: 'asc',
+              },
+            },
+          },
+        },
+      },
     });
     if (!payment) {
       throw new DomainError('Payment was not found', 'payment_not_found', 404);
     }
+    const guardedPayment = await this.applyStateGuard(payment);
+    if (!this.isIntentCreatable(guardedPayment)) {
+      return {
+        httpStatus: 200,
+        body: this.toBody(
+          guardedPayment,
+          guardedPayment.order.status,
+          false,
+          null,
+          null,
+        ),
+      };
+    }
     if (payment.providerIntentId && payment.checkoutUrl) {
-      return { httpStatus: 200, body: this.toBody(payment, false, null, null) };
+      return {
+        httpStatus: 200,
+        body: this.toBody(payment, payment.order.status, false, null, null),
+      };
     }
 
     const claim = await this.idempotency.claim({
@@ -57,10 +84,19 @@ export class PaymentIntentService {
     if (claim.kind === 'processing') {
       const current = await this.prisma.payment.findUniqueOrThrow({
         where: { id: payment.id },
+        include: {
+          order: true,
+        },
       });
       return {
         httpStatus: 202,
-        body: this.toBody(current, true, 'provider_timeout_ambiguous', 5),
+        body: this.toBody(
+          current,
+          current.order.status,
+          true,
+          'provider_timeout_ambiguous',
+          5,
+        ),
       };
     }
 
@@ -84,7 +120,7 @@ export class PaymentIntentService {
           lastProviderError: null,
         },
       });
-      const body = this.toBody(updated, false, null, null);
+      const body = this.toBody(updated, payment.order.status, false, null, null);
       await this.idempotency.complete(claim.recordId, claim.owner, 201, body);
       this.logger.log(
         formatStructuredLog('payment_pending', {
@@ -106,6 +142,9 @@ export class PaymentIntentService {
       status: string;
       checkoutUrl: string | null;
       uncertainSince: Date | null;
+      order: {
+        status: string;
+      };
     },
     claim: { recordId: string; owner: string },
   ): Promise<PaymentIntentResult> {
@@ -119,7 +158,13 @@ export class PaymentIntentService {
       return {
         httpStatus: 503,
         retryAfterSeconds: 30,
-        body: this.toBody(payment, true, 'provider_unavailable', 30),
+        body: this.toBody(
+          payment,
+          payment.order.status,
+          true,
+          'provider_unavailable',
+          30,
+        ),
       };
     }
     const updated = await this.prisma.payment.update({
@@ -132,7 +177,13 @@ export class PaymentIntentService {
         lastProviderError: providerError.code ?? 'provider_error',
       },
     });
-    const body = this.toBody(updated, true, 'provider_timeout_ambiguous', 5);
+    const body = this.toBody(
+      updated,
+      payment.order.status,
+      true,
+      'provider_timeout_ambiguous',
+      5,
+    );
     await this.idempotency.complete(claim.recordId, claim.owner, 202, body);
     this.logger.warn(
       formatStructuredLog('payment_pending', {
@@ -152,6 +203,7 @@ export class PaymentIntentService {
       status: string;
       checkoutUrl: string | null;
     },
+    orderStatus: string,
     degraded: boolean,
     reason: 'provider_unavailable' | 'provider_timeout_ambiguous' | null,
     retryAfterSeconds: number | null,
@@ -159,14 +211,91 @@ export class PaymentIntentService {
     return {
       paymentId: payment.id,
       orderId: payment.orderId,
-      status:
-        payment.status === 'pending_reconciliation'
-          ? 'pending_reconciliation'
-          : 'pending',
+      orderStatus,
+      status: this.toPaymentIntentStatus(payment.status),
       checkoutUrl: payment.checkoutUrl,
       degraded,
       reason,
       retryAfterSeconds,
     };
+  }
+
+  private async applyStateGuard<T extends {
+    id: string;
+    status: PaymentStatus;
+    order: {
+      status: OrderStatus;
+      reservations: Array<{
+        status: ReservationStatus;
+        expiresAt: Date;
+      }>;
+    };
+  }>(payment: T): Promise<T> {
+    const reservation = payment.order.reservations[0];
+    const isExpired =
+      payment.order.status === OrderStatus.expired ||
+      reservation?.status === ReservationStatus.expired ||
+      (reservation?.expiresAt ? reservation.expiresAt <= new Date() : false);
+
+    if (isExpired && this.isMutablePaymentStatus(payment.status)) {
+      const updated = await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.expired,
+          reconciliationAfter: null,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          lastProviderError: null,
+        },
+      });
+      return { ...payment, ...updated };
+    }
+
+    return payment;
+  }
+
+  private isIntentCreatable(payment: {
+    status: PaymentStatus;
+    order: {
+      status: OrderStatus;
+      reservations: Array<{
+        status: ReservationStatus;
+        expiresAt: Date;
+      }>;
+    };
+  }): boolean {
+    const reservation = payment.order.reservations[0];
+    if (payment.order.status !== OrderStatus.pending_payment) return false;
+    if (!this.isMutablePaymentStatus(payment.status)) {
+      return false;
+    }
+    return (
+      reservation?.status === ReservationStatus.active &&
+      reservation.expiresAt > new Date()
+    );
+  }
+
+  private toPaymentIntentStatus(
+    status: string,
+  ): PaymentIntentResult['body']['status'] {
+    if (
+      status === 'created' ||
+      status === 'pending' ||
+      status === 'pending_reconciliation' ||
+      status === 'succeeded' ||
+      status === 'failed' ||
+      status === 'expired'
+    ) {
+      return status;
+    }
+    return 'pending';
+  }
+
+  private isMutablePaymentStatus(status: PaymentStatus): boolean {
+    return (
+      status === PaymentStatus.created ||
+      status === PaymentStatus.pending ||
+      status === PaymentStatus.pending_reconciliation
+    );
   }
 }

@@ -19,6 +19,8 @@ type WebhookCommand = {
   provider: string;
   providerTxnId: string;
   status: 'succeeded' | 'failed';
+  amount: number | null;
+  currency: string | null;
   payloadHash: string;
   providerEventId: string;
 };
@@ -52,7 +54,7 @@ export class PaymentRepository {
   }
 
   async processWebhook(command: WebhookCommand) {
-    return this.prisma.$transaction(async (tx) => {
+    const outcome = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${`${command.provider}:${command.providerEventId}`})
@@ -104,6 +106,24 @@ export class PaymentRepository {
         command.provider,
       );
 
+      const validationError = await this.validateProviderEvent(
+        tx,
+        context,
+        command,
+      );
+      if (validationError) {
+        await this.rejectProviderEvent(
+          tx,
+          event.id,
+          validationError.code,
+          validationError.details,
+        );
+        return {
+          kind: 'rejected' as const,
+          error: validationError,
+        };
+      }
+
       const isPayloadReplay =
         context.payment.payloadHash === command.payloadHash &&
         context.payment.providerTxnId === command.providerTxnId;
@@ -123,13 +143,13 @@ export class PaymentRepository {
           false,
         );
         await this.finishProviderEvent(tx, event.id, replay.response);
-        return replay;
+        return { kind: 'processed' as const, result: replay };
       }
 
       if (command.status === 'failed') {
         const result = await this.markPaymentFailed(tx, context, command);
         await this.finishProviderEvent(tx, event.id, result.response);
-        return result;
+        return { kind: 'processed' as const, result };
       }
 
       const result = await this.confirmPaymentSuccess(tx, context, {
@@ -137,8 +157,19 @@ export class PaymentRepository {
         payloadHash: command.payloadHash,
       });
       await this.finishProviderEvent(tx, event.id, result.response);
-      return result;
+      return { kind: 'processed' as const, result };
     });
+
+    if (outcome.kind === 'rejected') {
+      throw new DomainError(
+        outcome.error.message,
+        outcome.error.code,
+        409,
+        outcome.error.details,
+      );
+    }
+
+    return outcome.result;
   }
 
   private async finishProviderEvent(
@@ -150,6 +181,23 @@ export class PaymentRepository {
       where: { id: eventId },
       data: {
         status: 'processed',
+        responseBody: response as Prisma.InputJsonValue,
+        processedAt: new Date(),
+      },
+    });
+  }
+
+  private async rejectProviderEvent(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    errorCode: string,
+    response: Record<string, unknown>,
+  ) {
+    await tx.paymentProviderEvent.update({
+      where: { id: eventId },
+      data: {
+        status: 'rejected',
+        errorCode,
         responseBody: response as Prisma.InputJsonValue,
         processedAt: new Date(),
       },
@@ -199,6 +247,70 @@ export class PaymentRepository {
     }
 
     return { order, payment, reservation };
+  }
+
+  private async validateProviderEvent(
+    tx: Prisma.TransactionClient,
+    context: Awaited<ReturnType<PaymentRepository['loadOrderPaymentContext']>>,
+    command: WebhookCommand,
+  ): Promise<{
+    code: string;
+    message: string;
+    details: Record<string, unknown>;
+  } | null> {
+    if (command.provider !== 'mock') {
+      if (command.currency?.toUpperCase() !== 'VND') {
+        return {
+          code: 'payment_currency_mismatch',
+          message: 'Payment currency does not match the order currency',
+          details: {
+            expectedCurrency: 'VND',
+            actualCurrency: command.currency,
+          },
+        };
+      }
+
+      const expectedAmount = Math.round(
+        Number(context.order.totalAmount) * 100,
+      );
+      if (command.amount !== expectedAmount) {
+        return {
+          code: 'payment_amount_mismatch',
+          message: 'Payment amount does not match the order total',
+          details: {
+            expectedAmount,
+            actualAmount: command.amount,
+          },
+        };
+      }
+    }
+
+    const paymentWithSameTxn = await tx.payment.findUnique({
+      where: {
+        provider_providerTxnId: {
+          provider: command.provider,
+          providerTxnId: command.providerTxnId,
+        },
+      },
+      select: {
+        id: true,
+        orderId: true,
+      },
+    });
+
+    if (paymentWithSameTxn && paymentWithSameTxn.id !== context.payment.id) {
+      return {
+        code: 'provider_transaction_conflict',
+        message: 'Provider transaction is already linked to another payment',
+        details: {
+          provider: command.provider,
+          providerTxnId: command.providerTxnId,
+          existingOrderId: paymentWithSameTxn.orderId,
+        },
+      };
+    }
+
+    return null;
   }
 
   private async confirmPaymentSuccess(

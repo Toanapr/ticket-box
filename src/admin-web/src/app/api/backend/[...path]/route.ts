@@ -48,7 +48,7 @@ async function proxyBackendRequest(
   headers.delete("cookie");
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (targetUrl.pathname.startsWith("/admin") && token) {
+  if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 

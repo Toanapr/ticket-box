@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { BellIcon, LayersIcon, TicketIcon } from "./icons";
+import { BellIcon, LayersIcon, TicketIcon, UserIcon } from "./icons";
 import { AdminPageShell } from "./admin-ui";
 
 const navItems = [
@@ -16,6 +16,11 @@ const navItems = [
     href: "/admin/notifications",
     label: "Notifications",
     icon: BellIcon,
+  },
+  {
+    href: "/admin/profile",
+    label: "Profile",
+    icon: UserIcon,
   },
 ];
 

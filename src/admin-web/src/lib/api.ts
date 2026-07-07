@@ -338,3 +338,15 @@ export async function apiFetch<T>(
 
   return response.json() as Promise<T>;
 }
+
+export type UserProfile = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  organizationId?: string | null;
+};
+
+export async function getProfile(): Promise<UserProfile> {
+  return apiFetch<UserProfile>("/auth/me");
+}

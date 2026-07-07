@@ -11,7 +11,7 @@ PDF press kit có thể lớn, lỗi, chứa nội dung không liên quan hoặc
 - Xử lý bất đồng bộ qua queue/workflow: extract, clean, sanitize, generate.
 - Lưu trạng thái job, prompt version, model version và draft output.
 - Mỗi job/stage idempotent theo object version và pipeline version.
-- Đặt timeout, retry budget, exponential backoff/jitter; vượt budget chuyển DLQ/failed để retry thủ công.
+- Đặt timeout, retry budget, exponential backoff/jitter; vượt budget chuyển job sang `failed` để retry thủ công.
 - Yêu cầu admin review/edit trước khi publish.
 - Khi job lỗi, trang concert tiếp tục dùng bio cũ hoặc bio thủ công.
 
@@ -43,6 +43,5 @@ PDF press kit có thể lớn, lỗi, chứa nội dung không liên quan hoặc
 
 - Test PDF lỗi, file lớn, scan-only, nội dung độc hại và model timeout.
 - Kiểm tra retry không tạo nhiều draft ngoài ý muốn.
-- Kiểm tra vượt retry budget vào DLQ và manual replay vẫn giữ cùng job id.
+- Kiểm tra vượt retry budget vào `failed` và manual retry vẫn giữ cùng job id.
 - Xác nhận job lỗi không ảnh hưởng trang concert và checkout.
-

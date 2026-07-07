@@ -47,7 +47,7 @@ sequenceDiagram
 | Payment timeout | Order giữ `PENDING_PAYMENT`; reconciliation kiểm tra lại gateway; reservation hết TTL thì release. |
 | Webhook gửi nhiều lần | Payment Service dedupe theo provider transaction id/payload hash. |
 | Ticket issuing retry | Ticket issuing idempotent; bảng tickets chống trùng từng vé bằng `UNIQUE(order_item_id, sequence_no)` và `UNIQUE(qr_token_hash)`. |
-| Notification lỗi | Ghi delivery failure và retry qua queue; không rollback ticket đã issued. |
+| Notification lỗi | Ghi delivery failure và retry bằng scheduled worker; không rollback ticket đã issued. |
 | Payment success sau khi reservation expired | Không issue ticket tự động; chuyển order sang reconciliation/refund_required. |
 
 ## Luồng soát vé khi mất mạng và đồng bộ lại
@@ -101,8 +101,7 @@ sequenceDiagram
     participant Import as Guest List Import Service
     participant Staging as Staging Tables
     participant DB as PostgreSQL
-    participant Outbox as Outbox Publisher
-    participant Bus as RabbitMQ
+    participant OutboxWorker as Outbox Polling Worker
     participant Checkin as Check-in Service
     participant Admin as Admin Dashboard
 
@@ -112,9 +111,8 @@ sequenceDiagram
     Import->>Staging: Parse, validate, normalize
     Import->>Import: Deduplicate guest identity
     Import->>DB: Publish version + outbox nếu toàn batch hợp lệ
-    Outbox->>DB: Đọc outbox đã commit
-    Outbox->>Bus: Publish GuestListUpdated
-    Bus-->>Checkin: Notify manifest update
+    OutboxWorker->>DB: Đọc outbox đã commit
+    OutboxWorker->>Checkin: Áp dụng GuestListUpdated / mark manifest stale
     Import-->>Admin: Summary + invalid rows
 ```
 
@@ -127,7 +125,7 @@ sequenceDiagram
 | Trùng khách mời | Dedupe theo concert + identity + sponsor; không publish bản trùng. |
 | Batch lỗi nặng | Quarantine file, không ghi đè dữ liệu production. |
 | Import service restart | Retry theo `(concert_id, file checksum, schema version)`, không tạo version hoặc row trùng. |
-| Worker crash sau DB commit | Outbox tiếp tục publish `GuestListUpdated`; version đã active không bị publish lại thành version mới. |
+| Worker crash sau DB commit | Outbox polling worker tiếp tục xử lý `GuestListUpdated`; version đã active không bị tạo lại thành version mới. |
 
 ## Luồng cập nhật cache concert
 
@@ -137,17 +135,15 @@ sequenceDiagram
     actor Admin as Admin
     participant Concert as Concert Service
     participant DB as DB
-    participant Outbox as Outbox Publisher
-    participant EventBus as Event Bus
+    participant OutboxWorker as Outbox Polling Worker
     participant CacheWorker as Cache Worker
     participant Cache as Nginx/Varnish/Redis
     participant PublicAPI as Public API
 
     Admin->>Concert: Update concert
     Concert->>DB: Save + outbox event trong cùng transaction
-    Outbox->>DB: Đọc outbox đã commit
-    Outbox->>EventBus: Publish ConcertUpdated
-    EventBus-->>CacheWorker: Deliver ConcertUpdated
+    OutboxWorker->>DB: Đọc outbox đã commit
+    OutboxWorker->>CacheWorker: Deliver ConcertUpdated
     CacheWorker->>Cache: Invalidate concert detail/listing keys
     PublicAPI->>Cache: Serve updated content
 ```
@@ -194,7 +190,7 @@ sequenceDiagram
 |---|---|
 | PDF lỗi hoặc quá lớn | Reject upload hoặc đưa job vào failed, không ảnh hưởng trang concert. |
 | Extract text lỗi | Lưu lỗi job để admin upload lại hoặc nhập bio thủ công. |
-| AI model timeout | Retry có giới hạn với backoff/jitter; vượt budget thì vào DLQ/failed để admin retry thủ công. |
+| AI model timeout | Retry có giới hạn với backoff/jitter; vượt budget thì vào failed state để admin retry thủ công. |
 | AI sinh nội dung không phù hợp | Không auto-publish; admin phải review/edit/publish. |
 | Worker nhận lại cùng message | Dedupe theo job/stage key, không tạo thêm draft hoặc gọi model lại khi stage đã hoàn tất. |
 | Nội dung PDF cố điều khiển model | Xem PDF là input không tin cậy; sanitize và giữ system instruction cố định. |

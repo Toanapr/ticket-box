@@ -180,7 +180,7 @@ Khi expire:
 | Vấn đề | Cách xử lý |
 |---|---|
 | Row lock nóng trên ticket type SVIP | Dùng waiting room để giới hạn write concurrency vào ticket type hot. |
-| Retry transaction quá nhiều | Serialize command cực hot bằng RabbitMQ theo `ticket_type_id`. |
+| Retry transaction quá nhiều | Giới hạn concurrency theo `ticket_type_id` ở API/worker; nếu cần mở rộng sau, có thể tách command processor chuyên trách. |
 | Dashboard/reporting ảnh hưởng primary | Dùng read replica hoặc read model riêng. |
 | Số concert/ticket type lớn | Partition/shard theo `concert_id` và `ticket_type_id` nếu cần. |
 

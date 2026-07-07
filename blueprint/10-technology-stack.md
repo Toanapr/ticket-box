@@ -4,7 +4,7 @@
 
 TicketBox chọn Next.js làm frontend framework thống nhất cho audience web, admin web và scanner PWA; NestJS làm backend framework thống nhất cho API và worker. Backend đi theo modular monolith có module boundary rõ, kết hợp worker bất đồng bộ cho notification, ticket issuance, payment reconciliation, CSV import và AI jobs.
 
-Phạm vi implement chính ưu tiên stack có thể chạy được bằng Docker Compose: PostgreSQL là nguồn dữ liệu giao dịch, Redis cho cache/rate limit/waiting room, RabbitMQ cho xử lý bất đồng bộ, MinIO hoặc S3-compatible storage cho file, auth nội bộ bằng JWT/session và RBAC. Không đưa orchestration cluster, event streaming platform, identity provider riêng, secret manager riêng, lớp bảo vệ web chuyên dụng hoặc nền tảng quan sát hệ thống đầy đủ vào phạm vi công nghệ chính của đồ án.
+Phạm vi implement chính ưu tiên stack có thể chạy được bằng Docker Compose: PostgreSQL là nguồn dữ liệu giao dịch và async state/outbox, Redis cho cache/rate limit/waiting room, NestJS scheduled workers cho xử lý bất đồng bộ, MinIO hoặc S3-compatible storage cho file, auth nội bộ bằng JWT/session và RBAC. Không đưa hàng đợi ngoài PostgreSQL, orchestration cluster, event streaming platform, identity provider riêng, secret manager riêng, lớp bảo vệ web chuyên dụng hoặc nền tảng quan sát hệ thống đầy đủ vào phạm vi công nghệ chính của đồ án.
 
 ## Stack MVP bắt buộc
 
@@ -16,11 +16,11 @@ Phạm vi implement chính ưu tiên stack có thể chạy được bằng Dock
 | Backend framework | NestJS | API backend, domain modules, workers và integration adapters. | Đồng nhất TypeScript với Next.js, DI/module rõ, phù hợp modular monolith. | Giữ transaction discipline; không để module gọi chéo tùy tiện. |
 | Database | PostgreSQL | Concert, ticket type, reservation, order, payment, ticket, check-in, guest list, audit. | Transaction mạnh, lock/constraint rõ, query/reporting tốt. | Checkout luôn kiểm tra DB; cache không là nguồn quyết định vé. |
 | Cache/rate limit/waiting room | Redis single instance cho MVP | Concert cache, inventory summary TTL ngắn, rate limit counter, waiting room token, idempotency cache nếu phù hợp. | Đủ cho local/dev và demo tải cơ bản; dễ nâng cấp sau. | Không lưu dữ liệu cần bền vững chỉ trong Redis. |
-| Message broker | RabbitMQ | Notification, ticket issuance, payment reconciliation, CSV import, AI jobs, retry/DLQ. | Routing/retry/DLQ hợp workflow nghiệp vụ và đủ nhẹ cho đồ án. | Dùng queue riêng cho job quan trọng; log rõ DLQ/retry reason. |
+| Async processing | PostgreSQL outbox/job tables + NestJS Schedule workers | Notification, ticket issuance, payment reconciliation, CSV import, AI jobs, retry/failed state. | Khớp code hiện tại, giảm thành phần vận hành cho đồ án, vẫn đảm bảo retry/idempotency bằng DB transaction. | Dùng bảng job/outbox riêng cho luồng quan trọng; log rõ retry reason và failed reason. |
 | Object storage | MinIO hoặc local S3-compatible storage | Lưu ảnh concert, SVG seating map, PDF press kit, CSV guest list, ticket assets. | Dễ chạy local bằng Docker Compose, API gần S3. | Có thể thay bằng S3 thật khi deploy production. |
 | Authentication/Authorization | NestJS auth + JWT/session + RBAC | Đăng nhập, phân quyền audience/organizer/scanner/admin. | Đủ cho đồ án, ít vận hành hơn một identity provider riêng. | Thiết kế claims/guards rõ để sau này có thể thay auth provider. |
 | Secrets/config | `.env` + config validation | DB URL, Redis URL, payment secret, AI key, JWT secret. | Đơn giản, phù hợp local và đồ án. | Không commit secret; validate config khi app start. |
-| Monitoring cơ bản | Structured logs + health checks + metrics endpoint | Theo dõi request, order/payment/ticket/check-in, queue depth cơ bản. | Đủ để debug demo và load test nhỏ. | Chuẩn hóa correlation id, order_id, payment_id, ticket_id trong log. |
+| Monitoring cơ bản | Structured logs + health checks + metrics endpoint | Theo dõi request, order/payment/ticket/check-in, pending/failed job count cơ bản. | Đủ để debug demo và load test nhỏ. | Chuẩn hóa correlation id, order_id, payment_id, ticket_id trong log. |
 | PDF parser/OCR | PyMuPDF hoặc Apache PDFBox; Tesseract chỉ khi cần OCR | Extract text từ PDF press kit. | Self-hosted, chi phí thấp, đủ cho PDF text-based. | OCR là fallback, không bắt buộc nếu input PDF có text. |
 | AI model integration | AI adapter configurable hoặc mock provider cho local | Tạo draft AI Artist Bio từ text đã làm sạch. | Giữ đúng kiến trúc async mà không cần GPU/local LLM nặng. | AI lỗi không ảnh hưởng concert page/checkout; admin review trước khi publish. |
 | Email/App notification | SMTP adapter hoặc in-app notification store | Gửi e-ticket, reminder, thông báo hủy trong app/web. | Dễ demo và test hơn tự vận hành mail server. | Có thể log email trong local dev thay vì gửi thật. |
@@ -40,8 +40,8 @@ Khuyến nghị bắt đầu bằng modular monolith backend có module boundary
 | Tiêu chí | Lợi ích | Rủi ro/chi phí | Cách giảm rủi ro |
 |---|---|---|---|
 | Kiểm soát hạ tầng | Chủ động cấu hình networking, data locality, version, scaling. | Team phải chịu trách nhiệm vận hành nhiều thành phần. | Dùng Docker Compose và runbook tối giản. |
-| Chi phí | Dễ chạy local và demo bằng container OSS. | Khi production, vẫn phải trả chi phí node, DB, broker kể cả lúc ít traffic. | Chỉ scale stateless workload khi cần; capacity planning theo concert campaign. |
-| Chống lock-in | Dùng công nghệ OSS, dễ chuyển môi trường. | Tự tích hợp nhiều mảnh ghép hơn. | Chuẩn hóa qua SQL, Redis, AMQP, S3-compatible API và log/metrics có cấu trúc. |
-| Hiệu năng | Service luôn warm, latency ổn định hơn serverless cold start. | Nếu scale chậm, spike có thể làm nghẽn node/DB/broker. | Chứng minh bằng waiting room, rate limit, cache và transaction ngắn. |
+| Chi phí | Dễ chạy local và demo bằng container OSS. | Khi production, vẫn phải trả chi phí node, DB/cache kể cả lúc ít traffic. | Chỉ scale stateless workload khi cần; capacity planning theo concert campaign. |
+| Chống lock-in | Dùng công nghệ OSS, dễ chuyển môi trường. | Tự tích hợp nhiều mảnh ghép hơn. | Chuẩn hóa qua SQL, Redis, S3-compatible API và log/metrics có cấu trúc. |
+| Hiệu năng | Service luôn warm, latency ổn định hơn serverless cold start. | Nếu scale chậm, spike có thể làm nghẽn node/DB/cache hoặc worker backlog. | Chứng minh bằng waiting room, rate limit, cache và transaction ngắn. |
 | Consistency | PostgreSQL transaction giúp reservation/payment dễ kiểm soát. | Hot row inventory có thể nghẽn dưới concurrent write lớn. | Waiting room, short transaction, row-level lock tối ưu, partition theo ticket type/concert khi cần. |
 | Vận hành sự kiện | Có thể build dashboard và runbook sát nhu cầu mở bán/ngày diễn. | Cần trực ca, alert, backup/restore nếu chạy thật. | Giữ ở mức dashboard, log, health check và hướng dẫn vận hành cơ bản. |

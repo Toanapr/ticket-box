@@ -27,7 +27,7 @@ flowchart TD
 
     Postgres["PostgreSQL"]
     Redis["Redis"]
-    RabbitMQ["RabbitMQ"]
+    AsyncState["PostgreSQL outbox/job tables"]
     Storage["Object Storage"]
 
     PaymentGateway["VNPAY / MoMo"]
@@ -61,12 +61,12 @@ flowchart TD
     Ticket --> Postgres
     Checkin --> Postgres
 
-    Order --> RabbitMQ
-    PaymentSvc --> RabbitMQ
-    Ticket --> RabbitMQ
-    GuestImport --> RabbitMQ
-    AIBio --> RabbitMQ
-    Notify --> RabbitMQ
+    Order --> AsyncState
+    PaymentSvc --> AsyncState
+    Ticket --> AsyncState
+    GuestImport --> AsyncState
+    AIBio --> AsyncState
+    Notify --> AsyncState
 
     PaymentSvc --> PaymentGateway
     PaymentGateway --> PaymentSvc
@@ -90,7 +90,7 @@ flowchart TD
 
 ## Luồng phụ thuộc khi checkout
 
-Checkout phụ thuộc vào Auth, Inventory, Order, Payment và database transaction. Notification, analytics và email chỉ chạy sau qua queue. Nếu notification lỗi, checkout không rollback. Nếu payment gateway lỗi, hệ thống dừng bước thanh toán nhưng vẫn giữ được read path cho concert.
+Checkout phụ thuộc vào Auth, Inventory, Order, Payment và database transaction. Notification, analytics và email chỉ chạy sau qua outbox/job table được scheduled worker xử lý. Nếu notification lỗi, checkout không rollback. Nếu payment gateway lỗi, hệ thống dừng bước thanh toán nhưng vẫn giữ được read path cho concert.
 
 ## Topology triển khai khuyến nghị
 
@@ -119,7 +119,7 @@ flowchart TD
     subgraph Platform["Docker Compose platform containers"]
         Postgres["PostgreSQL"]
         Redis["Redis"]
-        RabbitMQ["RabbitMQ"]
+        AsyncState["PostgreSQL outbox/job tables"]
         MinIO["MinIO / S3-compatible storage"]
     end
 
@@ -132,14 +132,14 @@ flowchart TD
 
     BackendAPI --> Postgres
     BackendAPI --> Redis
-    BackendAPI --> RabbitMQ
+    BackendAPI --> AsyncState
     BackendAPI --> MinIO
 
-    RabbitMQ --> NotificationWorker
-    RabbitMQ --> ReservationSweeper
-    RabbitMQ --> PaymentReconciliation
-    RabbitMQ --> CSVImport
-    RabbitMQ --> AIBioWorker
+    NotificationWorker --> AsyncState
+    ReservationSweeper --> AsyncState
+    PaymentReconciliation --> AsyncState
+    CSVImport --> AsyncState
+    AIBioWorker --> AsyncState
 ```
 
 | Layer | Khuyến nghị |
@@ -148,7 +148,7 @@ flowchart TD
 | Runtime | Docker Compose chạy audience web, admin web, scanner PWA, backend API, worker và platform containers. |
 | Database | PostgreSQL single instance cho đồ án; backup script hoặc dump hướng dẫn trong README. |
 | Redis | Redis single instance cho cache, rate limit, waiting room token và inventory summary gần realtime. |
-| RabbitMQ | Durable queue, retry và DLQ cho event/job quan trọng. |
+| PostgreSQL outbox/job tables | Durable async state, retry theo attempt count/schedule và failed-state/manual retry cho event/job quan trọng. |
 | Object storage | MinIO hoặc S3-compatible storage cho PDF/CSV/seating map/ticket assets. |
 | Monitoring cơ bản | Structured logs, health checks, metrics endpoint và dashboard tối thiểu nếu có thời gian. |
 
@@ -157,6 +157,6 @@ flowchart TD
 | Tiêu chí | Lợi ích | Rủi ro/chi phí | Cách giảm rủi ro |
 |---|---|---|---|
 | Kiểm soát hạ tầng | Chủ động cấu hình networking, data locality, version, scaling. | Team phải chịu trách nhiệm vận hành nhiều container. | Docker Compose, `.env` rõ ràng, runbook tối giản. |
-| Chi phí | Dễ chạy local và demo bằng container OSS. | DB/broker/cache vẫn tiêu tốn tài nguyên máy local. | Chỉ bật thành phần cần demo, seed data gọn. |
+| Chi phí | Dễ chạy local và demo bằng container OSS. | DB/cache và worker polling vẫn tiêu tốn tài nguyên máy local. | Chỉ bật thành phần cần demo, seed data gọn. |
 | Consistency | PostgreSQL transaction giúp reservation/payment dễ kiểm soát. | Hot row inventory có thể nghẽn dưới concurrent write lớn. | Waiting room, short transaction, row-level lock tối ưu, partition theo ticket type/concert. |
 | Vận hành sự kiện | Có thể build dashboard và runbook sát nhu cầu vận hành. | Cần trực ca, log, backup/restore nếu chạy thật. | Sale-day checklist, load test nhỏ và hướng dẫn xử lý sự cố cơ bản. |

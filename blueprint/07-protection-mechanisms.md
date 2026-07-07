@@ -59,10 +59,10 @@ Nếu vượt limit, API trả `429 Too Many Requests` kèm `Retry-After`. Nếu
 
 ### Backpressure và overload response
 
-- Mỗi tầng có concurrency limit và queue depth tối đa theo capacity test.
+- Mỗi tầng có concurrency limit và backlog/admission depth tối đa theo capacity test.
 - Request chưa được nhận vào xử lý bị từ chối sớm bằng `429` hoặc `503` kèm `Retry-After`; không giữ HTTP connection chờ vô hạn.
 - Client retry bằng cùng idempotency key, exponential backoff có jitter và tôn trọng `Retry-After`.
-- Nếu dùng RabbitMQ để serialize command cực nóng, API chỉ trả thành công sau khi reservation đã commit; enqueue không đồng nghĩa đã giữ được vé.
+- Nếu dùng worker/command processor để serialize command cực nóng trong tương lai, API chỉ trả thành công sau khi reservation đã commit; ghi job không đồng nghĩa đã giữ được vé.
 
 ## Xử lý cổng thanh toán không ổn định
 
@@ -193,16 +193,14 @@ sequenceDiagram
     participant Admin
     participant Concert as Concert Service
     participant DB
-    participant Outbox as Outbox Publisher
-    participant Bus as Event Bus
+    participant OutboxWorker as Outbox Polling Worker
     participant CacheWorker
     participant Cache as Redis/Public Cache
 
     Admin->>Concert: Update concert
     Concert->>DB: Save + outbox event trong cùng transaction
-    Outbox->>DB: Đọc outbox đã commit
-    Outbox->>Bus: Publish ConcertUpdated
-    Bus-->>CacheWorker: Deliver event
+    OutboxWorker->>DB: Đọc outbox đã commit
+    OutboxWorker->>CacheWorker: Deliver event
     CacheWorker->>Cache: Delete concert detail/list keys
 ```
 
@@ -239,7 +237,7 @@ flowchart TD
     Renderer --> SMS["SMSChannel future"]
 ```
 
-Các service nghiệp vụ chỉ publish event như `TicketIssued`, `ConcertReminderDue`, `ConcertCanceled`. Notification Service chịu trách nhiệm template, channel adapter, retry, DLQ và delivery log.
+Các service nghiệp vụ ghi notification/outbox record như `TicketIssued`, `ConcertReminderDue`, `ConcertCanceled`. Notification worker chịu trách nhiệm template, channel adapter, retry, failed state và delivery log.
 
 ## CSV import reliability
 
@@ -268,20 +266,20 @@ Mặc định một batch publish theo chính sách all-or-nothing: có validati
 - Nếu AI lỗi, concert vẫn hiển thị bình thường với bio thủ công hoặc placeholder.
 - Mỗi job/stage idempotent theo object version và pipeline version; retry không tạo thêm draft.
 - Timeout và retry budget dùng exponential backoff có jitter; lỗi parse/file policy không retry, lỗi model transient có thể retry.
-- Vượt retry budget thì đưa job vào DLQ/failed state để admin retry thủ công sau khi sửa nguyên nhân.
+- Vượt retry budget thì đưa job vào failed state để admin retry thủ công sau khi sửa nguyên nhân.
 - Chỉ gọi model sau khi extraction/sanitization thành công; nội dung PDF được xem là dữ liệu không tin cậy, không được phép thay đổi system instruction.
 - File, extracted text, prompt và output có retention/access policy; job lỗi không thay bio đang publish.
 
-## Policy chung cho worker và queue
+## Policy chung cho worker và async job
 
-RabbitMQ cung cấp delivery at-least-once, vì vậy mọi consumer phải idempotent. Notification, cache invalidation, reconciliation, CSV và AI dùng cùng nguyên tắc:
+Async job/outbox trong PostgreSQL được xử lý bằng scheduled polling worker, vì vậy mọi worker phải idempotent. Notification, cache invalidation, reconciliation, CSV và AI dùng cùng nguyên tắc:
 
 | Thành phần | Policy |
 |---|---|
 | Retry | Có giới hạn, exponential backoff + jitter, chỉ cho lỗi retryable. |
-| DLQ | Message vượt retry budget vào DLQ; không tự động replay vô hạn. |
+| Failed state | Job/outbox vượt retry budget chuyển `failed`; không tự động replay vô hạn. |
 | ACK | Chỉ ACK sau khi side effect bền vững đã commit hoặc dedupe record đã lưu. |
-| Poison message | Lỗi schema/validation vào DLQ ngay cùng error reason. |
+| Poison job | Lỗi schema/validation chuyển `failed` ngay cùng error reason. |
 | Replay | Công cụ/manual action phải giữ message id và idempotency key cũ. |
 
 ## Quan sát hệ thống và graceful degradation
@@ -291,7 +289,7 @@ Các dashboard/alert tối thiểu gồm:
 - Waiting room admission rate, token rejection/replay, rate-limit rejection và overload `429/503`.
 - Circuit state, timeout rate, pending reconciliation age và provider error rate.
 - Cache hit ratio, stale response, fallback concurrency và database saturation.
-- Queue depth, oldest message age, retry count và DLQ count theo worker.
+- Pending/failed job count, oldest pending age và retry count theo worker.
 - Unsynced check-in count/age, conflict rate và manifest version distribution.
 - CSV batch failure/quarantine và AI job latency/failure.
 

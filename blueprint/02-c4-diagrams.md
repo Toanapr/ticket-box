@@ -49,7 +49,7 @@ flowchart TD
         Workers["Background Workers<br/>NestJS / TypeScript"]
         Postgres["PostgreSQL<br/>transactional database"]
         Redis["Redis<br/>cache/rate limit/waiting room"]
-        RabbitMQ["RabbitMQ<br/>event bus/job queue"]
+        Outbox["PostgreSQL outbox/job tables<br/>polled by scheduled workers"]
         ObjectStorage["MinIO/Object Storage<br/>PDF, CSV, SVG, ticket assets"]
     end
 
@@ -68,10 +68,10 @@ flowchart TD
 
     Gateway --> Postgres
     Gateway --> Redis
-    Gateway --> RabbitMQ
+    Gateway --> Outbox
     Gateway --> ObjectStorage
 
-    Workers --> RabbitMQ
+    Workers --> Outbox
     Workers --> Postgres
     Workers --> Redis
     Workers --> ObjectStorage
@@ -89,11 +89,11 @@ flowchart TD
 |---|---|---|
 | Audience/Admin Web | Next.js | HTTPS tới Backend API, cache public page khi phù hợp. |
 | Scanner Web/PWA App | Next.js PWA | HTTPS khi online, IndexedDB mã hóa khi offline. |
-| Backend API | NestJS | REST, transaction PostgreSQL, Redis, RabbitMQ. |
-| Workers | NestJS/TypeScript | RabbitMQ consumer, gọi AI/email/CSV/object storage. |
+| Backend API | NestJS | REST, transaction PostgreSQL, Redis, outbox/job tables. |
+| Workers | NestJS/TypeScript | Scheduled/polling workers, gọi AI/email/CSV/object storage. |
 | PostgreSQL | SQL database | Transaction, constraint, index, lock cho consistency. |
 | Redis | In-memory data store | Cache-aside, token bucket, waiting room token. |
-| RabbitMQ | Message broker | Retry, DLQ, asynchronous workflow. |
+| PostgreSQL outbox/job tables | Durable async state | Retry, failed-state/manual retry, asynchronous workflow. |
 | MinIO | Object storage | Lưu file lớn và asset versioned. |
 
 ## Phạm vi của sơ đồ C4

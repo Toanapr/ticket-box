@@ -31,7 +31,7 @@
 
 - Backend skeleton theo module: `auth`, `concert`, `inventory`, `order`, `payment`, `ticket`, `check-in`, `notification`, `guest-import`, `ai-artist-bio`.
 - PostgreSQL migration baseline.
-- Redis, RabbitMQ, MinIO/object storage cho local environment.
+- Redis và MinIO/object storage cho local environment; async job/outbox lưu trong PostgreSQL và xử lý bằng NestJS scheduled workers.
 - Logging, config validation, request correlation id.
 
 ### Done khi
@@ -70,7 +70,7 @@
 - Waiting room, sale access token, risk checks trong Backend API, CAPTCHA optional theo risk score.
 - Payment circuit breaker.
 - Payment reconciliation job.
-- Metrics sale day, queue depth, DLQ, inventory remaining.
+- Metrics sale day, pending/failed job count, oldest pending age, inventory remaining.
 
 ### Done khi
 
@@ -151,7 +151,7 @@
 ### Done khi
 
 - Có số liệu để đánh giá bottleneck thực tế.
-- Có chỉ số/log rõ cho payment pending, queue depth, DLQ, check-in conflict.
+- Có chỉ số/log rõ cho payment pending, pending/failed job backlog, check-in conflict.
 - Team có thể diễn tập ngày mở bán và ngày diễn.
 
 ## Quy tắc chuyển phase

@@ -13,7 +13,7 @@ Dùng nhiều lớp kiểm soát tải:
 3. Queue hoặc admission control tạo backpressure cho request giữ vé.
 4. Chuẩn bị sẵn capacity Docker/container trước giờ mở bán.
 5. Cache phục vụ read traffic để dành tài nguyên cho write-critical path.
-6. Đặt concurrency limit và queue depth tối đa; khi vượt ngưỡng, từ chối sớm bằng `429/503` kèm `Retry-After`.
+6. Đặt concurrency limit và backlog/admission depth tối đa; khi vượt ngưỡng, từ chối sớm bằng `429/503` kèm `Retry-After`.
 
 ## Lý do chọn
 
@@ -30,7 +30,7 @@ Dùng nhiều lớp kiểm soát tải:
 - Từ chối sớm làm một số người dùng phải quay lại hàng chờ dù hệ thống chưa sập.
 - Rate limit sai có thể chặn người dùng thật dùng chung IP.
 - Bật sẵn capacity tăng chi phí/tài nguyên dù traffic thực tế thấp hơn dự kiến.
-- Tăng số backend container không giải quyết được bottleneck ở database hoặc broker.
+- Tăng số backend container không giải quyết được bottleneck ở database hoặc Redis/cache.
 
 ## Phương án không chọn
 
@@ -41,6 +41,6 @@ Dùng nhiều lớp kiểm soát tải:
 ## Cách kiểm chứng
 
 - Load test theo traffic profile của giờ mở bán, không chỉ tải đều.
-- Kiểm tra queue depth, p95/p99 latency, error rate và database saturation.
+- Kiểm tra backlog/admission depth, p95/p99 latency, error rate và database saturation.
 - Mô phỏng Redis/waiting room lỗi để xác nhận reserve path không fail-open vào database.
 - Diễn tập mở bán với capacity đã chuẩn bị, waiting room và cơ chế degrade.

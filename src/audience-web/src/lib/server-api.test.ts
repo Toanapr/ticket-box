@@ -23,6 +23,13 @@ function apiConcert(): Record<string, unknown> {
     status: "published",
     seatingMapObjectKey: "concerts/backend/map.json",
     publishedArtistBio: "Backend Artist biography",
+    publishedArtistProfiles: [
+      {
+        name: "Backend Artist",
+        role: "Headliner",
+        summary: "Primary performer for the backend integration fixture.",
+      },
+    ],
     posterObjectKey: null,
     ticketTypes: [
       {

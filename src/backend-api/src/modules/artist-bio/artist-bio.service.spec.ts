@@ -101,10 +101,18 @@ describe('ArtistBioService', () => {
     artistBioDraftUpdate.mockResolvedValue({
       id: 'draft-id',
       content: 'Updated artist bio draft',
+      artistProfiles: [],
     });
     concertUpdate.mockResolvedValue({
       id: concertId,
       publishedArtistBio: 'Published draft content',
+      publishedArtistProfiles: [
+        {
+          name: 'Summer Live Artist',
+          role: 'Headliner',
+          summary: 'Lead performer highlighted in the uploaded press kit.',
+        },
+      ],
     });
     storage.save.mockResolvedValue({ objectKey: 'raw-object-key.pdf' });
     storage.delete.mockResolvedValue(undefined);
@@ -115,7 +123,7 @@ describe('ArtistBioService', () => {
     artistBioJobFindUnique.mockResolvedValue({
       id: 'existing-job-id',
       status: 'draft_ready',
-      draft: { id: 'draft-id' },
+      draft: { id: 'draft-id', artistProfiles: [] },
     });
 
     await expect(service.createJob(organizer, concertId, pdfFile())).resolves.toMatchObject({
@@ -174,6 +182,7 @@ describe('ArtistBioService', () => {
         id: concertId,
         organizationId: organizer.organizationId,
       },
+      artistProfiles: [],
     });
 
     await expect(
@@ -197,6 +206,13 @@ describe('ArtistBioService', () => {
       jobId: 'job-id',
       concertId,
       content: 'Published draft content',
+      artistProfiles: [
+        {
+          name: 'Summer Live Artist',
+          role: 'Headliner',
+          summary: 'Lead performer highlighted in the uploaded press kit.',
+        },
+      ],
       concert: {
         id: concertId,
         organizationId: organizer.organizationId,
@@ -211,16 +227,31 @@ describe('ArtistBioService', () => {
       draftId: 'draft-id',
       jobId: 'job-id',
       publishedArtistBio: 'Published draft content',
+      publishedArtistProfiles: [
+        {
+          name: 'Summer Live Artist',
+          role: 'Headliner',
+          summary: 'Lead performer highlighted in the uploaded press kit.',
+        },
+      ],
     });
 
     expect(concertUpdate).toHaveBeenCalledWith({
       where: { id: concertId },
       data: {
         publishedArtistBio: 'Published draft content',
+        publishedArtistProfiles: [
+          {
+            name: 'Summer Live Artist',
+            role: 'Headliner',
+            summary: 'Lead performer highlighted in the uploaded press kit.',
+          },
+        ],
       },
       select: {
         id: true,
         publishedArtistBio: true,
+        publishedArtistProfiles: true,
       },
     });
   });

@@ -29,6 +29,7 @@ export default async function EditConcertPage({
     concertId: id,
     artistName: concert.artistName,
     publishedArtistBio: concert.publishedArtistBio,
+    publishedArtistProfiles: concert.publishedArtistProfiles ?? [],
     latestDraft: null,
     jobs: [],
   }));

@@ -13,6 +13,12 @@ export type TicketType = {
   availableCount?: number;
 };
 
+export type ArtistProfile = {
+  name: string;
+  role?: string;
+  summary: string;
+};
+
 export type Concert = {
   id: string;
   title: string;
@@ -23,6 +29,7 @@ export type Concert = {
   status: ConcertStatus;
   seatingMapObjectKey: string;
   publishedArtistBio: string;
+  publishedArtistProfiles?: ArtistProfile[];
   posterObjectKey?: string | null;
   ticketTypes: TicketType[];
 };
@@ -38,6 +45,7 @@ export type ArtistBioDraft = {
   concertId: string;
   jobId: string;
   content: string;
+  artistProfiles: ArtistProfile[];
   reviewStatus: "pending_review" | string;
   providerVersion: string;
   modelVersion: string;
@@ -79,6 +87,7 @@ export type ArtistBioReviewState = {
   concertId: string;
   artistName: string;
   publishedArtistBio: string;
+  publishedArtistProfiles: ArtistProfile[];
   latestDraft: ArtistBioDraft | null;
   jobs: ArtistBioJob[];
 };
@@ -297,6 +306,7 @@ export async function publishArtistBioDraft(
   draftId: string;
   jobId: string;
   publishedArtistBio: string;
+  publishedArtistProfiles: ArtistProfile[];
 }> {
   return apiFetch(`/admin/artist-bio/drafts/${draftId}/publish`, {
     method: "POST",

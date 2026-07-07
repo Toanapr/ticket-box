@@ -198,6 +198,12 @@ export function ArtistBioManager({
             <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-700">
               {reviewState.publishedArtistBio || "No published artist bio yet."}
             </p>
+            <ArtistProfilesPreview
+              className="mt-5"
+              title="Published artist lineup"
+              profiles={reviewState.publishedArtistProfiles}
+              emptyLabel="No published artist lineup extracted yet."
+            />
           </section>
 
           <section className="rounded-2xl border border-black/10 bg-white p-5">
@@ -239,6 +245,12 @@ export function ArtistBioManager({
                     {isPublishing ? "Publishing..." : "Publish bio"}
                   </AdminButton>
                 </div>
+                <ArtistProfilesPreview
+                  className="mt-5"
+                  title="Extracted artist lineup"
+                  profiles={latestDraft.artistProfiles}
+                  emptyLabel="The PDF did not yield structured artist cards for the audience lineup yet."
+                />
               </>
             ) : (
               <div className="mt-4">
@@ -316,7 +328,7 @@ export function ArtistBioManager({
                   {job.lastError ?? "-"}
                 </td>
                 <td className="px-6 py-5">
-                  {job.status === "failed" ? (
+                  {job.status === "failed" || job.status === "draft_ready" ? (
                     <AdminButton
                       type="button"
                       variant="secondary"
@@ -339,6 +351,55 @@ export function ArtistBioManager({
           <AdminEmptyState>No artist bio jobs yet.</AdminEmptyState>
         ) : null}
       </AdminDataTable>
+    </div>
+  );
+}
+
+function ArtistProfilesPreview({
+  title,
+  profiles,
+  emptyLabel,
+  className = "",
+}: {
+  title: string;
+  profiles?: Array<{ name: string; role?: string; summary: string }> | null;
+  emptyLabel: string;
+  className?: string;
+}) {
+  const safeProfiles = profiles || [];
+  return (
+    <div className={className}>
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
+        {title}
+      </p>
+      {safeProfiles.length > 0 ? (
+        <div className="mt-3 grid gap-3">
+          {safeProfiles.map((artist) => (
+            <article
+              key={artist.name}
+              className="rounded-xl border border-black/10 bg-ticket-alabaster px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-display text-lg font-black tracking-tight text-ticket-obsidian">
+                    {artist.name}
+                  </p>
+                  {artist.role ? (
+                    <p className="mt-1 text-[11px] font-black uppercase tracking-[0.18em] text-ticket-green">
+                      {artist.role}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {artist.summary}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-slate-500">{emptyLabel}</p>
+      )}
     </div>
   );
 }

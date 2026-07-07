@@ -60,11 +60,18 @@ export interface TicketType {
   saleEndsAt: string;
 }
 
+export interface ArtistProfile {
+  name: string;
+  role?: string;
+  summary: string;
+}
+
 export interface ConcertSummary {
   id: string;
   slug: string;
   title: string;
   artists: string[];
+  artistProfiles: ArtistProfile[];
   venue: string;
   startsAt: string;
   status: ConcertStatus;

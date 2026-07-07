@@ -157,19 +157,49 @@ export default async function ConcertDetailPage({
             title="Dan nghe si bieu dien"
             icon={<UsersIcon className="h-6 w-6 text-ticket-green" />}
           >
-            <div className="flex flex-wrap gap-3">
-              {concert.artists.map((artist) => (
-                <span
-                  key={artist}
-                  className="inline-flex min-h-11 items-center gap-2 rounded border border-black/10 bg-ticket-stone px-4 text-sm font-black"
-                >
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-ticket-obsidian text-[10px] text-white">
-                    {artist[0]}
+            {concert.artistProfiles.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {concert.artistProfiles.map((artist) => (
+                  <article
+                    key={artist.name}
+                    className="rounded-[20px] border border-black/10 bg-ticket-stone/70 p-5"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ticket-obsidian text-sm font-black text-white">
+                        {artist.name[0]}
+                      </span>
+                      <div>
+                        <h3 className="font-display text-xl font-black tracking-tight text-ticket-obsidian">
+                          {artist.name}
+                        </h3>
+                        {artist.role ? (
+                          <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-ticket-green">
+                            {artist.role}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm leading-7 text-slate-600">
+                      {artist.summary}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {concert.artists.map((artist) => (
+                  <span
+                    key={artist}
+                    className="inline-flex min-h-11 items-center gap-2 rounded border border-black/10 bg-ticket-stone px-4 text-sm font-black"
+                  >
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-ticket-obsidian text-[10px] text-white">
+                      {artist[0]}
+                    </span>
+                    {artist}
                   </span>
-                  {artist}
-                </span>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </InfoSection>
 
           {concert.artistBio ? (
@@ -203,9 +233,15 @@ export default async function ConcertDetailPage({
             title="Thong tin chi tiet"
             icon={<InfoIcon className="h-6 w-6 text-ticket-green" />}
           >
-            <p className="max-w-3xl text-base leading-8 text-slate-600">
-              {concert.description}
-            </p>
+            {concert.description ? (
+              <p className="max-w-3xl text-base leading-8 text-slate-600">
+                {concert.description}
+              </p>
+            ) : (
+              <p className="text-sm font-bold text-slate-500">
+                Concert nay chua co mo ta chi tiet.
+              </p>
+            )}
           </InfoSection>
         </div>
 

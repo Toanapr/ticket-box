@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
   ArtistBioGenerationInput,
+  ArtistBioGenerationResult,
   ArtistBioProvider,
   ArtistBioProviderTimeoutError,
 } from './artist-bio-ai.provider';
@@ -18,7 +19,9 @@ export class FallbackArtistBioProvider implements ArtistBioProvider {
     this.modelVersion = primary.modelVersion;
   }
 
-  async generateBio(input: ArtistBioGenerationInput): Promise<string> {
+  async generateBio(
+    input: ArtistBioGenerationInput,
+  ): Promise<ArtistBioGenerationResult> {
     try {
       return await this.primary.generateBio(input);
     } catch (error) {

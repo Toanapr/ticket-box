@@ -1,6 +1,6 @@
 "use client";
 
-import { readMap, subscribeToStorageKeys, writeMap } from "./browser-storage";
+import { readMap, readRaw, subscribeToStorageKeys, writeMap } from "./browser-storage";
 import type { ActiveReservationRecord, BuyerInfo, OrderRecord, TicketRecord } from "./types";
 
 const activeReservationsKey = "ticketbox.audience.active-reservations";
@@ -38,7 +38,7 @@ export function getUserAccountSnapshot(): UserAccountSnapshot {
 }
 
 export function getUserAccountStorageVersion(): string {
-  return `${window.localStorage.getItem(activeReservationsKey) ?? ""}|${window.localStorage.getItem(ordersKey) ?? ""}|${window.localStorage.getItem(ticketsKey) ?? ""}`;
+  return `${readRaw(activeReservationsKey)}|${readRaw(ordersKey)}|${readRaw(ticketsKey)}`;
 }
 
 export function subscribeToUserAccountStorage(onChange: () => void): () => void {

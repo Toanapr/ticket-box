@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { GuestListEmailService } from './guest-list-email.service';
 import { GuestListImportService, GUEST_LIST_DEFAULT_ZONE } from './guest-list-import.service';
 import { GuestListStorageService } from './guest-list-storage.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -32,6 +33,9 @@ describe('GuestListImportService', () => {
     save: jest.fn(),
     delete: jest.fn(),
   } as unknown as jest.Mocked<GuestListStorageService>;
+  const guestListEmailService = {
+    sendPublishedGuestInvitations: jest.fn(),
+  } as unknown as jest.Mocked<GuestListEmailService>;
 
   const concertFindUnique = jest.fn();
   const batchFindUnique = jest.fn();
@@ -68,7 +72,11 @@ describe('GuestListImportService', () => {
     $transaction: transaction,
   } as unknown as PrismaService;
 
-  const service = new GuestListImportService(prisma, storage);
+  const service = new GuestListImportService(
+    prisma,
+    storage,
+    guestListEmailService,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -108,6 +116,7 @@ describe('GuestListImportService', () => {
     txStagingCreateMany.mockResolvedValue({ count: 1 });
     txEntryCreateMany.mockResolvedValue({ count: 1 });
     txOutboxCreate.mockResolvedValue({ id: 'outbox-id' });
+    guestListEmailService.sendPublishedGuestInvitations.mockResolvedValue(1);
   });
 
   it('publishes a valid guest list into the default private guest area', async () => {
@@ -136,6 +145,9 @@ describe('GuestListImportService', () => {
     expect(txOutboxCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ eventType: 'GuestListUpdated' }),
     });
+    expect(guestListEmailService.sendPublishedGuestInvitations).toHaveBeenCalledWith(
+      'version-id',
+    );
   });
 
   it('stages invalid duplicate rows without publishing a version', async () => {

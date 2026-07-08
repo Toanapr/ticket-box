@@ -21,6 +21,10 @@ import { ScannerLoggerService } from './scanner-logger.service';
 import { ScannerMetricsService } from './scanner-metrics.service';
 import { ScannerRepository } from './scanner.repository';
 import { signScannerManifest } from './scanner-manifest-signature.util';
+import {
+  GUEST_LIST_DEFAULT_ZONE,
+  GuestListImportService,
+} from '../guest-list/guest-list-import.service';
 
 type ManifestPayload = NonNullable<
   Awaited<ReturnType<ScannerRepository['findManifestPayloadByAssignmentId']>>
@@ -32,6 +36,7 @@ export class ScannerService {
     private readonly scannerRepository: ScannerRepository,
     private readonly scannerLogger: ScannerLoggerService,
     private readonly scannerMetrics: ScannerMetricsService,
+    private readonly guestListImportService: GuestListImportService,
   ) {}
 
   assertDeviceHeader(deviceId: string | undefined): string {
@@ -118,10 +123,11 @@ export class ScannerService {
       });
     }
 
+    const mergedGuestEntries = await this.loadGuestEntriesForAssignment(manifestSource);
     const totals = {
       totalTickets: manifestSource.manifestTickets.length,
       totalRevokedTickets: manifestSource.revokedTickets.length,
-      totalGuestEntries: manifestSource.guestEntries.length,
+      totalGuestEntries: mergedGuestEntries.length,
     };
     const totalEntries =
       totals.totalTickets + totals.totalRevokedTickets + totals.totalGuestEntries;
@@ -169,8 +175,8 @@ export class ScannerService {
         : this.sliceChunk(manifestSource.revokedTickets, chunkIndex!, chunkSize);
     const guestEntries =
       chunkSize === null
-        ? manifestSource.guestEntries
-        : this.sliceChunk(manifestSource.guestEntries, chunkIndex!, chunkSize);
+        ? mergedGuestEntries
+        : this.sliceChunk(mergedGuestEntries, chunkIndex!, chunkSize);
 
     const payloadWithoutSignature = {
       assignmentId: manifestSource.id,
@@ -313,11 +319,16 @@ export class ScannerService {
     const revokedByRef = new Map(
       manifestSource.revokedTickets.map((ticket) => [ticket.ticketRef, ticket] as const),
     );
+    const guestEntries = await this.loadGuestEntriesForAssignment(manifestSource);
+    const guestsByRef = new Map(
+      guestEntries.map((guest) => [guest.guestRef, guest] as const),
+    );
 
     const results: ScannerCheckInSyncResultDto[] = [];
 
     for (const event of dto.events) {
       const ticket = ticketsByRef.get(event.ticketRef);
+      const guest = guestsByRef.get(event.ticketRef);
       const rejectionReason = this.resolveCheckInRejectionReason({
         requestDeviceCode: deviceCode,
         requestScannerUserId: scannerUserId,
@@ -330,6 +341,7 @@ export class ScannerService {
         assignmentManifestVersion: assignment.manifestVersion,
         event,
         ticket,
+        guest,
         revokedTicket: revokedByRef.get(event.ticketRef),
       });
 
@@ -435,6 +447,15 @@ export class ScannerService {
     assignmentManifestVersion: number | null;
     event: ScannerCheckInSyncDto['events'][number];
     ticket: ManifestPayload['manifestTickets'][number] | undefined;
+    guest:
+      | {
+          guestRef: string;
+          displayName: string;
+          eventId: string;
+          gateCode: string;
+          zoneCode: string;
+        }
+      | undefined;
     revokedTicket: ManifestPayload['revokedTickets'][number] | undefined;
   }): ScannerCheckInReason | undefined {
     if (input.requestAssignmentId !== input.assignmentId) {
@@ -472,15 +493,54 @@ export class ScannerService {
       return ScannerCheckInReason.TICKET_REVOKED;
     }
 
-    if (!input.ticket) {
+    if (!input.ticket && !input.guest) {
       return ScannerCheckInReason.TICKET_NOT_FOUND;
     }
 
-    if (input.event.rawToken && input.ticket.rawToken !== input.event.rawToken) {
+    if (
+      input.ticket &&
+      input.event.rawToken &&
+      input.ticket.rawToken !== input.event.rawToken
+    ) {
       return ScannerCheckInReason.INVALID_TICKET_PAYLOAD;
     }
 
     return undefined;
+  }
+
+  private async loadGuestEntriesForAssignment(manifestSource: ManifestPayload) {
+    const seededGuestEntries = manifestSource.guestEntries.map((guest) => ({
+      guestRef: guest.guestRef,
+      displayName: guest.displayName,
+      eventId: guest.eventId,
+      gateCode: guest.gateCode,
+      zoneCode: guest.zoneCode,
+    }));
+
+    if (manifestSource.zoneCode !== GUEST_LIST_DEFAULT_ZONE) {
+      return seededGuestEntries;
+    }
+
+    const activeGuestManifest = await this.guestListImportService.getScannerManifest(
+      manifestSource.concertId,
+      manifestSource.zoneCode,
+    );
+    const activeGuestEntries = activeGuestManifest.guestList.entries.map((guest) => ({
+      guestRef: guest.guestRef,
+      displayName: guest.fullName,
+      eventId: manifestSource.eventId,
+      gateCode: manifestSource.gateCode,
+      zoneCode: manifestSource.zoneCode,
+    }));
+
+    return Array.from(
+      new Map(
+        [...seededGuestEntries, ...activeGuestEntries].map((guest) => [
+          guest.guestRef,
+          guest,
+        ]),
+      ).values(),
+    );
   }
 
   private mapRecordedCheckInResult(

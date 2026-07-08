@@ -10,7 +10,7 @@ export async function serverApiFetch<T>(
 
   headers.set("Content-Type", "application/json");
 
-  if (path.startsWith("/admin") && token) {
+  if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 

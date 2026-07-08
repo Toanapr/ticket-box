@@ -58,7 +58,16 @@ describe('ArtistBioProcessorService', () => {
         'Summer Live Artist brings cinematic pop influences and a strong live presence to the stage tonight.',
       ),
     );
-    generateBio.mockResolvedValue('Generated draft bio');
+    generateBio.mockResolvedValue({
+      draftContent: 'Generated draft bio',
+      artistProfiles: [
+        {
+          name: 'Summer Live Artist',
+          role: 'Headliner',
+          summary: 'Lead performer highlighted in the uploaded press kit.',
+        },
+      ],
+    });
   });
 
   it('marks the job as failed when the AI provider times out after the retry budget', async () => {
@@ -108,5 +117,15 @@ describe('ArtistBioProcessorService', () => {
     await expect(service.processJob('job-id')).resolves.toBe('skipped');
 
     expect(markDraftReady).toHaveBeenCalledTimes(1);
+    expect(markDraftReady).toHaveBeenCalledWith(
+      'job-id',
+      expect.objectContaining({
+        draftContent: 'Generated draft bio',
+        artistProfiles: expect.arrayContaining([
+          expect.objectContaining({ name: 'Summer Live Artist' }),
+        ]),
+      }),
+      expect.any(Object),
+    );
   });
 });

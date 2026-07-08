@@ -66,13 +66,13 @@ export class ArtistBioProcessorService {
         );
       }
 
-      const draftContent = await this.provider.generateBio({
+      const generation = await this.provider.generateBio({
         artistName: job.concert.artistName,
         sourceText: sanitizedText,
         timeoutMs: ARTIST_BIO_DEFAULT_TIMEOUT_MS,
       });
 
-      await this.artistBioService.markDraftReady(job.id, draftContent, {
+      await this.artistBioService.markDraftReady(job.id, generation, {
         extractedText,
         sanitizedText,
         providerVersion: this.provider.providerVersion,

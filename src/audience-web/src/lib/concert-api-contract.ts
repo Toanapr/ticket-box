@@ -25,6 +25,11 @@ export interface ConcertApiRecord {
   status: "published";
   seatingMapObjectKey: string;
   publishedArtistBio: string;
+  publishedArtistProfiles?: Array<{
+    name: string;
+    role?: string;
+    summary: string;
+  }>;
   posterObjectKey: string | null;
   ticketTypes: ConcertApiTicketType[];
 }
@@ -60,9 +65,40 @@ export function parseConcertApiRecord(value: unknown, path = "concert"): Concert
     status,
     seatingMapObjectKey: readString(record.seatingMapObjectKey, `${path}.seatingMapObjectKey`),
     publishedArtistBio: readString(record.publishedArtistBio, `${path}.publishedArtistBio`),
+    publishedArtistProfiles: readOptionalArtistProfiles(
+      record.publishedArtistProfiles,
+      `${path}.publishedArtistProfiles`,
+    ),
     posterObjectKey: record.posterObjectKey === undefined ? null : readNullableString(record.posterObjectKey, `${path}.posterObjectKey`),
     ticketTypes: ticketTypes.map((item, index) => parseTicketType(item, `${path}.ticketTypes[${index}]`)),
   };
+}
+
+function readOptionalArtistProfiles(
+  value: unknown,
+  path: string,
+): ConcertApiRecord["publishedArtistProfiles"] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new ConcertContractError(`${path} must be an array`);
+  }
+
+  return value.map((item, index) => {
+    const record = readObject(item, `${path}[${index}]`);
+    const role = record.role;
+
+    return {
+      name: readString(record.name, `${path}[${index}].name`),
+      role:
+        role === undefined || role === null
+          ? undefined
+          : readString(role, `${path}[${index}].role`),
+      summary: readString(record.summary, `${path}[${index}].summary`),
+    };
+  });
 }
 
 function parseTicketType(value: unknown, path: string): ConcertApiTicketType {

@@ -17,6 +17,13 @@ function concertFixture(overrides: Record<string, unknown> = {}): Record<string,
     status: "published",
     seatingMapObjectKey: "concerts/aurora/seating-map.json",
     publishedArtistBio: "Artist biography",
+    publishedArtistProfiles: [
+      {
+        name: "The Aurora Lights",
+        role: "Headliner",
+        summary: "Synth-pop act known for cinematic hooks and vivid live staging.",
+      },
+    ],
     posterObjectKey: "11111111-1111-4111-8111-111111111111-1.png",
     ticketTypes: [ticketTypeFixture()],
     ...overrides,
@@ -51,10 +58,18 @@ describe("concert API adapter", () => {
       slug: "aurora-live",
       title: "Aurora Live",
       artists: ["The Aurora Lights"],
+      artistProfiles: [
+        {
+          name: "The Aurora Lights",
+          role: "Headliner",
+          summary: "Synth-pop act known for cinematic hooks and vivid live staging.",
+        },
+      ],
       venue: "TicketBox Arena, Ho Chi Minh City",
       startsAt: "2026-09-15T12:00:00.000Z",
       status: "selling",
-      description: "Artist biography",
+      description: "",
+      artistBio: "Artist biography",
       seatingMapVersion: "concerts/aurora/seating-map.json",
       posterPath: "/api/media/concert-posters/11111111-1111-4111-8111-111111111111-1.png",
       ticketTypes: [
@@ -101,6 +116,44 @@ describe("concert API adapter", () => {
     expect(concert.ticketTypes[0]).toMatchObject({ availableApprox: 80 });
     expect(concert.ticketTypes[0].inventoryCachedAt).toBeUndefined();
     expect(concert.ticketTypes[0].inventoryStaleAt).toBeUndefined();
+  });
+
+  it("keeps manual description while exposing published artist bio separately", () => {
+    const concert = normalizeConcertDetail(
+      concertFixture({
+        description: "Manual concert description",
+        publishedArtistBio: "Generated artist bio",
+      }),
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(concert.description).toBe("Manual concert description");
+    expect(concert.artistBio).toBe("Generated artist bio");
+  });
+
+  it("does not reuse artist bio as concert description when description is empty", () => {
+    const concert = normalizeConcertDetail(
+      concertFixture({
+        description: null,
+        publishedArtistBio: "Generated artist bio",
+      }),
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(concert.description).toBe("");
+    expect(concert.artistBio).toBe("Generated artist bio");
+  });
+
+  it("falls back to the concert artist name when no structured artist profiles were published", () => {
+    const concert = normalizeConcertDetail(
+      concertFixture({
+        publishedArtistProfiles: undefined,
+      }),
+      new Date("2026-07-15T00:00:00.000Z"),
+    );
+
+    expect(concert.artists).toEqual(["The Aurora Lights"]);
+    expect(concert.artistProfiles).toEqual([]);
   });
 
   it.each([

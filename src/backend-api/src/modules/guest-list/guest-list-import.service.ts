@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ import {
   normalizeSponsorId,
   parseGuestListCsv,
 } from './guest-list-csv.util';
+import { GuestListEmailService } from './guest-list-email.service';
+import { buildGuestRef } from './guest-list-ref.util';
 import { GuestListStorageService } from './guest-list-storage.service';
 
 export const GUEST_LIST_DEFAULT_ZONE = 'GUEST-LIST';
@@ -74,9 +77,12 @@ export interface ActiveGuestListResponse {
 
 @Injectable()
 export class GuestListImportService {
+  private readonly logger = new Logger(GuestListImportService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: GuestListStorageService,
+    private readonly guestListEmailService: GuestListEmailService,
   ) {}
 
   async importCsv(
@@ -145,7 +151,7 @@ export class GuestListImportService {
       );
 
       try {
-        return await this.prisma.$transaction(async (tx) => {
+        const publishedBatch = await this.prisma.$transaction(async (tx) => {
           const batch = await tx.guestListBatch.create({
             data: {
               concertId,
@@ -248,6 +254,25 @@ export class GuestListImportService {
             idempotent: false,
           };
         });
+
+        if (
+          publishedBatch.status === 'published' &&
+          'version' in publishedBatch &&
+          publishedBatch.version?.id
+        ) {
+          try {
+            await this.guestListEmailService.sendPublishedGuestInvitations(
+              publishedBatch.version.id,
+            );
+          } catch (error) {
+            this.logger.error(
+              `Failed to send guest invitation emails for version ${publishedBatch.version.id}`,
+              error instanceof Error ? error.stack : undefined,
+            );
+          }
+        }
+
+        return publishedBatch;
       } catch (error) {
         await this.storage.delete(objectKey);
         throw error;
@@ -348,6 +373,7 @@ export class GuestListImportService {
         generatedAt: new Date().toISOString(),
         entries: version.entries.map((entry) => ({
           id: entry.id,
+          guestRef: buildGuestRef(entry.id),
           fullName: entry.fullName,
           email: entry.email,
           phone: entry.phone,

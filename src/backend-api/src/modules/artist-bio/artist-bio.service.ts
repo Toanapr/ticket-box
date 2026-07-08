@@ -18,6 +18,8 @@ import {
 import { ArtistBioQueueService } from './artist-bio-queue.service';
 import { ArtistBioStorageService } from './artist-bio-storage.service';
 import { requireArtistBioDraftContent } from './dto/artist-bio-review.dto';
+import { normalizeArtistProfiles } from './artist-profile.util';
+import { ArtistBioGenerationResult } from './artist-bio-ai.provider';
 
 @Injectable()
 export class ArtistBioService {
@@ -140,8 +142,10 @@ export class ArtistBioService {
 
     this.assertOrganizerOwnsConcert(user, job.concert.organizationId);
 
-    if (job.status !== 'failed') {
-      throw new BadRequestException('Only failed artist bio jobs can be retried');
+    if (job.status !== 'failed' && job.status !== 'draft_ready') {
+      throw new BadRequestException(
+        'Only failed or draft_ready artist bio jobs can be retried',
+      );
     }
 
     const updated = await this.prisma.artistBioJob.update({
@@ -223,10 +227,14 @@ export class ArtistBioService {
       where: { id: draft.concertId },
       data: {
         publishedArtistBio: draft.content,
+        publishedArtistProfiles: toArtistProfilesJson(
+          normalizeArtistProfiles(draft.artistProfiles),
+        ),
       },
       select: {
         id: true,
         publishedArtistBio: true,
+        publishedArtistProfiles: true,
       },
     });
 
@@ -243,6 +251,9 @@ export class ArtistBioService {
       draftId: draft.id,
       jobId: draft.jobId,
       publishedArtistBio: updatedConcert.publishedArtistBio,
+      publishedArtistProfiles: normalizeArtistProfiles(
+        updatedConcert.publishedArtistProfiles,
+      ),
     };
   }
 
@@ -297,7 +308,7 @@ export class ArtistBioService {
 
   async markDraftReady(
     jobId: string,
-    draftContent: string,
+    generation: ArtistBioGenerationResult,
     metadata: {
       extractedText: string;
       sanitizedText: string;
@@ -334,14 +345,16 @@ export class ArtistBioService {
             })
           ).concertId,
           jobId,
-          content: draftContent,
+          content: generation.draftContent,
+          artistProfiles: toArtistProfilesJson(generation.artistProfiles),
           reviewStatus: 'pending_review',
           providerVersion: metadata.providerVersion,
           modelVersion: metadata.modelVersion,
           promptVersion: metadata.promptVersion,
         },
         update: {
-          content: draftContent,
+          content: generation.draftContent,
+          artistProfiles: toArtistProfilesJson(generation.artistProfiles),
           reviewStatus: 'pending_review',
           providerVersion: metadata.providerVersion,
           modelVersion: metadata.modelVersion,
@@ -404,4 +417,10 @@ function isArtistBioSchemaError(
     error instanceof Prisma.PrismaClientKnownRequestError &&
     (error.code === 'P2021' || error.code === 'P2022')
   );
+}
+
+function toArtistProfilesJson(
+  profiles: ReturnType<typeof normalizeArtistProfiles>,
+): Prisma.InputJsonValue {
+  return profiles as unknown as Prisma.InputJsonValue;
 }

@@ -1,9 +1,15 @@
 import type {
   ScannerAssignment,
   ScannerCheckInSyncEvent,
+  ScannerManifestGuest,
   ScannerManifest,
   ScannerManifestTicket,
 } from "@/lib/scanner/types";
+
+type ScannableEntry = Pick<
+  ScannerManifestTicket,
+  "ticketRef" | "eventId" | "gateCode" | "zoneCode"
+>;
 
 export type ParsedQrPayload = {
   ticketRef: string;
@@ -14,7 +20,7 @@ export type LocalScanValidationResult =
   | {
       ok: true;
       payload: ParsedQrPayload;
-      ticket: ScannerManifestTicket;
+      ticket: ScannableEntry;
     }
   | {
       ok: false;
@@ -132,8 +138,11 @@ export function validateLocalScan(input: {
   const ticket =
     input.manifest.tickets.find((item) => item.ticketRef === payload.ticketRef) ??
     input.manifest.tickets.find((item) => item.rawToken === payload.rawToken);
+  const guest =
+    input.manifest.guestList.find((item) => item.guestRef === payload.ticketRef) ??
+    input.manifest.guestList.find((item) => item.guestRef === payload.rawToken);
 
-  if (!ticket) {
+  if (!ticket && !guest) {
     return {
       ok: false,
       reason: "ticket_not_found",
@@ -141,7 +150,9 @@ export function validateLocalScan(input: {
     };
   }
 
-  if (ticket.eventId !== input.assignment.eventId) {
+  const scopedEntry = ticket ?? mapGuestToScannableEntry(guest!);
+
+  if (scopedEntry.eventId !== input.assignment.eventId) {
     return {
       ok: false,
       reason: "wrong_event",
@@ -149,7 +160,7 @@ export function validateLocalScan(input: {
     };
   }
 
-  if (ticket.gateCode !== input.assignment.gateCode) {
+  if (scopedEntry.gateCode !== input.assignment.gateCode) {
     return {
       ok: false,
       reason: "wrong_gate",
@@ -157,7 +168,7 @@ export function validateLocalScan(input: {
     };
   }
 
-  if (ticket.zoneCode !== input.assignment.zoneCode) {
+  if (scopedEntry.zoneCode !== input.assignment.zoneCode) {
     return {
       ok: false,
       reason: "wrong_zone",
@@ -168,7 +179,7 @@ export function validateLocalScan(input: {
   return {
     ok: true,
     payload,
-    ticket,
+    ticket: scopedEntry,
   };
 }
 
@@ -186,5 +197,14 @@ export function buildPendingQueueEvent(input: {
     gateCode: input.assignment.gateCode,
     zoneCode: input.assignment.zoneCode,
     clientScannedAt: new Date().toISOString(),
+  };
+}
+
+function mapGuestToScannableEntry(guest: ScannerManifestGuest): ScannableEntry {
+  return {
+    ticketRef: guest.guestRef,
+    eventId: guest.eventId,
+    gateCode: guest.gateCode,
+    zoneCode: guest.zoneCode,
   };
 }

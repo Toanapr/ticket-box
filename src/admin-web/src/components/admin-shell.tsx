@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
-import { BellIcon, LayersIcon, TicketIcon, QrCodeIcon } from "./icons";
+import {
+  BellIcon,
+  LayersIcon,
+  QrCodeIcon,
+  TicketIcon,
+  UserIcon,
+} from "./icons";
 import { AdminPageShell } from "./admin-ui";
 
 const navItems = [
@@ -21,6 +27,11 @@ const navItems = [
     href: "/admin/scanners",
     label: "Scanners",
     icon: QrCodeIcon,
+  },
+  {
+    href: "/admin/profile",
+    label: "Profile",
+    icon: UserIcon,
   },
 ];
 

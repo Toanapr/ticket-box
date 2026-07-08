@@ -22,7 +22,9 @@ type ConcertFormProps = {
 export function ConcertForm({ mode, concert }: ConcertFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(concert?.title ?? "");
+  const [artistName, setArtistName] = useState(concert?.artistName ?? "");
   const [venue, setVenue] = useState(concert?.venue ?? "");
+  const [description, setDescription] = useState(concert?.description ?? "");
   const [startAt, setStartAt] = useState(
     toDateTimeLocalValue(concert?.startAt),
   );
@@ -59,8 +61,8 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     setError("");
     setRecoveryConcertId(null);
 
-    if (!title.trim() || !venue.trim() || !startAt) {
-      setError("Title, venue, and start time are required.");
+    if (!title.trim() || !artistName.trim() || !venue.trim() || !startAt) {
+      setError("Title, artist name, venue, and start time are required.");
       return;
     }
 
@@ -84,6 +86,8 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
           body: JSON.stringify(
             buildConcertPayload({
               title,
+              artistName,
+              description,
               venue,
               startAt,
               status: "draft",
@@ -108,7 +112,15 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         await apiFetch<Concert>(`/admin/concerts/${concert!.id}`, {
           method: "PATCH",
           body: JSON.stringify(
-            buildConcertPayload({ title, venue, startAt, status, concert }),
+            buildConcertPayload({
+              title,
+              artistName,
+              description,
+              venue,
+              startAt,
+              status,
+              concert,
+            }),
           ),
         });
       } else if (createdConcert) {
@@ -150,6 +162,24 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
           onChange={(event) => setVenue(event.target.value)}
           className={inputClassName}
           required
+        />
+      </AdminField>
+
+      <AdminField label="Artist name">
+        <input
+          value={artistName}
+          onChange={(event) => setArtistName(event.target.value)}
+          className={inputClassName}
+          required
+        />
+      </AdminField>
+
+      <AdminField label="Concert description">
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          className="mt-2 min-h-28 w-full rounded border border-black/10 bg-ticket-alabaster px-4 py-3 text-sm leading-7 text-ticket-obsidian outline-none transition placeholder:text-slate-400 focus:border-ticket-green focus:bg-white"
+          placeholder="Optional long-form concert description for the public detail page"
         />
       </AdminField>
 
@@ -248,6 +278,8 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
 
 function buildConcertPayload(input: {
   title: string;
+  artistName: string;
+  description: string;
   venue: string;
   startAt: string;
   status: ConcertPayload["status"];
@@ -260,14 +292,15 @@ function buildConcertPayload(input: {
   return {
     title,
     venue,
-    artistName: input.concert?.artistName ?? title,
-    description: input.concert?.description ?? null,
+    artistName: input.artistName.trim(),
+    description: input.description.trim() || null,
     startAt: input.startAt,
     status: input.status,
     seatingMapObjectKey:
       input.concert?.seatingMapObjectKey ?? fallbackObjectKey,
     publishedArtistBio:
-      input.concert?.publishedArtistBio ?? `${title} live at ${venue}.`,
+      input.concert?.publishedArtistBio ??
+      `${input.artistName.trim()} live at ${venue}.`,
   };
 }
 

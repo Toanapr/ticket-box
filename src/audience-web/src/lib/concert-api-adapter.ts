@@ -18,15 +18,27 @@ export function normalizeConcertDetail(value: unknown, now = new Date()): Concer
 
 function normalizeConcertRecord(concert: ConcertApiRecord, now: Date): ConcertDetail {
   const ticketTypes = concert.ticketTypes.map(normalizeTicketType);
+  const artistProfiles =
+    concert.publishedArtistProfiles?.map((profile) => ({
+      name: profile.name,
+      role: profile.role,
+      summary: profile.summary,
+    })) ?? [];
+
   return {
     id: concert.id,
     slug: concert.slug,
     title: concert.title,
-    artists: [concert.artistName],
+    artists:
+      artistProfiles.length > 0
+        ? artistProfiles.map((profile) => profile.name)
+        : [concert.artistName],
+    artistProfiles,
     venue: concert.venue,
     startsAt: concert.startAt,
     status: deriveSaleStatus(ticketTypes, now),
-    description: concert.description ?? concert.publishedArtistBio,
+    description: concert.description ?? "",
+    artistBio: concert.publishedArtistBio,
     seatingMapVersion: concert.seatingMapObjectKey,
     posterPath: concert.posterObjectKey
       ? `/api/media/concert-posters/${encodeURIComponent(concert.posterObjectKey)}`

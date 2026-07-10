@@ -12,9 +12,15 @@ const classByStatus: Record<ConcertStatus, string> = {
   soldout: "bg-slate-200 text-slate-600",
 };
 
-export function StatusBadge({ status }: { status: ConcertStatus }): React.ReactElement {
+export function StatusBadge({
+  status,
+}: {
+  status: ConcertStatus;
+}): React.ReactElement {
   return (
-    <span className={`inline-flex rounded px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${classByStatus[status]}`}>
+    <span
+      className={`inline-flex rounded px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${classByStatus[status]}`}
+    >
       {labelByStatus[status]}
     </span>
   );

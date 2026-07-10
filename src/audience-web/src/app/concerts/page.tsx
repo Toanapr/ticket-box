@@ -9,7 +9,7 @@ export default async function ConcertsPage(): Promise<React.ReactElement> {
 
   return (
     <PageShell>
-      <Breadcrumbs items={[{ label: "Kham pha concerts" }]} />
+      <Breadcrumbs items={[{ label: "Khám phá concert" }]} />
       <HeroSpotlight concerts={concerts} />
       <ConcertListClient concerts={concerts} />
     </PageShell>

@@ -17,7 +17,10 @@ interface AuthFormClientProps {
 const fieldClass =
   "mt-2 min-h-12 w-full rounded border border-black/10 bg-ticket-alabaster px-4 text-base font-bold outline-none transition focus:border-ticket-green focus:bg-white";
 
-export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps): React.ReactElement {
+export function AuthFormClient({
+  mode,
+  nextPath = "/user",
+}: AuthFormClientProps): React.ReactElement {
   const router = useRouter();
   const { setUser } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
@@ -67,9 +70,22 @@ export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-5">
           {isRegister ? (
-            <AuthField label="Họ và tên" name="fullName" autoComplete="name" minLength={2} maxLength={120} required />
+            <AuthField
+              label="Họ và tên"
+              name="fullName"
+              autoComplete="name"
+              minLength={2}
+              maxLength={120}
+              required
+            />
           ) : null}
-          <AuthField label="Email" name="email" type="email" autoComplete="email" required />
+          <AuthField
+            label="Email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+          />
           <AuthField
             label="Mật khẩu"
             name="password"
@@ -80,7 +96,10 @@ export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps
           />
 
           {message ? (
-            <div role="status" className="rounded border border-black/10 bg-ticket-stone px-4 py-3 text-sm font-bold text-slate-700">
+            <div
+              role="status"
+              className="rounded border border-black/10 bg-ticket-stone px-4 py-3 text-sm font-bold text-slate-700"
+            >
               {message}
             </div>
           ) : null}
@@ -97,7 +116,9 @@ export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps
         <p className="mt-6 text-sm font-bold text-slate-600">
           {isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"}{" "}
           <Link
-            href={`${isRegister ? "/login" : "/register"}${nextPath !== "/user" ? `?next=${encodeURIComponent(nextPath)}` : ""}`}
+            href={`${isRegister ? "/login" : "/register"}${
+              nextPath !== "/user" ? `?next=${encodeURIComponent(nextPath)}` : ""
+            }`}
             className="text-ticket-green underline-offset-4 hover:underline"
           >
             {isRegister ? "Đăng nhập" : "Đăng ký"}
@@ -107,21 +128,32 @@ export function AuthFormClient({ mode, nextPath = "/user" }: AuthFormClientProps
 
       <aside className="rounded-lg border border-black/10 bg-ticket-obsidian p-6 text-white md:p-8">
         <TicketIcon className="h-10 w-10 text-ticket-green" />
-        <h2 className="mt-5 font-display text-2xl font-black">Một tài khoản cho toàn bộ hành trình vé.</h2>
+        <h2 className="mt-5 font-display text-2xl font-black">
+          Một tài khoản cho toàn bộ hành trình vé.
+        </h2>
         <div className="mt-6 grid gap-4 text-sm leading-6 text-slate-200">
           <AuthBenefit text="Xem vé đang giữ chỗ nhưng chưa thanh toán." />
           <AuthBenefit text="Mở nhanh e-ticket đã phát hành." />
           <AuthBenefit text="Dùng lại thông tin mua vé ở lần checkout sau." />
         </div>
         <div className="mt-8 rounded border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300">
-          Phiên đăng nhập được bảo vệ bằng cookie HttpOnly và tự hết hạn theo access token.
+          Phiên đăng nhập được bảo vệ bằng cookie HttpOnly và tự hết hạn theo
+          access token.
         </div>
       </aside>
     </section>
   );
 }
 
-function AuthField({ label, name, type = "text", ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string; name: string }): React.ReactElement {
+function AuthField({
+  label,
+  name,
+  type = "text",
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  name: string;
+}): React.ReactElement {
   return (
     <label className="block text-sm font-black text-ticket-obsidian">
       {label}

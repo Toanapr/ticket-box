@@ -41,9 +41,22 @@ export class AdminController {
     return this.adminService.listConcerts(user);
   }
 
+  @Get('dashboard')
+  getDashboard(@CurrentUser() user: CurrentUser) {
+    return this.adminService.getDashboard(user);
+  }
+
   @Get('concerts/:id')
   getConcert(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
     return this.adminService.getConcert(user, id);
+  }
+
+  @Get('concerts/:id/operations')
+  getConcertOperations(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.adminService.getConcertOperations(user, id);
   }
 
   @Get('notifications')
@@ -68,6 +81,15 @@ export class AdminController {
   @Delete('concerts/:id')
   deleteConcert(@CurrentUser() user: CurrentUser, @Param('id') id: string) {
     return this.adminService.deleteConcert(user, id);
+  }
+
+  @Post('concerts/:id/cancel')
+  cancelConcert(
+    @CurrentUser() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() body: { reason?: string | null },
+  ) {
+    return this.adminService.cancelConcert(user, id, body);
   }
 
   @Put('concerts/:id/poster')

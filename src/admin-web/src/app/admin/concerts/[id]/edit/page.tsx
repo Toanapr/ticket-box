@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { ArtistBioManager } from "@/components/artist-bio-manager";
 import { ConcertForm } from "@/components/concert-form";
-import { AdminBackLink, AdminHero, AdminPanel } from "@/components/admin-ui";
+import {
+  AdminBackLink,
+  AdminHero,
+  AdminLinkButton,
+  AdminPanel,
+} from "@/components/admin-ui";
 import { ArtistBioReviewState, Concert } from "@/lib/api";
 import { serverApiFetch } from "@/lib/server-api";
 
@@ -42,6 +47,14 @@ export default async function EditConcertPage({
           eyebrow="Concert setup"
           title={`Edit ${concert.title}`}
           description="Update public-facing event details while keeping all current publishing rules and save behavior intact."
+          action={
+            <AdminLinkButton
+              href={`/admin/concerts/${concert.id}/operations`}
+              variant="secondary"
+            >
+              Operations
+            </AdminLinkButton>
+          }
         />
       </div>
 

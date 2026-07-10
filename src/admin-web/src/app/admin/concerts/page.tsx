@@ -78,6 +78,9 @@ export default async function ConcertsPage() {
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/ticket-types`} variant="secondary">
                       Ticket types
                     </AdminLinkButton>
+                    <AdminLinkButton href={`/admin/concerts/${concert.id}/operations`} variant="secondary">
+                      Operations
+                    </AdminLinkButton>
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/guest-list`} variant="secondary">
                       Guest list
                     </AdminLinkButton>

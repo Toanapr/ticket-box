@@ -14,6 +14,7 @@ import { SmtpEmailChannelAdapter } from './adapters/smtp-email-channel.adapter';
 
 const TICKET_ISSUED_TYPE = 'TicketIssued';
 const CONCERT_REMINDER_24H_TYPE = 'ConcertReminder24h';
+const CONCERT_CANCELED_REFUND_REQUIRED_TYPE = 'ConcertCanceledRefundRequired';
 const DEFAULT_CHANNELS = [
   NotificationChannel.in_app,
   NotificationChannel.email,
@@ -174,6 +175,50 @@ export class NotificationService {
       concertsScanned: concerts.length,
       tasksCreated,
     };
+  }
+
+  async createConcertCanceledRefundTasks(input: {
+    concertId: string;
+    concertTitle: string;
+    organizationId: string;
+    refunds: Array<{
+      orderId: string;
+      ownerUserId: string;
+      ticketCount: number;
+    }>;
+  }): Promise<{ tasksCreated: number }> {
+    if (input.refunds.length === 0) {
+      return { tasksCreated: 0 };
+    }
+
+    const result = await this.prisma.notificationRecord.createMany({
+      data: input.refunds.flatMap((refund) =>
+        DEFAULT_CHANNELS.map((channel) => ({
+          organizationId: input.organizationId,
+          eventType: CONCERT_CANCELED_REFUND_REQUIRED_TYPE,
+          notificationType: CONCERT_CANCELED_REFUND_REQUIRED_TYPE,
+          concertId: input.concertId,
+          orderId: refund.orderId,
+          ownerUserId: refund.ownerUserId,
+          ticketCount: refund.ticketCount,
+          channel,
+          status: NotificationStatus.pending,
+          idempotencyKey: `concert-canceled:${input.concertId}:${refund.orderId}:${channel}`,
+          message: `Concert ${input.concertTitle} has been canceled. Order ${refund.orderId} now requires refund handling.`,
+        })),
+      ),
+      skipDuplicates: true,
+    });
+
+    this.logger.log(
+      formatStructuredLog('concert_cancellation_notification_tasks_created', {
+        concertId: input.concertId,
+        refundOrderCount: input.refunds.length,
+        tasksCreated: result.count,
+      }),
+    );
+
+    return { tasksCreated: result.count };
   }
 
   async processDueBatch(

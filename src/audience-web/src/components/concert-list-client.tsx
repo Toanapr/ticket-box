@@ -23,11 +23,18 @@ const filters: Array<{ label: string; value: Filter }> = [
 const filterTabBaseClass =
   "inline-flex min-h-11 shrink-0 cursor-pointer items-center border-b-[3px] px-0 pb-4 pt-2 text-sm font-black uppercase tracking-wide transition-colors";
 
-function FilterTab({ label, value, active, onSelect }: FilterTabProps): React.ReactElement {
+function FilterTab({
+  label,
+  value,
+  active,
+  onSelect,
+}: FilterTabProps): React.ReactElement {
   return (
     <label
       className={`${filterTabBaseClass} ${
-        active ? "border-ticket-green text-ticket-obsidian" : "border-transparent text-slate-500 hover:text-ticket-obsidian"
+        active
+          ? "border-ticket-green text-ticket-obsidian"
+          : "border-transparent text-slate-500 hover:text-ticket-obsidian"
       }`}
     >
       <input
@@ -43,7 +50,11 @@ function FilterTab({ label, value, active, onSelect }: FilterTabProps): React.Re
   );
 }
 
-export function ConcertListClient({ concerts }: { concerts: ConcertSummary[] }): React.ReactElement {
+export function ConcertListClient({
+  concerts,
+}: {
+  concerts: ConcertSummary[];
+}): React.ReactElement {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -51,8 +62,12 @@ export function ConcertListClient({ concerts }: { concerts: ConcertSummary[] }):
     const normalizedQuery = query.trim().toLowerCase();
     return concerts.filter((concert) => {
       const matchesFilter = filter === "all" || concert.status === filter;
-      const haystack = `${concert.title} ${concert.artists.join(" ")} ${concert.venue}`.toLowerCase();
-      return matchesFilter && (!normalizedQuery || haystack.includes(normalizedQuery));
+      const haystack =
+        `${concert.title} ${concert.artists.join(" ")} ${concert.venue}`.toLowerCase();
+      return (
+        matchesFilter &&
+        (!normalizedQuery || haystack.includes(normalizedQuery))
+      );
     });
   }, [concerts, filter, query]);
 
@@ -90,8 +105,12 @@ export function ConcertListClient({ concerts }: { concerts: ConcertSummary[] }):
         </div>
       ) : (
         <div className="rounded-lg border border-black/10 bg-white p-10 text-center">
-          <h2 className="font-display text-2xl font-black">Không tìm thấy concert</h2>
-          <p className="mt-2 text-sm text-slate-600">Thử đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
+          <h2 className="font-display text-2xl font-black">
+            Không tìm thấy concert
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Thử đổi bộ lọc hoặc từ khóa tìm kiếm.
+          </p>
         </div>
       )}
     </section>

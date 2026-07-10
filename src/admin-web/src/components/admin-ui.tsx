@@ -97,6 +97,36 @@ export function AdminPanel({
   );
 }
 
+export function AdminMetricsGrid({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{children}</div>;
+}
+
+export function AdminMetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <AdminPanel className="space-y-2">
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
+        {label}
+      </p>
+      <p className="font-display text-3xl font-black tracking-tight text-ticket-obsidian">
+        {value}
+      </p>
+      {hint ? <p className="text-sm leading-6 text-slate-600">{hint}</p> : null}
+    </AdminPanel>
+  );
+}
+
 export function AdminPanelTitle({
   title,
   description,

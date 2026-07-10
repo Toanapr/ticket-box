@@ -6,14 +6,20 @@ export function SiteHeader(): React.ReactElement {
   return (
     <header className="sticky top-0 z-40 border-b border-black/10 bg-[rgba(250,250,248,0.88)] backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 md:px-10">
-        <Link href="/concerts" className="flex items-center gap-2 font-display text-xl font-black tracking-tight">
+        <Link
+          href="/concerts"
+          className="flex items-center gap-2 font-display text-xl font-black tracking-tight"
+        >
           <TicketIcon className="h-7 w-7 text-ticket-green" />
           <span>
             Ticket<span className="text-ticket-green">Box</span>
           </span>
         </Link>
 
-        <nav aria-label="Điều hướng chính" className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex">
+        <nav
+          aria-label="Điều hướng chính"
+          className="hidden items-center gap-8 text-sm font-bold text-slate-600 md:flex"
+        >
           <Link className="transition hover:text-ticket-green" href="/concerts">
             Sự kiện
           </Link>
@@ -41,15 +47,22 @@ export function SiteFooter(): React.ReactElement {
             Ticket<span className="text-ticket-green">Box</span>
           </div>
           <p className="max-w-md text-sm leading-6 text-slate-600">
-            Hệ thống bán vé concert cho khán giả: xem sự kiện, giữ vé, theo dõi thanh toán và nhận e-ticket QR.
+            Hệ thống bán vé concert cho khán giả: xem sự kiện, giữ vé, theo dõi
+            thanh toán và nhận e-ticket QR.
           </p>
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-            <span className="rounded border border-black/10 bg-ticket-alabaster px-3 py-2">SSL Secure</span>
-            <span className="rounded border border-black/10 bg-ticket-alabaster px-3 py-2">Signed QR</span>
+            <span className="rounded border border-black/10 bg-ticket-alabaster px-3 py-2">
+              SSL Secure
+            </span>
+            <span className="rounded border border-black/10 bg-ticket-alabaster px-3 py-2">
+              Signed QR
+            </span>
           </div>
         </div>
         <div>
-          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Dịch vụ</h2>
+          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">
+            Dịch vụ
+          </h2>
           <div className="grid gap-3 text-sm text-slate-600">
             <Link href="/concerts">Chính sách bảo mật</Link>
             <Link href="/concerts">Điều khoản sử dụng</Link>
@@ -57,7 +70,9 @@ export function SiteFooter(): React.ReactElement {
           </div>
         </div>
         <div>
-          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">Trợ giúp</h2>
+          <h2 className="mb-4 text-xs font-black uppercase tracking-wider">
+            Trợ giúp
+          </h2>
           <div className="grid gap-3 text-sm text-slate-600">
             <span>1900 6408 (8:30 - 18:30)</span>
             <span>support@ticketbox.vn</span>
@@ -72,6 +87,14 @@ export function SiteFooter(): React.ReactElement {
   );
 }
 
-export function PageShell({ children }: { children: React.ReactNode }): React.ReactElement {
-  return <main className="mx-auto min-h-[calc(100dvh-18rem)] w-full max-w-7xl px-5 py-8 md:px-10 md:py-12">{children}</main>;
+export function PageShell({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <main className="mx-auto min-h-[calc(100dvh-18rem)] w-full max-w-7xl px-5 py-8 md:px-10 md:py-12">
+      {children}
+    </main>
+  );
 }

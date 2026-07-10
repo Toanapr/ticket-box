@@ -29,7 +29,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     toDateTimeLocalValue(concert?.startAt),
   );
   const [status, setStatus] = useState<ConcertPayload["status"]>(
-    concert?.status ?? "draft",
+    concert?.status === "canceled" ? "published" : (concert?.status ?? "draft"),
   );
   const [error, setError] = useState("");
   const [recoveryConcertId, setRecoveryConcertId] = useState<string | null>(
@@ -112,7 +112,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         await apiFetch<Concert>(`/admin/concerts/${concert!.id}`, {
           method: "PATCH",
           body: JSON.stringify(
-            buildConcertPayload({
+            buildConcertUpdatePayload({
               title,
               artistName,
               description,
@@ -193,19 +193,26 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         />
       </AdminField>
 
-      <AdminField label="Status">
-        <select
-          value={status}
-          onChange={(event) =>
-            setStatus(event.target.value as ConcertPayload["status"])
-          }
-          className={inputClassName}
-        >
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-          <option value="canceled">Canceled</option>
-        </select>
-      </AdminField>
+      {concert?.status === "canceled" ? (
+        <AdminNotice>
+          This concert is already canceled. Publishing state is now managed by
+          the dedicated operations workflow, so status changes are disabled
+          here.
+        </AdminNotice>
+      ) : (
+        <AdminField label="Status">
+          <select
+            value={status}
+            onChange={(event) =>
+              setStatus(event.target.value as ConcertPayload["status"])
+            }
+            className={inputClassName}
+          >
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </AdminField>
+      )}
 
       <AdminField
         label={`Poster${mode === "create" ? " (required for publish)" : ""}`}
@@ -302,6 +309,26 @@ function buildConcertPayload(input: {
       input.concert?.publishedArtistBio ??
       `${input.artistName.trim()} live at ${venue}.`,
   };
+}
+
+function buildConcertUpdatePayload(input: {
+  title: string;
+  artistName: string;
+  description: string;
+  venue: string;
+  startAt: string;
+  status: ConcertPayload["status"];
+  concert?: Concert;
+}): Partial<ConcertPayload> {
+  const payload = buildConcertPayload(input);
+
+  if (input.concert?.status === "canceled") {
+    const rest: Partial<ConcertPayload> = { ...payload };
+    delete rest.status;
+    return rest;
+  }
+
+  return payload;
 }
 
 function slugify(value: string) {

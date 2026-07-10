@@ -34,6 +34,123 @@ export type Concert = {
   ticketTypes: TicketType[];
 };
 
+export type DashboardConcertEntry = {
+  concertId: string;
+  title: string;
+  status: ConcertStatus;
+  artistName: string;
+  venue: string;
+  startAt: string;
+  ticketTypesCount: number;
+  inventory: {
+    capacity: number;
+    sold: number;
+    reserved: number;
+    available: number;
+    issued: number;
+    checkedIn: number;
+    revoked: number;
+  };
+  orders: {
+    total: number;
+    pendingPayment: number;
+    issued: number;
+    refundRequired: number;
+    failed: number;
+    expired: number;
+  };
+  revenue: {
+    gross: string;
+    refundExposure: string;
+  };
+};
+
+export type AdminDashboard = {
+  generatedAt: string;
+  totals: {
+    concerts: number;
+    publishedConcerts: number;
+    canceledConcerts: number;
+    grossRevenue: string;
+    refundExposure: string;
+    ticketsIssued: number;
+    ticketsCheckedIn: number;
+    ticketsReserved: number;
+    ticketsAvailable: number;
+    pendingOrders: number;
+    refundRequiredOrders: number;
+  };
+  concerts: DashboardConcertEntry[];
+};
+
+export type ConcertOperations = {
+  concert: {
+    id: string;
+    title: string;
+    status: ConcertStatus;
+    artistName: string;
+    venue: string;
+    startAt: string;
+  };
+  summary: DashboardConcertEntry;
+  ticketTypeBreakdown: Array<{
+    ticketTypeId: string;
+    zoneCode: string;
+    name: string;
+    price: string;
+    capacity: number;
+    perUserLimit: number;
+    saleStartAt: string;
+    saleEndAt: string;
+    reservedCount: number;
+    soldCount: number;
+    availableCount: number;
+  }>;
+  refundQueue: Array<{
+    orderId: string;
+    buyerFullName: string | null;
+    buyerEmail: string | null;
+    buyerPhone: string | null;
+    totalAmount: string;
+    orderStatus: string;
+    paymentStatus: string | null;
+    paymentProvider: string | null;
+    issuedTicketCount: number;
+    revokedTicketCount: number;
+    createdAt: string;
+  }>;
+  cancellationPreview: {
+    currentStatus: ConcertStatus;
+    willChangeStatusTo: "canceled";
+    alreadyCanceled: boolean;
+    activeReservationsToExpire: number;
+    pendingOrdersToExpire: number;
+    ordersToMarkRefundRequired: number;
+    paymentsToExpire: number;
+    paymentsAwaitingReconciliation: number;
+    issuedTicketsToRevoke: number;
+    notificationsToCreate: number;
+  };
+};
+
+export type CancelConcertResult = {
+  concertId: string;
+  title: string;
+  status: ConcertStatus;
+  cancellation: {
+    alreadyCanceled: boolean;
+    performedAt: string | null;
+    reason: string | null;
+    activeReservationsToExpire: number;
+    pendingOrdersToExpire: number;
+    ordersToMarkRefundRequired: number;
+    paymentsToExpire: number;
+    paymentsAwaitingReconciliation: number;
+    issuedTicketsToRevoke: number;
+    notificationsToCreate: number;
+  };
+};
+
 export type ArtistBioJobStatus =
   | "queued"
   | "processing"
@@ -202,6 +319,26 @@ export async function deleteConcert(
 ): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/admin/concerts/${concertId}`, {
     method: "DELETE",
+  });
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  return apiFetch<AdminDashboard>("/admin/dashboard");
+}
+
+export async function getConcertOperations(
+  concertId: string,
+): Promise<ConcertOperations> {
+  return apiFetch<ConcertOperations>(`/admin/concerts/${concertId}/operations`);
+}
+
+export async function cancelConcert(
+  concertId: string,
+  reason?: string,
+): Promise<CancelConcertResult> {
+  return apiFetch<CancelConcertResult>(`/admin/concerts/${concertId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason?.trim() || null }),
   });
 }
 

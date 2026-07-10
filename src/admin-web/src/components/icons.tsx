@@ -134,3 +134,14 @@ export function UserIcon(props: IconProps): React.ReactElement {
     </IconBase>
   );
 }
+
+export function BarChartIcon(props: IconProps): React.ReactElement {
+  return (
+    <IconBase {...props}>
+      <path d="M3 3v18h18" />
+      <path d="M8 16V9" />
+      <path d="M12 16V5" />
+      <path d="M16 16v-7" />
+    </IconBase>
+  );
+}

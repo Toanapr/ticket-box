@@ -347,6 +347,10 @@ export class SmtpEmailChannelAdapter implements NotificationChannelAdapter {
       return 'TicketBox concert reminder';
     }
 
+    if (task.notificationType === 'ConcertCanceledRefundRequired') {
+      return 'TicketBox concert cancellation and refund update';
+    }
+
     return 'TicketBox e-ticket confirmation';
   }
 

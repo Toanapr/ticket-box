@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
 import {
   BellIcon,
+  BarChartIcon,
   LayersIcon,
   QrCodeIcon,
   TicketIcon,
@@ -13,6 +14,11 @@ import {
 import { AdminPageShell } from "./admin-ui";
 
 const navItems = [
+  {
+    href: "/admin/dashboard",
+    label: "Dashboard",
+    icon: BarChartIcon,
+  },
   {
     href: "/admin/concerts",
     label: "Concerts",

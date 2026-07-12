@@ -21,7 +21,7 @@ export function LogoutButton() {
       onClick={handleLogout}
       disabled={isLoggingOut}
       variant="secondary"
-      className="min-h-11 rounded-full px-4 text-xs"
+      className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-4 text-xs"
     >
       {isLoggingOut ? "Signing out..." : "Sign out"}
     </AdminButton>

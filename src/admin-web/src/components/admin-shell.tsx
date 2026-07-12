@@ -51,11 +51,11 @@ export function AdminAppShell({
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-black/10 bg-[rgba(250,250,248,0.92)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 md:px-10 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-col gap-4 px-5 py-4 md:px-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex shrink-0 items-center justify-between gap-3">
             <Link
               href="/admin/concerts"
-              className="flex items-center gap-3 font-display text-xl font-black tracking-tight text-ticket-obsidian"
+              className="flex shrink-0 items-center gap-3 whitespace-nowrap font-display text-xl font-black tracking-tight text-ticket-obsidian"
             >
               <span className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-white">
                 <TicketIcon className="h-6 w-6 text-ticket-green" />
@@ -64,15 +64,15 @@ export function AdminAppShell({
                 Ticket<span className="text-ticket-green">Box</span> Admin
               </span>
             </Link>
-            <div className="hidden rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500 sm:block">
+            <div className="hidden shrink-0 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500 sm:block">
               Organizer workspace
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between lg:gap-4">
+          <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between xl:justify-end xl:gap-3">
             <nav
               aria-label="Admin navigation"
-              className="flex flex-wrap items-center gap-2"
+              className="flex flex-wrap items-center gap-1.5 xl:flex-nowrap"
             >
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -83,7 +83,8 @@ export function AdminAppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-black transition ${
+                    aria-current={isActive ? "page" : undefined}
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-black transition ${
                       isActive
                         ? "bg-ticket-obsidian text-white"
                         : "bg-white text-slate-600 hover:text-ticket-green"

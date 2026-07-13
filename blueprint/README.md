@@ -17,11 +17,11 @@ Blueprint này là nguồn tài liệu thiết kế chính cho đồ án TicketB
 | 2 | [02-c4-diagrams.md](02-c4-diagrams.md) | C4 System Context và logical Container boundaries. |
 | 3 | [03-high-level-architecture.md](03-high-level-architecture.md) | Domain dependency, critical path, điểm tích hợp và topology triển khai. |
 | 4 | [04-database-design.md](04-database-design.md) | Source of truth cho schema, invariant và transaction dữ liệu quan trọng. |
-| 5 | [05-business-flows.md](05-business-flows.md) | Luồng mua vé, soát vé offline, nhập guest list CSV và xử lý lỗi. |
+| 5 | [05-business-flows.md](05-business-flows.md) | Luồng mua vé, soát vé offline, guest-list CSV, cache và AI Artist Bio. |
 | 6 | [06-access-control.md](06-access-control.md) | Mô hình RBAC, quyền theo vai trò, kiểm tra quyền ở API/admin/mobile. |
 | 7 | [07-protection-mechanisms.md](07-protection-mechanisms.md) | Lớp bảo vệ ở biên/dependency: admission control, rate limit, circuit breaker, idempotency và caching. |
 | 8 | [08-requirements.md](08-requirements.md) | Yêu cầu chức năng theo nhóm người dùng và yêu cầu phi chức năng. |
-| 9 | [09-implementation-roadmap.md](09-implementation-roadmap.md) | Source of truth cho roadmap, phase, scope, checklist, tiêu chí hoàn thành và kết luận. |
+| 9 | [09-implementation-roadmap.md](09-implementation-roadmap.md) | Roadmap theo implementation hiện tại: phần đã có, correctness gap, acceptance và readiness trước khi nộp. |
 | 10 | [10-technology-stack.md](10-technology-stack.md) | Lựa chọn công nghệ, nhược điểm, phương án thay thế và trade-off. |
 
 ## Tài liệu giải thích chuyên sâu

@@ -8,11 +8,11 @@ Trang danh sách và chi tiết concert được đọc hàng nghìn lần mỗi
 
 Dùng cache nhiều lớp:
 
-- Public cache hoặc reverse proxy cache cho nội dung public và static assets khi phù hợp.
-- Redis cache-aside cho danh sách, chi tiết concert và read model.
+- Redis là cache bắt buộc cho dữ liệu public; reverse proxy/public edge cache là production extension.
+- Redis cache-aside cho danh sách, chi tiết concert và inventory summary gần realtime.
 - Tách dữ liệu concert tương đối tĩnh khỏi inventory summary gần realtime.
 - Inventory chính xác chỉ được kiểm tra tại backend khi reserve.
-- Ghi cache invalidation event bằng transactional outbox; dùng request coalescing, TTL jitter và stale-while-revalidate/stale-if-error.
+- Sau database commit, service xóa trực tiếp các Redis key liên quan; dùng request coalescing, TTL jitter và bounded DB miss budget.
 - Giới hạn concurrency/query budget khi fallback database để cache failure không kéo sập write-critical path.
 
 ## Lý do chọn
@@ -21,7 +21,7 @@ Dùng cache nhiều lớp:
 - Public cache chặn phần lớn traffic đọc lặp lại trước khi vào backend.
 - Redis giảm query lặp lại và có thể dùng TTL ngắn cho inventory summary.
 - Tách read path giúp database ưu tiên write-critical path.
-- Outbox tránh mất invalidation khi process crash sau DB commit.
+- Direct invalidation khớp implementation và giảm một worker/outbox riêng; TTL bảo đảm eventual refresh nếu delete lỗi.
 - Bounded fallback ưu tiên dữ liệu public hơi stale hơn làm bão hòa PostgreSQL.
 
 ## Trade-off
@@ -43,5 +43,5 @@ Dùng cache nhiều lớp:
 
 - Load test public page và đo cache hit ratio.
 - Kiểm tra database vẫn ổn định khi cache miss tăng.
-- Mô phỏng Redis/public cache lỗi toàn phần và đo fallback concurrency, stale response, `503`.
+- Mô phỏng Redis lỗi toàn phần và đo DB miss concurrency cùng `503` khi budget cạn.
 - Đo độ trễ cập nhật inventory summary và kiểm thử cache invalidation.

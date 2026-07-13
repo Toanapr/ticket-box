@@ -8,7 +8,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 
 ## Quyết định thiết kế
 
-- Tải trước signed ticket manifest theo concert, cổng hoặc khu vực.
+- Tải trước HMAC-signed ticket/guest manifest theo concert, cổng hoặc khu vực.
 - Lưu local checked-in set để chặn scan trùng trên cùng thiết bị.
 - Ghi mỗi lần scan vào durable append-only local queue.
 - Sync batch idempotent khi có mạng; backend là nguồn quyết định cuối cùng.
@@ -18,7 +18,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 
 ## Lý do chọn
 
-- Signed manifest cho phép kiểm tra tính hợp lệ mà không gọi backend.
+- Manifest preloaded cho phép đối chiếu token/ref, scope và revoke list mà không gọi backend. Browser-side cryptographic verification bằng asymmetric public key là hardening còn lại.
 - Durable queue tránh mất dữ liệu khi app crash hoặc mạng mất.
 - Idempotent sync cho phép retry batch an toàn.
 - Phân vùng manifest theo cổng/khu giảm dữ liệu và giảm nguy cơ scan chéo.
@@ -28,7 +28,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 
 - Hai thiết bị offline vẫn có thể cùng chấp nhận một vé trước khi sync.
 - Manifest có thể cũ nếu vé vừa refund hoặc revoke.
-- Local storage chứa dữ liệu nhạy cảm nên cần mã hóa và quản lý thiết bị.
+- IndexedDB chứa dữ liệu vận hành; demo giảm PII và cleanup sau event. Application-level encryption/key management là production hardening.
 - Conflict sau sync cần quy trình vận hành xử lý tại cổng.
 - Giữ event conflict/rejected làm tăng local storage và cần cleanup có kiểm soát.
 
@@ -43,5 +43,4 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 - Test mất mạng, app crash, restart và sync lại.
 - Test timeout/partial ACK, gửi lại toàn batch và crash sau ACK trước cleanup.
 - Scan cùng vé trên một thiết bị và trên hai thiết bị offline.
-- Kiểm tra manifest signature, version, TTL và revoke-list sync.
-
+- Kiểm tra manifest scope, version, TTL và revoke-list sync; sau hardening, kiểm tra thêm asymmetric signature tại client.

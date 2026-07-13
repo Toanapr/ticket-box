@@ -6,11 +6,11 @@ Payment gateway có thể timeout, trả callback trễ hoặc gửi webhook nhi
 
 ## Quyết định thiết kế
 
-- Tách public read path khỏi Payment Service.
-- Dùng payment state machine và trạng thái `PENDING_PAYMENT` hoặc pending reconciliation.
+- Tách public read path khỏi Payment Module và adapter payment provider.
+- Tách order state `pending_payment` khỏi payment state `pending_reconciliation`.
 - Tạo order/payment bằng idempotency key.
 - Chỉ tin webhook đã verify hoặc kết quả reconciliation, không tin browser redirect.
-- Dùng circuit breaker và graceful degradation khi gateway lỗi kéo dài.
+- Dùng in-process circuit breaker, bulkhead và graceful degradation khi gateway lỗi kéo dài.
 - Chỉ phát hành vé sau khi payment success được xác nhận đúng một lần và reservation liên quan vẫn còn hợp lệ; nếu reservation đã expired thì chuyển sang reconciliation/refund_required.
 
 ## Lý do chọn
@@ -43,4 +43,3 @@ Payment gateway có thể timeout, trả callback trễ hoặc gửi webhook nhi
 - Mô phỏng gateway timeout dài và kiểm tra public page vẫn hoạt động.
 - Kiểm tra circuit threshold/cooldown/half-open probe và bulkhead saturation.
 - Kiểm tra một payment success chỉ phát hành vé đúng một lần.
-

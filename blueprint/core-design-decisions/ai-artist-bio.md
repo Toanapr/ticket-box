@@ -6,9 +6,9 @@ PDF press kit có thể lớn, lỗi, chứa nội dung không liên quan hoặc
 
 ## Quyết định thiết kế
 
-- Upload PDF vào object storage thay vì lưu trực tiếp trong database.
-- Kiểm tra file size, loại file và malware trước khi xử lý.
-- Xử lý bất đồng bộ qua queue/workflow: extract, clean, sanitize, generate.
+- Upload PDF vào local persistent storage thay vì lưu trực tiếp trong database.
+- Kiểm tra file size, MIME/magic bytes và server-generated storage key; antivirus là production extension.
+- Xử lý bất đồng bộ qua PostgreSQL job state và scheduled worker: extract, clean, sanitize, generate.
 - Lưu trạng thái job, prompt version, model version và draft output.
 - Mỗi job/stage idempotent theo object version và pipeline version.
 - Đặt timeout, retry budget, exponential backoff/jitter; vượt budget chuyển job sang `failed` để retry thủ công.
@@ -17,7 +17,7 @@ PDF press kit có thể lớn, lỗi, chứa nội dung không liên quan hoặc
 
 ## Lý do chọn
 
-- Object storage phù hợp file lớn và hỗ trợ lifecycle/versioning.
+- File storage tách binary khỏi transactional database; local storage phù hợp demo single-writer và có đường chuyển sang object storage.
 - Async worker cô lập tác vụ chậm, tốn CPU/GPU khỏi API chính.
 - Human review giảm rủi ro hallucination và nội dung không phù hợp.
 - Job state, retry và audit giúp vận hành và tái tạo kết quả.
@@ -26,7 +26,7 @@ PDF press kit có thể lớn, lỗi, chứa nội dung không liên quan hoặc
 ## Trade-off
 
 - Bio không được tạo ngay sau upload.
-- Cần vận hành worker, queue, PDF parser và có thể cần GPU.
+- Cần scheduled worker, durable job state, PDF parser và external AI provider configuration.
 - Human review tăng thời gian và công việc của admin.
 - Lưu extracted text và AI output tạo thêm yêu cầu bảo mật, retention.
 - Retry budget có thể làm job thất bại sớm hơn khi model chập chờn và cần admin retry.

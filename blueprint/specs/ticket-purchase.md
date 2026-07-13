@@ -7,21 +7,21 @@ Tính năng mua vé cho phép khán giả chọn concert đã publish, chọn lo
 Actor chính:
 
 - Khán giả đã đăng nhập.
-- Backend API, Inventory Service, Order Service, Payment Service và Ticket Service.
-- Notification Service gửi thông báo sau khi vé được phát hành.
+- Backend API cùng Inventory, Order, Payment và Ticket Module.
+- Notification Module gửi thông báo sau khi vé được phát hành.
 
 ## Luồng chính
 
 1. Khán giả mở trang concert đã publish và chọn ticket type còn trong sale window.
-2. Khán giả chọn số lượng vé và gửi yêu cầu mua kèm idempotency key và sale access token hợp lệ.
-3. Backend xác thực user, kiểm tra role `audience`, kiểm tra token vào sale và chống bot/rate limit.
+2. Khán giả chọn số lượng vé và gửi yêu cầu giữ vé kèm idempotency key; nếu concert bật bounded admission thì gửi thêm sale access token.
+3. Backend xác thực role `audience`, áp dụng fixed-window rate limit, risk guard và kiểm tra sale token khi admission được bật.
 4. Inventory giữ vé trong transaction: kiểm tra sale window, capacity còn lại và quota theo user.
-5. Hệ thống tạo reservation có TTL, order `PENDING_PAYMENT` và order items tương ứng.
-6. Payment Service tạo payment intent idempotent và trả payment URL hoặc deeplink.
+5. Hệ thống tạo reservation có TTL; request tiếp theo tạo order `pending_payment`, order items và payment record tương ứng.
+6. Payment Module tạo payment intent idempotent và trả payment URL hoặc deeplink.
 7. Khán giả thanh toán qua provider.
 8. Webhook/callback đã verify xác nhận payment thành công.
-9. Hệ thống confirm reservation, chuyển order sang trạng thái đã thanh toán/phát hành và tạo đúng số e-ticket.
-10. Notification Service gửi e-ticket hoặc thông báo mua thành công cho khán giả.
+9. Trong transaction xử lý payment success, hệ thống confirm reservation, chuyển inventory/quota và tạo đúng số e-ticket idempotent; order kết thúc ở `issued`.
+10. Sau commit, Notification Module tạo delivery records; scheduled worker gửi in-app/email mà không ảnh hưởng ticket đã phát hành.
 
 ## Kịch bản lỗi
 
@@ -30,20 +30,20 @@ Actor chính:
 | Concert không tồn tại hoặc chưa publish | Trả `404 Not Found`; không tiết lộ dữ liệu draft. |
 | Ticket type không thuộc concert, đã ngừng bán hoặc chưa mở bán | Từ chối reservation và trả lỗi nghiệp vụ rõ ràng. |
 | Request thiếu hoặc trùng idempotency key | Thiếu key bị từ chối; key trùng trả lại kết quả đã tạo trước đó nếu cùng user và payload tương thích. |
-| Sale access token hết hạn, sai scope hoặc bị replay | Từ chối trước khi vào transaction inventory. |
+| Admission được bật nhưng sale token thiếu, hết hạn hoặc sai scope | Từ chối trước transaction inventory và trả lỗi/retry metadata rõ ràng. Token hợp lệ được phép retry cùng user/concert trong TTL. |
 | Hết vé trong lúc giữ | Transaction thất bại, không tạo order/payment mới. |
 | User vượt quota bằng nhiều request song song | Chỉ các request trong quota được giữ vé; request còn lại bị từ chối. |
 | Payment thất bại hoặc user hủy thanh toán | Order chuyển sang failed/canceled theo kết quả provider; reservation được release hoặc để sweeper expire theo chính sách. |
-| Payment timeout hoặc không có webhook | Order giữ `PENDING_PAYMENT`; reconciliation kiểm tra lại provider; reservation hết TTL thì được expire. |
-| Payment success đến sau khi reservation expired | Không phát hành vé tự động; order chuyển sang trạng thái cần reconciliation/refund. |
-| Ticket issuing retry hoặc worker xử lý lại job/outbox record | Phát hành vé idempotent; không tạo QR/ticket trùng. |
-| Notification gửi thất bại | Ghi nhận lỗi và retry async; không rollback order hoặc ticket đã phát hành. |
+| Payment timeout hoặc không có webhook | Order giữ `pending_payment`, payment chuyển `pending_reconciliation`; reconciliation kiểm tra provider, reservation hết TTL thì được expire. |
+| Payment success đến sau khi reservation expired | Payment vẫn `succeeded`, order chuyển `refund_required`; không phát hành vé tự động. |
+| Webhook/reconciliation retry ticket issuance | Cùng transaction path và unique `(order_item_id, sequence_no)` trả kết quả idempotent; không tạo QR/ticket trùng. |
+| Notification gửi thất bại | Delivery chuyển `failed` và lưu error; không rollback order/ticket. Automatic retry là hardening còn lại. |
 
 ## Ràng buộc
 
 - Bảo mật: Chỉ user role `audience` hoặc `system_admin` theo quy trình vận hành mới tạo reservation/order; user chỉ xem được order và ticket của chính mình.
 - Consistency: Không được oversell; không user nào vượt `per_user_limit`; một payment success chỉ phát hành vé đúng một lần.
-- Idempotency: Các thao tác tạo reservation/order/payment và issue ticket phải retry-safe.
+- Idempotency: Reservation, order, payment intent, provider event và ticket issuance có boundary/dedupe key riêng và phải retry-safe.
 - Thời gian: Reservation có TTL hữu hạn; sweeper phải release reservation hết hạn mà không ảnh hưởng reservation còn active.
 - Payment: Không tin browser redirect là bằng chứng thanh toán; chỉ dùng webhook đã verify hoặc reconciliation.
 - Hiệu năng: Inventory chính xác chỉ kiểm tra ở backend transaction; số vé còn lại trên UI có thể trễ vài giây.
@@ -56,7 +56,7 @@ Actor chính:
 - [ ] Nhiều request song song từ cùng user không vượt quota của ticket type.
 - [ ] Gửi lại cùng idempotency key không tạo thêm reservation, order, payment hoặc ticket.
 - [ ] Reservation hết TTL được release và làm inventory/quota available trở lại.
-- [ ] Payment success đến sau reservation expiry không phát hành vé và được đưa vào luồng reconciliation/refund.
+- [ ] Payment success đến sau reservation expiry không phát hành vé và đưa order vào `refund_required`.
 - [ ] Ticket issuing retry không tạo QR/ticket trùng.
 - [ ] Lỗi notification không làm checkout thành công bị rollback.
 - [ ] User không thể xem order/ticket của user khác.

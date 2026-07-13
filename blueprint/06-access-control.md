@@ -12,7 +12,7 @@ TicketBox dùng RBAC làm nền tảng, kết hợp ownership check theo organiz
 | `organizer` | Ban tổ chức | Tạo/sửa/hủy concert thuộc organization, cấu hình vé, upload PDF/CSV, xem doanh thu concert mình quản lý. |
 | `scanner` | Nhân sự soát vé | Đăng nhập scanner app, tải manifest được phân công, quét và đồng bộ check-in. |
 | `system_admin` | Quản trị hệ thống | Quản lý organization, user, global config, audit. |
-| `service_account` | Worker/internal service | Gọi API nội bộ hoặc consume event theo scope hẹp. |
+| `service_account` | Tài khoản tích hợp dự phòng | Có trong schema nhưng scheduled workers hiện gọi service/database in-process, không dùng internal HTTP. |
 
 ## Ma trận quyền
 
@@ -36,7 +36,7 @@ Nguyên tắc chung:
 1. Không tin quyền từ UI; backend kiểm tra lại ở mọi endpoint.
 2. Token chỉ chứng minh danh tính và role, không thay thế resource ownership check.
 3. Admin action nhạy cảm phải có audit log.
-4. Scanner token phải ngắn hạn và bind theo device, event, gate hoặc zone.
+4. Scanner dùng Bearer token của user và `x-device-id`; backend đối chiếu device/assignment active theo concert, event, gate và zone ở database.
 5. Service account chỉ có scope tối thiểu cho job nội bộ.
 
 ### API endpoint
@@ -48,13 +48,13 @@ Mọi endpoint private yêu cầu access token hợp lệ. Backend kiểm tra:
 3. Resource ownership: `concert.organization_id` phải thuộc organization của organizer.
 4. Với scanner: device/event/gate assignment còn hiệu lực.
 5. Với audience: `user_id` trong token phải trùng owner của order hoặc ticket.
-6. Với thao tác ghi có retry: bắt buộc có idempotency key.
+6. Với thao tác tạo side effect quan trọng có retry như reservation và payment intent: bắt buộc có idempotency key. PATCH/DELETE vốn idempotent không cần áp dụng máy móc.
 
 Ví dụ:
 
 | Endpoint | Kiểm tra |
 |---|---|
-| `POST /reservations` | Role `audience`, sale access token hợp lệ, idempotency key, quota/inventory check ở backend. |
+| `POST /reservations` | Role `audience`, multi-scope rate limit, risk guard, idempotency key và quota/inventory transaction. Signed sale admission token được kiểm tra khi bounded admission được bật. |
 | `PATCH /admin/concerts/{id}` | Role `organizer`, concert thuộc organization của user. |
 | `POST /admin/concerts` | Role `organizer`; user phải có `organization_id`; backend tự gán organization của concert từ authenticated user, không nhận `organization_id` do client tự chọn. |
 | `POST /admin/concerts/{id}/ticket-types` | Role `organizer`; concert thuộc organization của user. |
@@ -69,9 +69,11 @@ Admin web chỉ hiển thị route khi user có role `organizer` hoặc `system_
 
 ### Scanner app
 
-Scanner app dùng token ngắn hạn, bind với `device_id`, `concert_id`, `gate_id` và `zone_code` nếu có. Manifest tải về phải có chữ ký, version và TTL. Khi vận hành offline, app phải cho phép ghi nhận check-in tạm thời vào durable local queue và tự đồng bộ lại khi có mạng; backend vẫn là nguồn quyết định cuối cùng khi phát hiện conflict.
+Scanner app dùng Bearer token kết hợp `x-device-id`; backend bind quyền qua `scanner_devices` và `scanner_assignments`. Manifest tải về có signature, version, TTL và scope concert/event/gate/zone. Khi offline, app ghi check-in vào IndexedDB queue và tự đồng bộ lại khi có mạng; backend vẫn là nguồn quyết định cuối cùng khi phát hiện conflict.
 
 ## Audit log
+
+Implementation hiện có structured log và correlation id cho payment, notification, scanner và các luồng quan trọng. Durable `audit_logs` table cho admin mutation là hạng mục hoàn thiện còn lại; phạm vi tối thiểu gồm actor, action, resource, metadata và timestamp, không cần event sourcing.
 
 Các hành động cần audit:
 

@@ -8,16 +8,16 @@ Trong vài phút đầu mở bán, lượng người dùng và request giữ vé
 
 Dùng nhiều lớp kiểm soát tải:
 
-1. Waiting room/virtual queue giới hạn số người được vào luồng mua vé.
-2. Backend API/Redis rate limit request theo IP, user, device và endpoint.
-3. Queue hoặc admission control tạo backpressure cho request giữ vé.
+1. Redis cache-aside phục vụ read traffic.
+2. Backend API/Redis fixed-window rate limit theo IP, user, device và endpoint.
+3. Risk guard và bounded admission tùy campaign tạo backpressure trước request giữ vé.
 4. Chuẩn bị sẵn capacity Docker/container trước giờ mở bán.
 5. Cache phục vụ read traffic để dành tài nguyên cho write-critical path.
 6. Đặt concurrency limit và backlog/admission depth tối đa; khi vượt ngưỡng, từ chối sớm bằng `429/503` kèm `Retry-After`.
 
 ## Lý do chọn
 
-- Waiting room làm phẳng traffic trước khi request chạm backend và database.
+- Rate limit/risk guard giảm spam trước khi request chạm transaction; bounded admission làm phẳng write traffic khi được bật.
 - Rate limit loại bỏ spam sớm, giảm chi phí xử lý bên trong.
 - Backpressure giữ hệ thống trong ngưỡng có thể xử lý thay vì nhận vô hạn.
 - Chuẩn bị capacity trước giờ mở bán giúp tránh khởi động container đúng lúc traffic tăng.
@@ -26,7 +26,7 @@ Dùng nhiều lớp kiểm soát tải:
 ## Trade-off
 
 - Người dùng phải chờ và cần UX hiển thị vị trí/trạng thái rõ ràng.
-- Queue tạo thêm trạng thái, timeout và bài toán retry.
+- Admission token tạo thêm trạng thái TTL và bài toán retry.
 - Từ chối sớm làm một số người dùng phải quay lại hàng chờ dù hệ thống chưa sập.
 - Rate limit sai có thể chặn người dùng thật dùng chung IP.
 - Bật sẵn capacity tăng chi phí/tài nguyên dù traffic thực tế thấp hơn dự kiến.
@@ -42,5 +42,5 @@ Dùng nhiều lớp kiểm soát tải:
 
 - Load test theo traffic profile của giờ mở bán, không chỉ tải đều.
 - Kiểm tra backlog/admission depth, p95/p99 latency, error rate và database saturation.
-- Mô phỏng Redis/waiting room lỗi để xác nhận reserve path không fail-open vào database.
-- Diễn tập mở bán với capacity đã chuẩn bị, waiting room và cơ chế degrade.
+- Mô phỏng Redis lỗi để xác nhận DB fallback/rate fallback có giới hạn và admission không fail-open.
+- Diễn tập mở bán với cache, rate/risk policy, bounded admission nếu bật và cơ chế degrade.

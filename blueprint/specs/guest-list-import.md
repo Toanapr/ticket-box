@@ -2,25 +2,25 @@
 
 ## Mô tả
 
-Tính năng import guest list CSV cho phép organizer hoặc system admin upload file khách mời theo concert, validate dữ liệu trong staging, dedupe, tạo summary lỗi và publish version mới khi toàn bộ batch hợp lệ. Batch lỗi không được làm hỏng guest list production đang dùng tại cổng.
+Tính năng import guest list CSV cho phép organizer hoặc system admin upload full snapshot khách mời theo concert, validate trong staging, dedupe, tạo summary lỗi và publish active version mới khi toàn bộ batch hợp lệ. Batch lỗi không làm hỏng version đang dùng tại cổng.
 
 Actor chính:
 
 - Organizer thuộc organization sở hữu concert.
 - System admin khi hỗ trợ vận hành.
-- Guest List Import Service, Object Storage, Outbox Polling Worker và Check-in Service.
+- Guest List Import Module, Local File Storage, PostgreSQL/outbox record và Check-in Module.
 
 ## Luồng chính
 
 1. Organizer chọn concert thuộc organization của mình và upload CSV guest list.
-2. Backend xác thực quyền, lưu raw file vào object storage và tạo import batch với checksum/schema version.
-3. Import worker đọc file, parse header/delimiter/encoding theo format được hỗ trợ.
-4. Worker normalize dữ liệu định danh khách, zone/ticket type, sponsor và các trường liên hệ.
-5. Worker validate từng dòng và ghi kết quả vào staging.
-6. Worker dedupe trong file và so với guest entry active theo concert, sponsor và identity.
-7. Nếu toàn batch hợp lệ, worker publish version mới trong transaction và ghi outbox `GuestListUpdated`.
-8. Outbox polling worker đọc event đã commit để Check-in Service/manifest biết có version mới.
-9. Admin dashboard hiển thị batch status, summary, version active và danh sách lỗi nếu có.
+2. Backend xác thực quyền, lưu raw file vào local persistent storage và tạo import batch với checksum/schema version.
+3. Guest List Module đọc file trong request, parse header/delimiter/encoding theo format được hỗ trợ.
+4. Module normalize identity, sponsor và các trường liên hệ.
+5. Module validate từng dòng và ghi kết quả vào staging.
+6. Module dedupe identity trong cùng file. Identity đã có ở version active cũ không phải lỗi vì snapshot mới thay thế version cũ.
+7. Nếu toàn batch hợp lệ, module publish version mới và ghi `GuestListUpdated` trong cùng transaction.
+8. Check-in Module đọc active version trực tiếp khi tạo manifest; outbox record là integration hook bền vững cho mở rộng sau.
+9. Admin dashboard hiển thị batch status, summary, active version và danh sách lỗi nếu có.
 
 ## Kịch bản lỗi
 
@@ -33,15 +33,15 @@ Actor chính:
 | Dòng thiếu identity, full name, zone/ticket mapping hoặc sai format | Ghi invalid row vào staging; toàn batch không publish. |
 | Zone hoặc ticket type không thuộc concert | Batch invalid; không ghi production. |
 | Duplicate trong cùng file | Batch invalid với report các dòng trùng. |
-| Duplicate với guest entry active theo identity/sponsor | Batch invalid hoặc rejected theo policy dedupe; version active không đổi. |
-| Worker crash giữa chừng | Retry theo `(concert_id, file_checksum, schema_version)` không tạo batch/version/row trùng. |
-| Worker crash sau DB commit nhưng trước khi outbox được xử lý | Outbox polling worker xử lý lại `GuestListUpdated`; không tạo version mới lần nữa. |
+| Identity đã tồn tại ở version active cũ | Hợp lệ; entry được tạo lại trong snapshot/version mới. |
+| Request/process lỗi giữa chừng | Database transaction rollback; retry theo `(concert_id, file_checksum, schema_version)` không tạo batch/version/row trùng. |
+| Process lỗi sau DB commit | Active version và `GuestListUpdated` đã cùng commit; retry trả batch cũ, không tạo version mới. |
 | Batch lỗi nặng hoặc nghi ngờ file độc hại | Quarantine file và giữ nguyên dữ liệu production. |
 
 ## Ràng buộc
 
 - Bảo mật: Chỉ organizer sở hữu concert hoặc system admin được upload/import; raw file chứa PII phải được bảo vệ và có retention rõ.
-- All-or-nothing: Version mới chỉ active khi toàn bộ batch hợp lệ.
+- Snapshot/all-or-nothing: Version mới chứa toàn bộ guest list và chỉ active khi toàn bộ batch hợp lệ.
 - Idempotency: Import idempotent theo concert, checksum và schema version.
 - Audit: Lưu người upload, thời điểm, checksum, batch status, summary lỗi và version publish.
 - Consistency: Publish version active và outbox event phải nằm trong cùng transaction.
@@ -54,9 +54,9 @@ Actor chính:
 - [ ] Batch invalid không thay đổi guest list version active.
 - [ ] File thiếu header bắt buộc, duplicate header hoặc header không hỗ trợ bị báo lỗi rõ.
 - [ ] Dòng sai format hoặc thiếu dữ liệu bắt buộc xuất hiện trong error report.
-- [ ] Duplicate trong file hoặc duplicate với dữ liệu active bị phát hiện theo identity policy.
+- [ ] Duplicate trong cùng file bị phát hiện; identity lặp lại từ version trước không làm batch full snapshot thất bại.
 - [ ] Retry cùng file/checksum không tạo version hoặc guest entry trùng.
-- [ ] Worker crash sau DB commit vẫn xử lý event qua outbox sau khi chạy lại.
+- [ ] Retry sau process lỗi/timeout không tạo version hoặc guest entry trùng; committed outbox record vẫn tồn tại.
 - [ ] Scanner manifest chỉ nhận guest entry từ version đã publish.
 - [ ] User ngoài organization không thể upload guest list cho concert.
 

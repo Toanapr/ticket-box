@@ -1,10 +1,8 @@
 import type {
   ScannerAssignment,
-  ScannerCheckInSyncEvent,
   ScannerManifest,
   ScannerManifestTicket,
-} from "@/lib/scanner/types";
-import { randomUUID } from 'expo-crypto';
+} from "./types";
 
 export type ParsedQrPayload = {
   ticketRef: string;
@@ -41,8 +39,7 @@ export function parseQrPayload(rawValue: string): ParsedQrPayload | null {
 
   try {
     const parsed = JSON.parse(normalizedValue) as
-      | { rawToken?: unknown; ticketRef?: unknown }
-      | string;
+      { rawToken?: unknown; ticketRef?: unknown } | string;
 
     if (typeof parsed === "string") {
       return {
@@ -54,7 +51,8 @@ export function parseQrPayload(rawValue: string): ParsedQrPayload | null {
     const ticketRef =
       typeof parsed.ticketRef === "string" && parsed.ticketRef.trim().length > 0
         ? parsed.ticketRef.trim()
-        : typeof parsed.rawToken === "string" && parsed.rawToken.trim().length > 0
+        : typeof parsed.rawToken === "string" &&
+            parsed.rawToken.trim().length > 0
           ? parsed.rawToken.trim()
           : null;
     const rawToken =
@@ -110,16 +108,25 @@ export function validateLocalScan(input: {
     };
   }
 
-  if (input.checkedInTicketRefs.includes(payload.ticketRef)) {
+  const ticket =
+    input.manifest.tickets.find(
+      (item) => item.ticketRef === payload.ticketRef,
+    ) ??
+    input.manifest.tickets.find((item) => item.rawToken === payload.rawToken);
+
+  if (!ticket) {
     return {
       ok: false,
-      reason: "duplicate_local_scan",
-      message: "This ticket has already been recorded on this device.",
+      reason: "ticket_not_found",
+      message:
+        "The scanned ticket was not found in the current manifest scope.",
     };
   }
 
   const revokedTicket = input.manifest.revokedTickets.find(
-    (ticket) => ticket.ticketRef === payload.ticketRef,
+    (item) =>
+      item.ticketRef === ticket.ticketRef ||
+      item.ticketRef === payload.ticketRef,
   );
 
   if (revokedTicket) {
@@ -130,15 +137,16 @@ export function validateLocalScan(input: {
     };
   }
 
-  const ticket =
-    input.manifest.tickets.find((item) => item.ticketRef === payload.ticketRef) ??
-    input.manifest.tickets.find((item) => item.rawToken === payload.rawToken);
-
-  if (!ticket) {
+  // A QR commonly contains rawToken while local state stores the canonical
+  // ticketRef from the manifest. Always compare after canonicalization.
+  if (
+    input.checkedInTicketRefs.includes(ticket.ticketRef) ||
+    input.checkedInTicketRefs.includes(ticket.rawToken)
+  ) {
     return {
       ok: false,
-      reason: "ticket_not_found",
-      message: "The scanned ticket was not found in the current manifest scope.",
+      reason: "duplicate_local_scan",
+      message: "This ticket has already been recorded on this device.",
     };
   }
 
@@ -168,24 +176,12 @@ export function validateLocalScan(input: {
 
   return {
     ok: true,
-    payload,
+    // Always sync the canonical pair from the signed manifest. Manual entry may
+    // contain only a ticket reference, while the backend also validates rawToken.
+    payload: {
+      ticketRef: ticket.ticketRef,
+      rawToken: ticket.rawToken,
+    },
     ticket,
-  };
-}
-
-export function buildPendingQueueEvent(input: {
-  assignment: ScannerAssignment;
-  payload: ParsedQrPayload;
-}): ScannerCheckInSyncEvent {
-  return {
-    clientEventId: randomUUID(),
-    ticketRef: input.payload.ticketRef,
-    rawToken: input.payload.rawToken,
-    scannerUserId: input.assignment.scannerUserId,
-    deviceId: input.assignment.deviceId,
-    eventId: input.assignment.eventId,
-    gateCode: input.assignment.gateCode,
-    zoneCode: input.assignment.zoneCode,
-    clientScannedAt: new Date().toISOString(),
   };
 }

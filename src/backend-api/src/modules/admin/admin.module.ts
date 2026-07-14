@@ -4,6 +4,7 @@ import { ArtistBioModule } from '../artist-bio/artist-bio.module';
 import { ConcertPosterModule } from '../concert-poster/concert-poster.module';
 import { GuestListModule } from '../guest-list/guest-list.module';
 import { NotificationModule } from '../notification/notification.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminScannerController } from './admin-scanner.controller';
@@ -16,6 +17,7 @@ import { AdminScannerService } from './admin-scanner.service';
     ConcertPosterModule,
     GuestListModule,
     NotificationModule,
+    ScannerModule,
   ],
   controllers: [AdminController, AdminScannerController],
   providers: [AdminService, AdminScannerService],

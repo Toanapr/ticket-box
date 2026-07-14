@@ -3,7 +3,7 @@ import type {
   ScannerCheckInSyncRequest,
   ScannerCheckInSyncResponse,
   ScannerManifest,
-} from "@/lib/scanner/types";
+} from "./types";
 
 type ScannerApiClientOptions = {
   accessToken: string;
@@ -42,7 +42,7 @@ export class ScannerApiClient {
     this.correlationId = options.correlationId;
     this.baseUrl =
       options.baseUrl ??
-      process.env.NEXT_PUBLIC_SCANNER_API_BASE_URL?.trim() ??
+      process.env.EXPO_PUBLIC_SCANNER_API_BASE_URL?.trim() ??
       "http://localhost:3000/scanner";
   }
 

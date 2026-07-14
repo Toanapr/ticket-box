@@ -4,6 +4,7 @@ import { ScannerAuthGuard } from './scanner-auth.guard';
 import { ScannerCorrelationMiddleware } from './scanner-correlation.middleware';
 import { ScannerController } from './scanner.controller';
 import { ScannerLoggerService } from './scanner-logger.service';
+import { ScannerManifestProjectionService } from './scanner-manifest-projection.service';
 import { ScannerMetricsService } from './scanner-metrics.service';
 import { ScannerRepository } from './scanner.repository';
 import { ScannerService } from './scanner.service';
@@ -17,8 +18,13 @@ import { ScannerService } from './scanner.service';
     ScannerAuthGuard,
     ScannerLoggerService,
     ScannerMetricsService,
+    ScannerManifestProjectionService,
   ],
-  exports: [ScannerService, ScannerMetricsService],
+  exports: [
+    ScannerService,
+    ScannerMetricsService,
+    ScannerManifestProjectionService,
+  ],
 })
 export class ScannerModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

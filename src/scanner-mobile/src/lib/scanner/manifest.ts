@@ -4,7 +4,7 @@ import type {
   ScannerManifestGuest,
   ScannerManifestRevokedTicket,
   ScannerManifestTicket,
-} from "@/lib/scanner/types";
+} from "./types";
 
 export function getManifestValidationStatus(
   manifest: ScannerManifest | null,

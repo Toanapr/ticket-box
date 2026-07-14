@@ -5,6 +5,7 @@ import {
   Prisma,
   ScannerAssignmentStatus,
   ScannerDeviceStatus,
+  TicketStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -147,11 +148,31 @@ export class ScannerRepository {
             zoneCode: params.zoneCode,
             manifestVersion: params.manifestVersion,
             clientScannedAt: params.clientScannedAt,
-            result: this.resolveResult(params.rejectionReason, winningAcceptedEvent),
-            reason: this.resolveReason(params.rejectionReason, winningAcceptedEvent),
+            result: this.resolveResult(
+              params.rejectionReason,
+              winningAcceptedEvent,
+            ),
+            reason: this.resolveReason(
+              params.rejectionReason,
+              winningAcceptedEvent,
+            ),
             winningEventId: winningAcceptedEvent?.id ?? null,
           },
         });
+
+        if (
+          createdEvent.result === CheckInResultStatus.accepted &&
+          params.ticketId &&
+          this.isUuid(params.ticketId)
+        ) {
+          await tx.ticket.updateMany({
+            where: {
+              id: params.ticketId,
+              status: TicketStatus.issued,
+            },
+            data: { status: TicketStatus.checked_in },
+          });
+        }
 
         return {
           event: createdEvent,
@@ -192,5 +213,11 @@ export class ScannerRepository {
     }
 
     return 'accepted_first_scan';
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 }

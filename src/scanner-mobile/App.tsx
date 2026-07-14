@@ -1,6 +1,6 @@
 import './global.css';
 import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,29 +15,51 @@ import { HistoryScreen } from './src/screens/HistoryScreen';
 
 const Tab = createBottomTabNavigator();
 
+const NAVIGATION_BAR_REHIDE_DELAY_MS = 1200;
+
+function hideAndroidNavigationBar() {
+  if (Platform.OS !== 'android') return;
+
+  void NavigationBar.setVisibilityAsync('hidden').catch(() => {});
+}
+
 export default function App() {
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      NavigationBar.setVisibilityAsync('hidden').catch(() => {});
-      NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
-      
-      // Lắng nghe sự kiện nếu thanh điều hướng vô tình bị hiện lên do chạm mép màn hình
-      // thì tự động ép nó ẩn đi ngay lập tức để giữ trạng thái full màn hình (Immersive Sticky)
-      const listener = NavigationBar.addVisibilityListener(({ visibility }) => {
-        if (visibility === 'visible') {
-          setTimeout(() => {
-            NavigationBar.setVisibilityAsync('hidden').catch(() => {});
-          }, 1500); // Chờ 1.5s rồi tự động ẩn lại (tạo cảm giác tự nhiên như immersive sticky chuẩn của Android)
-        }
-      });
+    if (Platform.OS !== 'android') return;
 
-      return () => listener.remove();
-    }
+    let rehideTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // Behavior is also configured natively in app.json. This runtime call keeps
+    // Expo Go and development builds aligned when edge-to-edge is not enforced.
+    void NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
+    hideAndroidNavigationBar();
+
+    const visibilitySubscription = NavigationBar.addVisibilityListener(
+      ({ visibility }) => {
+        if (visibility !== 'visible') return;
+
+        if (rehideTimer) clearTimeout(rehideTimer);
+        rehideTimer = setTimeout(
+          hideAndroidNavigationBar,
+          NAVIGATION_BAR_REHIDE_DELAY_MS,
+        );
+      },
+    );
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') hideAndroidNavigationBar();
+    });
+
+    return () => {
+      if (rehideTimer) clearTimeout(rehideTimer);
+      visibilitySubscription.remove();
+      appStateSubscription.remove();
+    };
   }, []);
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer onStateChange={hideAndroidNavigationBar}>
         <StatusBar style="light" />
         <Tab.Navigator
           screenOptions={{

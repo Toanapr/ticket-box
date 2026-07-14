@@ -1,13 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ScannerDeviceStatus, ScannerAssignmentStatus, UserRole } from '@prisma/client';
+import {
+  ScannerDeviceStatus,
+  ScannerAssignmentStatus,
+  UserRole,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CurrentUser } from '../auth/current-user';
 import { AssignScannerDto, ProvisionScannerDto } from './dto/scanner-admin.dto';
+import { ScannerManifestProjectionService } from '../scanner/scanner-manifest-projection.service';
 
 @Injectable()
 export class AdminScannerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scannerManifestProjection: ScannerManifestProjectionService,
+  ) {}
 
   async listDevices(user: CurrentUser) {
     const devices = await this.prisma.scannerDevice.findMany({
@@ -35,7 +43,9 @@ export class AdminScannerService {
 
   async provisionDevice(user: CurrentUser, dto: ProvisionScannerDto) {
     const deviceId = randomUUID();
-    const deviceCode = dto.deviceCode || `DEV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const deviceCode =
+      dto.deviceCode ||
+      `DEV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const scannerUserId = randomUUID();
 
     // Tạo User ngầm định cho thiết bị
@@ -68,7 +78,11 @@ export class AdminScannerService {
     };
   }
 
-  async assignDevice(user: CurrentUser, deviceId: string, dto: AssignScannerDto) {
+  async assignDevice(
+    user: CurrentUser,
+    deviceId: string,
+    dto: AssignScannerDto,
+  ) {
     const device = await this.prisma.scannerDevice.findUnique({
       where: { id: deviceId },
     });
@@ -108,6 +122,8 @@ export class AdminScannerService {
         status: ScannerAssignmentStatus.active,
       },
     });
+
+    await this.scannerManifestProjection.refreshAssignment(assignment.id);
 
     return assignment;
   }

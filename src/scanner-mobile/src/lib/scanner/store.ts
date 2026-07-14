@@ -21,14 +21,13 @@ export interface ScannerState {
   setConnectionConfig: (config: ScannerConnectionConfig) => void;
   setAssignment: (assignment: ScannerAssignment | null) => void;
   setManifest: (manifest: ScannerManifest | null) => void;
-  
-  addQueueItem: (item: ScannerQueueItem) => void;
+
+  recordPendingScan: (item: ScannerQueueItem) => boolean;
   replaceQueue: (queue: ScannerQueueItem[]) => void;
   
   addResult: (result: ScannerResultRecord) => void;
   replaceResults: (results: ScannerResultRecord[]) => void;
   
-  addCheckedInTicketRef: (ref: string) => void;
   setLastSuccessfulSyncAt: (timestamp: string) => void;
   
   clearAll: () => void;
@@ -49,10 +48,21 @@ export const useScannerStore = create<ScannerState>()(
       setAssignment: (assignment) => set({ assignment }),
       setManifest: (manifest) => set({ manifest }),
       
-      addQueueItem: (item) => {
-        const currentQueue = get().queue;
-        const filtered = currentQueue.filter(q => q.clientEventId !== item.clientEventId);
-        set({ queue: [...filtered, item] });
+      recordPendingScan: (item) => {
+        const state = get();
+        const alreadyRecorded =
+          state.checkedInTicketRefs.includes(item.ticketRef) ||
+          state.queue.some((queued) => queued.ticketRef === item.ticketRef);
+
+        if (alreadyRecorded) {
+          return false;
+        }
+
+        set({
+          queue: [...state.queue, item],
+          checkedInTicketRefs: [...state.checkedInTicketRefs, item.ticketRef],
+        });
+        return true;
       },
       
       replaceQueue: (queue) => set({ queue }),
@@ -64,13 +74,6 @@ export const useScannerStore = create<ScannerState>()(
       },
       
       replaceResults: (results) => set({ results }),
-      
-      addCheckedInTicketRef: (ref) => {
-        const currentRefs = get().checkedInTicketRefs;
-        if (!currentRefs.includes(ref)) {
-          set({ checkedInTicketRefs: [...currentRefs, ref] });
-        }
-      },
       
       setLastSuccessfulSyncAt: (timestamp) => set({ lastSuccessfulSyncAt: timestamp }),
       

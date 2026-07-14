@@ -4,6 +4,7 @@ import { ScannerLoggerService } from './scanner-logger.service';
 import { ScannerMetricsService } from './scanner-metrics.service';
 import { ScannerRepository } from './scanner.repository';
 import { ScannerService } from './scanner.service';
+import { ScannerManifestProjectionService } from './scanner-manifest-projection.service';
 
 describe('ScannerService guest QR support', () => {
   const scannerRepository = {
@@ -33,11 +34,16 @@ describe('ScannerService guest QR support', () => {
     getScannerManifest: jest.fn(),
   } as unknown as jest.Mocked<GuestListImportService>;
 
+  const scannerManifestProjection = {
+    refreshAssignment: jest.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<ScannerManifestProjectionService>;
+
   const service = new ScannerService(
     scannerRepository,
     scannerLogger,
     scannerMetrics,
     guestListImportService,
+    scannerManifestProjection,
   );
 
   beforeEach(() => {
@@ -104,7 +110,11 @@ describe('ScannerService guest QR support', () => {
   });
 
   it('adds active guest list entries into the scanner manifest for guest zone assignments', async () => {
-    const result = await service.getManifest('device-guest-01', 'scanner-user-guest', {});
+    const result = await service.getManifest(
+      'device-guest-01',
+      'scanner-user-guest',
+      {},
+    );
 
     expect(result.totalGuestEntries).toBe(1);
     expect(result.guestList).toEqual([

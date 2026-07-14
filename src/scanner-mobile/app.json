@@ -11,11 +11,28 @@
     "android": {
       "predictiveBackGestureEnabled": false
     },
+    "androidNavigationBar": {
+      "visible": "sticky-immersive",
+      "barStyle": "light-content",
+      "backgroundColor": "#09090b",
+      "enforceContrast": false
+    },
     "plugins": [
       [
         "expo-camera",
         {
           "cameraPermission": "Allow TicketBox to access your camera for scanning tickets."
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "visibility": "hidden",
+          "behavior": "overlay-swipe",
+          "position": "absolute",
+          "backgroundColor": "#09090b",
+          "barStyle": "light",
+          "legacyVisible": "sticky-immersive"
         }
       ]
     ]

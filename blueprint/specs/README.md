@@ -41,4 +41,3 @@ Tên file dùng kebab-case và mô tả một capability nghiệp vụ hoàn ch�
 
 - [TicketBox Blueprint](../README.md)
 - [Core Design Decisions](../core-design-decisions/README.md)
-- [Quy trình tài liệu và implementation](../../docs/documentation-and-implementation-workflow.md)

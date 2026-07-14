@@ -7,7 +7,7 @@ Blueprint này là nguồn tài liệu thiết kế chính cho đồ án TicketB
 | Nguồn | Vai trò |
 |---|---|
 | `blueprint/` | Thư mục Blueprint dùng để review và nộp bài; source of truth cho thiết kế hệ thống TicketBox. |
-| [`../docs/project-brief-ticketbox.md`](../docs/project-brief-ticketbox.md) | Bối cảnh đề bài và phạm vi đồ án. |
+| [Project brief](project-brief-ticketbox.md) | Bối cảnh đề bài, yêu cầu hệ thống và phạm vi đồ án. |
 
 ## Mục lục Blueprint
 

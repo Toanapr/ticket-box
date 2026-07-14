@@ -2,7 +2,7 @@
 
 Tài liệu này đối chiếu giữa:
 
-- đề bài trong `docs/project-brief-ticketbox.md`
+- đề bài trong `blueprint/project-brief-ticketbox.md`
 - blueprint trong thư mục `blueprint/`
 - phần cài đặt hiện có trong `src/`
 

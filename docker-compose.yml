@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ticketbox
+      POSTGRES_PASSWORD: ticketbox123
+      POSTGRES_DB: ticketbox
+    ports:
+      - "5433:5432"
+    volumes:
+      - ticketbox_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketbox -d ticketbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-api:
+    build:
+      context: .
+      dockerfile: src/backend-api/Dockerfile
+    env_file:
+      - path: ./src/backend-api/.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgresql://ticketbox:ticketbox123@postgres:5432/ticketbox?schema=public
+      DIRECT_URL: postgresql://ticketbox:ticketbox123@postgres:5432/ticketbox?schema=public
+      JWT_SECRET: ticketbox-demo-jwt-secret
+      JWT_ISSUER: ticketbox-backend
+      JWT_EXPIRES_IN_SECONDS: "3600"
+      REDIS_URL: redis://redis:6379/0
+      PUBLIC_CONCERT_CACHE_TTL_SECONDS: "60"
+      INVENTORY_SUMMARY_CACHE_TTL_SECONDS: "5"
+      CACHE_TTL_JITTER_RATIO: "0.15"
+      CACHE_MISS_QUERY_BUDGET: "8"
+      WEBHOOK_SIGNING_SECRET: ticketbox-demo-webhook-secret
+      PAYMENT_PROVIDER_TIMEOUT_MS: "3000"
+      PAYMENT_PROVIDER_MAX_CONCURRENCY: "10"
+      PAYMENT_CIRCUIT_FAILURE_THRESHOLD: "5"
+      PAYMENT_CIRCUIT_COOLDOWN_MS: "30000"
+      PAYMENT_RECONCILIATION_BATCH_SIZE: "20"
+      PAYMENT_RECONCILIATION_LEASE_MS: "30000"
+      PAYMENT_RECONCILIATION_RETRY_MS: "30000"
+      PAYMENT_PENDING_RECONCILIATION_AGE_MS: "60000"
+      MOCK_PAYMENT_MODE: success
+      MOCK_PAYMENT_DELAY_MS: "0"
+      VNPAY_PAYMENT_URL: ${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_QUERYDR_URL: ${VNPAY_QUERYDR_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      VNPAY_LOCALE: ${VNPAY_LOCALE:-vn}
+      VNPAY_ORDER_TYPE: ${VNPAY_ORDER_TYPE:-other}
+      VNPAY_IP_ADDR: ${VNPAY_IP_ADDR:-127.0.0.1}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_SECURE: "false"
+      SMTP_USER: demo@ticketbox.local
+      SMTP_PASS: ""
+      SMTP_FROM: TicketBox <demo@ticketbox.local>
+      GEMINI_API_KEY: ""
+      GOOGLE_API_KEY: ""
+      GEMINI_MODEL: gemini-2.5-flash
+      CONCERT_POSTER_STORAGE_DIR: /app/src/backend-api/storage/concert-posters
+      SCANNER_MANIFEST_SIGNING_SECRET: dev-scanner-manifest-secret
+      NOTIFICATION_WORKER_ENABLED: "false"
+      NOTIFICATION_REMINDER_SCHEDULER_ENABLED: "false"
+    volumes:
+      - ticketbox_backend_storage:/app/src/backend-api/storage
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok ? 0 : 1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: src/admin-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://backend-api:3000
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      NEXT_PUBLIC_API_BASE_URL: http://backend-api:3000
+    ports:
+      - "3002:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/backend/health').then((r)=>process.exit(r.ok ? 0 : 1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  audience-web:
+    build:
+      context: .
+      dockerfile: src/audience-web/Dockerfile
+      args:
+        BACKEND_API_BASE_URL: http://backend-api:3000
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      BACKEND_API_BASE_URL: http://backend-api:3000
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/backend/health').then((r)=>process.exit(r.ok ? 0 : 1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  ticketbox_postgres_data:
+  ticketbox_backend_storage:

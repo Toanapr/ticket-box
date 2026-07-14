@@ -1,0 +1,16 @@
+﻿Selected checkout/concurrency cases:
+- completes reservation -> order -> mock success -> issued tickets
+- returns renderable opaque QR token for newly issued ticket
+- does not let one user exceed quota with parallel requests
+- enforces quota across paid orders and concurrent follow-up requests
+- does not oversell the last available ticket under concurrent requests
+
+
+> backend-api@0.0.1 test:e2e
+> jest --config ./test/jest-e2e.json --runInBand --verbose test/checkout-flow.e2e-spec.ts --testNamePattern completes reservation|does not let one user exceed quota|enforces quota across paid orders|does not oversell the last available ticket|returns renderable opaque QR token
+
+Test Suites: 1 passed, 1 total
+Tests:       14 skipped, 5 passed, 19 total
+Snapshots:   0 total
+Time:        2.356 s
+Ran all test suites matching test/checkout-flow.e2e-spec.ts with tests matching "completes reservation|does not let one user exceed quota|enforces quota across paid orders|does not oversell the last available ticket|returns renderable opaque QR token".

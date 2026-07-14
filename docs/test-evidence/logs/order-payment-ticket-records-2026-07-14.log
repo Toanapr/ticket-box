@@ -1,0 +1,5 @@
+﻿               order_id               | order_status | total_amount |              payment_id              | provider | payment_status |              ticket_id               | ticket_status | sequence_no | qr_token_present | qr_hash_present 
+--------------------------------------+--------------+--------------+--------------------------------------+----------+----------------+--------------------------------------+---------------+-------------+------------------+-----------------
+ 728e2ca3-6ed9-41d7-a517-abb6abbd1c43 | issued       |    700000.00 | c6f0c412-adfa-4a20-8d32-c933042044b6 | mock     | succeeded      | 74bd9c78-42e4-41c1-ab4f-190b944a5af0 | issued        |           1 | t                | t
+(1 row)
+

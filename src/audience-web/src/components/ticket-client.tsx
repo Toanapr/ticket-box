@@ -17,11 +17,29 @@ export function TicketClient({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load(): Promise<void> {
-      setTicket(await getTicket(ticketId));
-      setLoading(false);
+    let active = true;
+
+    async function load(initialLoad = false): Promise<void> {
+      try {
+        const nextTicket = await getTicket(ticketId);
+        if (active) setTicket(nextTicket);
+      } finally {
+        if (active && initialLoad) setLoading(false);
+      }
     }
-    void load();
+
+    void load(true);
+    const refreshInterval = window.setInterval(() => void load(), 10_000);
+    const refreshWhenVisible = (): void => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [ticketId]);
 
   if (loading) {
@@ -48,6 +66,21 @@ export function TicketClient({
       </div>
     );
   }
+
+  const statusDisplay = {
+    issued: {
+      label: "Chưa check-in",
+      className: "bg-ticket-green/10 text-ticket-green",
+    },
+    checked_in: {
+      label: "Đã check-in",
+      className: "bg-sky-100 text-sky-800",
+    },
+    revoked: {
+      label: "Vé đã bị thu hồi",
+      className: "bg-red-100 text-red-800",
+    },
+  }[ticket.status];
 
   return (
     <section className="mx-auto max-w-3xl">
@@ -118,8 +151,10 @@ export function TicketClient({
           <div className="mt-1 font-mono text-lg font-black tracking-wide">
             {ticket.ticketId}
           </div>
-          <div className="mt-4 inline-flex rounded-full bg-ticket-green/10 px-3 py-1 text-xs font-black uppercase text-ticket-green">
-            Chưa check-in
+          <div
+            className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${statusDisplay.className}`}
+          >
+            {statusDisplay.label}
           </div>
           <div className="mt-5 break-all font-mono text-[11px] uppercase text-slate-500">
             {ticket.signedPayload}

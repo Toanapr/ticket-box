@@ -3,7 +3,7 @@ import type {
   ScannerCheckInSyncRequest,
   ScannerCheckInSyncResponse,
   ScannerManifest,
-} from "@/lib/scanner/types";
+} from "./types";
 
 type ScannerApiClientOptions = {
   accessToken: string;

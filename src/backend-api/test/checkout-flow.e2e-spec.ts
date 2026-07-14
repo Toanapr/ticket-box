@@ -1047,6 +1047,102 @@ describe('Checkout flow and invariants (e2e)', () => {
     expect(quota?.paidCount ?? 0).toBe(0);
   });
 
+  it('enforces quota across paid orders and concurrent follow-up requests', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Paid Quota Guard',
+      zoneCode: 'PQG',
+      price: '180000.00',
+      capacity: 20,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const testIp = `paid-quota-${userId}`;
+
+    const firstReservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', testIp)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const firstOrder = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: firstReservation.body.id,
+        idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
+      });
+    const firstPayment = await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('Authorization', bearerToken(userId))
+      .send({ orderId: firstOrder.body.id });
+
+    expect(firstPayment.body.paymentStatus).toBe('succeeded');
+
+    const parallelAttempts = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        request(app.getHttpServer())
+          .post('/reservations')
+          .set('Authorization', bearerToken(userId))
+          .set('x-forwarded-for', testIp)
+          .send({
+            ticketTypeId: testTicketType.id,
+            quantity: 1,
+            idempotencyKey: randomUUID(),
+          }),
+      ),
+    );
+    const winningReservation = parallelAttempts.find(
+      (response) => response.status === 201,
+    );
+
+    expect(
+      parallelAttempts.filter((response) => response.status === 201),
+    ).toHaveLength(1);
+    expect(winningReservation).toBeDefined();
+
+    const secondOrder = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: winningReservation!.body.id,
+        idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
+      });
+    const secondPayment = await request(app.getHttpServer())
+      .post('/payments/mock-success')
+      .set('Authorization', bearerToken(userId))
+      .send({ orderId: secondOrder.body.id });
+
+    expect(secondPayment.body.paymentStatus).toBe('succeeded');
+
+    const overLimit = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', testIp)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    expect(overLimit.status).toBe(409);
+    expect(overLimit.body.error).toBe('quota_exceeded');
+
+    const quota = await prisma.userTicketQuota.findUniqueOrThrow({
+      where: {
+        userId_ticketTypeId: {
+          userId,
+          ticketTypeId: testTicketType.id,
+        },
+      },
+    });
+    expect(quota.paidCount).toBe(2);
+    expect(quota.reservedCount).toBe(0);
+  });
+
   it('does not oversell the last available ticket under concurrent requests', async () => {
     const testTicketType = await createTestTicketType({
       name: 'Last Ticket Contention',

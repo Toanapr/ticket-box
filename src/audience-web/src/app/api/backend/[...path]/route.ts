@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { clearAccessToken, getAccessToken, getBackendBaseUrl } from "@/lib/backend-bff";
+import { isSameOriginRequest } from "@/lib/request-origin";
 
 interface RouteContext {
   params: Promise<{ path: string[] }>;
@@ -27,8 +28,7 @@ async function proxyRequest(request: Request, context: RouteContext): Promise<Re
     return NextResponse.json({ message: "Backend route is not allowed" }, { status: 404 });
   }
 
-  const origin = request.headers.get("origin");
-  if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) {
+  if (request.method !== "GET" && !isSameOriginRequest(request)) {
     return NextResponse.json({ message: "Cross-origin request rejected" }, { status: 403 });
   }
 

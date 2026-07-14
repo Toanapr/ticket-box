@@ -20,6 +20,7 @@ import { ScannerManifestResponseDto } from './dto/scanner-manifest-response.dto'
 import { ScannerLoggerService } from './scanner-logger.service';
 import { ScannerMetricsService } from './scanner-metrics.service';
 import { ScannerRepository } from './scanner.repository';
+import { ScannerManifestProjectionService } from './scanner-manifest-projection.service';
 import { signScannerManifest } from './scanner-manifest-signature.util';
 import {
   GUEST_LIST_DEFAULT_ZONE,
@@ -37,6 +38,7 @@ export class ScannerService {
     private readonly scannerLogger: ScannerLoggerService,
     private readonly scannerMetrics: ScannerMetricsService,
     private readonly guestListImportService: GuestListImportService,
+    private readonly scannerManifestProjection: ScannerManifestProjectionService,
   ) {}
 
   assertDeviceHeader(deviceId: string | undefined): string {
@@ -105,7 +107,10 @@ export class ScannerService {
     scannerUserId: string,
     query: ManifestQueryDto,
   ): Promise<ScannerManifestResponseDto> {
-    const assignment = await this.getAuthorizedActiveAssignment(deviceCode, scannerUserId);
+    const assignment = await this.getAuthorizedActiveAssignment(
+      deviceCode,
+      scannerUserId,
+    );
 
     if (query.assignmentId && query.assignmentId !== assignment.id) {
       throw new ForbiddenException({
@@ -114,7 +119,11 @@ export class ScannerService {
       });
     }
 
-    const manifestSource = await this.scannerRepository.findManifestPayloadByAssignmentId(assignment.id);
+    await this.scannerManifestProjection.refreshAssignment(assignment.id);
+    const manifestSource =
+      await this.scannerRepository.findManifestPayloadByAssignmentId(
+        assignment.id,
+      );
 
     if (!manifestSource) {
       throw new NotFoundException({
@@ -123,21 +132,25 @@ export class ScannerService {
       });
     }
 
-    const mergedGuestEntries = await this.loadGuestEntriesForAssignment(manifestSource);
+    const mergedGuestEntries =
+      await this.loadGuestEntriesForAssignment(manifestSource);
     const totals = {
       totalTickets: manifestSource.manifestTickets.length,
       totalRevokedTickets: manifestSource.revokedTickets.length,
       totalGuestEntries: mergedGuestEntries.length,
     };
     const totalEntries =
-      totals.totalTickets + totals.totalRevokedTickets + totals.totalGuestEntries;
+      totals.totalTickets +
+      totals.totalRevokedTickets +
+      totals.totalGuestEntries;
     const maxFullEntries = this.getManifestMaxFullEntries();
     const requestedChunkSize = query.chunkSize;
 
     if (!requestedChunkSize && totalEntries > maxFullEntries) {
       throw new PayloadTooLargeException({
         error: 'scanner_manifest_requires_chunking',
-        message: 'Manifest is too large for full download and must be requested in chunks',
+        message:
+          'Manifest is too large for full download and must be requested in chunks',
         maxFullEntries,
         totalEntries,
         recommendedChunkSize: this.getManifestDefaultChunkSize(),
@@ -155,7 +168,7 @@ export class ScannerService {
           Math.ceil(totals.totalGuestEntries / chunkSize),
         )
       : 1;
-    const chunkIndex = chunkSize ? query.chunkIndex ?? 0 : null;
+    const chunkIndex = chunkSize ? (query.chunkIndex ?? 0) : null;
 
     if (chunkIndex !== null && chunkIndex >= totalChunks) {
       throw new BadRequestException({
@@ -168,11 +181,19 @@ export class ScannerService {
     const tickets =
       chunkSize === null
         ? manifestSource.manifestTickets
-        : this.sliceChunk(manifestSource.manifestTickets, chunkIndex!, chunkSize);
+        : this.sliceChunk(
+            manifestSource.manifestTickets,
+            chunkIndex!,
+            chunkSize,
+          );
     const revokedTickets =
       chunkSize === null
         ? manifestSource.revokedTickets
-        : this.sliceChunk(manifestSource.revokedTickets, chunkIndex!, chunkSize);
+        : this.sliceChunk(
+            manifestSource.revokedTickets,
+            chunkIndex!,
+            chunkSize,
+          );
     const guestEntries =
       chunkSize === null
         ? mergedGuestEntries
@@ -185,8 +206,12 @@ export class ScannerService {
       gateCode: manifestSource.gateCode,
       zoneCode: manifestSource.zoneCode,
       version: manifestSource.manifestVersion ?? 1,
-      generatedAt: (manifestSource.manifestIssuedAt ?? manifestSource.updatedAt).toISOString(),
-      expiresAt: (manifestSource.manifestExpiresAt ?? manifestSource.updatedAt).toISOString(),
+      generatedAt: (
+        manifestSource.manifestIssuedAt ?? manifestSource.updatedAt
+      ).toISOString(),
+      expiresAt: (
+        manifestSource.manifestExpiresAt ?? manifestSource.updatedAt
+      ).toISOString(),
       chunkIndex,
       chunkSize,
       totalChunks,
@@ -217,7 +242,10 @@ export class ScannerService {
       })),
     };
 
-    const signature = signScannerManifest(this.getManifestSigningSecret(), payloadWithoutSignature);
+    const signature = signScannerManifest(
+      this.getManifestSigningSecret(),
+      payloadWithoutSignature,
+    );
 
     return {
       ...payloadWithoutSignature,
@@ -229,7 +257,10 @@ export class ScannerService {
     deviceCode: string,
     scannerUserId: string,
   ): Promise<ScannerAssignmentResponseDto> {
-    const assignment = await this.getAuthorizedActiveAssignment(deviceCode, scannerUserId);
+    const assignment = await this.getAuthorizedActiveAssignment(
+      deviceCode,
+      scannerUserId,
+    );
     const device = assignment.device;
 
     return {
@@ -247,8 +278,12 @@ export class ScannerService {
     };
   }
 
-  private async getAuthorizedActiveAssignment(deviceCode: string, scannerUserId: string) {
-    const device = await this.scannerRepository.findDeviceWithActiveAssignments(deviceCode);
+  private async getAuthorizedActiveAssignment(
+    deviceCode: string,
+    scannerUserId: string,
+  ) {
+    const device =
+      await this.scannerRepository.findDeviceWithActiveAssignments(deviceCode);
 
     if (!device) {
       throw new NotFoundException({
@@ -274,13 +309,17 @@ export class ScannerService {
     if (device.assignments.length > 1) {
       throw new ConflictException({
         error: 'scanner_assignment_inconsistent',
-        message: 'Multiple active assignments were found for this scanner device',
+        message:
+          'Multiple active assignments were found for this scanner device',
       });
     }
 
     const assignment = device.assignments[0];
 
-    if (assignment.scannerUserId !== scannerUserId || device.scannerUserId !== scannerUserId) {
+    if (
+      assignment.scannerUserId !== scannerUserId ||
+      device.scannerUserId !== scannerUserId
+    ) {
       throw new ForbiddenException({
         error: 'scanner_assignment_forbidden',
         message: 'Scanner user is not allowed to access this assignment',
@@ -294,7 +333,10 @@ export class ScannerService {
   }
 
   private getManifestSigningSecret(): string {
-    return process.env.SCANNER_MANIFEST_SIGNING_SECRET?.trim() || 'dev-scanner-manifest-secret';
+    return (
+      process.env.SCANNER_MANIFEST_SIGNING_SECRET?.trim() ||
+      'dev-scanner-manifest-secret'
+    );
   }
 
   async syncCheckIns(
@@ -303,8 +345,15 @@ export class ScannerService {
     dto: ScannerCheckInSyncDto,
     correlationId: string,
   ): Promise<ScannerCheckInSyncResponseDto> {
-    const assignment = await this.getAuthorizedActiveAssignment(deviceCode, scannerUserId);
-    const manifestSource = await this.scannerRepository.findManifestPayloadByAssignmentId(assignment.id);
+    const assignment = await this.getAuthorizedActiveAssignment(
+      deviceCode,
+      scannerUserId,
+    );
+    await this.scannerManifestProjection.refreshAssignment(assignment.id);
+    const manifestSource =
+      await this.scannerRepository.findManifestPayloadByAssignmentId(
+        assignment.id,
+      );
 
     if (!manifestSource) {
       throw new NotFoundException({
@@ -314,12 +363,17 @@ export class ScannerService {
     }
 
     const ticketsByRef = new Map(
-      manifestSource.manifestTickets.map((ticket) => [ticket.ticketRef, ticket] as const),
+      manifestSource.manifestTickets.map(
+        (ticket) => [ticket.ticketRef, ticket] as const,
+      ),
     );
     const revokedByRef = new Map(
-      manifestSource.revokedTickets.map((ticket) => [ticket.ticketRef, ticket] as const),
+      manifestSource.revokedTickets.map(
+        (ticket) => [ticket.ticketRef, ticket] as const,
+      ),
     );
-    const guestEntries = await this.loadGuestEntriesForAssignment(manifestSource);
+    const guestEntries =
+      await this.loadGuestEntriesForAssignment(manifestSource);
     const guestsByRef = new Map(
       guestEntries.map((guest) => [guest.guestRef, guest] as const),
     );
@@ -362,7 +416,10 @@ export class ScannerService {
         rejectionReason,
       });
 
-      const result = this.mapRecordedCheckInResult(recorded.event, recorded.replayed);
+      const result = this.mapRecordedCheckInResult(
+        recorded.event,
+        recorded.replayed,
+      );
       results.push(result);
       this.scannerMetrics.incrementResult(result.result);
 
@@ -370,7 +427,10 @@ export class ScannerService {
         this.scannerMetrics.incrementDuplicateReplay();
       }
 
-      if (result.result !== ScannerCheckInResult.ACCEPTED || recorded.replayed) {
+      if (
+        result.result !== ScannerCheckInResult.ACCEPTED ||
+        recorded.replayed
+      ) {
         this.scannerLogger.warn('scanner.sync.event_outcome', {
           correlationId,
           assignmentId: assignment.id,
@@ -396,11 +456,18 @@ export class ScannerService {
       scannerUserId,
       manifestVersion: dto.manifestVersion,
       requestedEventCount: dto.events.length,
-      acceptedCount: results.filter((result) => result.result === ScannerCheckInResult.ACCEPTED).length,
-      conflictCount: results.filter((result) => result.result === ScannerCheckInResult.CONFLICT).length,
-      rejectedCount: results.filter((result) => result.result === ScannerCheckInResult.REJECTED).length,
+      acceptedCount: results.filter(
+        (result) => result.result === ScannerCheckInResult.ACCEPTED,
+      ).length,
+      conflictCount: results.filter(
+        (result) => result.result === ScannerCheckInResult.CONFLICT,
+      ).length,
+      rejectedCount: results.filter(
+        (result) => result.result === ScannerCheckInResult.REJECTED,
+      ).length,
       duplicateReplayCount: results.filter(
-        (result) => result.reason === ScannerCheckInReason.DUPLICATE_EVENT_REPLAY,
+        (result) =>
+          result.reason === ScannerCheckInReason.DUPLICATE_EVENT_REPLAY,
       ).length,
       metrics: metricsSnapshot,
     });
@@ -427,10 +494,15 @@ export class ScannerService {
       });
     }
 
-    if (dto.events.some((event) => Number.isNaN(Date.parse(event.clientScannedAt)))) {
+    if (
+      dto.events.some((event) =>
+        Number.isNaN(Date.parse(event.clientScannedAt)),
+      )
+    ) {
       throw new BadRequestException({
         error: 'invalid_client_scanned_at',
-        message: 'All sync events must include a valid ISO clientScannedAt timestamp',
+        message:
+          'All sync events must include a valid ISO clientScannedAt timestamp',
       });
     }
   }
@@ -464,7 +536,8 @@ export class ScannerService {
 
     if (
       input.assignmentManifestVersion !== null &&
-      input.requestManifestVersion !== input.assignmentManifestVersion
+      (input.requestManifestVersion < 1 ||
+        input.requestManifestVersion > input.assignmentManifestVersion)
     ) {
       return ScannerCheckInReason.INVALID_MANIFEST_SCOPE;
     }
@@ -521,17 +594,20 @@ export class ScannerService {
       return seededGuestEntries;
     }
 
-    const activeGuestManifest = await this.guestListImportService.getScannerManifest(
-      manifestSource.concertId,
-      manifestSource.zoneCode,
+    const activeGuestManifest =
+      await this.guestListImportService.getScannerManifest(
+        manifestSource.concertId,
+        manifestSource.zoneCode,
+      );
+    const activeGuestEntries = activeGuestManifest.guestList.entries.map(
+      (guest) => ({
+        guestRef: guest.guestRef,
+        displayName: guest.fullName,
+        eventId: manifestSource.eventId,
+        gateCode: manifestSource.gateCode,
+        zoneCode: manifestSource.zoneCode,
+      }),
     );
-    const activeGuestEntries = activeGuestManifest.guestList.entries.map((guest) => ({
-      guestRef: guest.guestRef,
-      displayName: guest.fullName,
-      eventId: manifestSource.eventId,
-      gateCode: manifestSource.gateCode,
-      zoneCode: manifestSource.zoneCode,
-    }));
 
     return Array.from(
       new Map(
@@ -587,11 +663,17 @@ export class ScannerService {
   }
 
   private getManifestMaxFullEntries(): number {
-    return this.getPositiveIntegerEnv('SCANNER_MANIFEST_MAX_FULL_ENTRIES', 1000);
+    return this.getPositiveIntegerEnv(
+      'SCANNER_MANIFEST_MAX_FULL_ENTRIES',
+      1000,
+    );
   }
 
   private getManifestDefaultChunkSize(): number {
-    return this.getPositiveIntegerEnv('SCANNER_MANIFEST_DEFAULT_CHUNK_SIZE', 250);
+    return this.getPositiveIntegerEnv(
+      'SCANNER_MANIFEST_DEFAULT_CHUNK_SIZE',
+      250,
+    );
   }
 
   private getManifestMaxChunkSize(): number {
@@ -606,10 +688,16 @@ export class ScannerService {
     }
 
     const parsedValue = Number.parseInt(value, 10);
-    return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+    return Number.isInteger(parsedValue) && parsedValue > 0
+      ? parsedValue
+      : fallback;
   }
 
-  private sliceChunk<T>(items: T[], chunkIndex: number, chunkSize: number): T[] {
+  private sliceChunk<T>(
+    items: T[],
+    chunkIndex: number,
+    chunkSize: number,
+  ): T[] {
     const start = chunkIndex * chunkSize;
     return items.slice(start, start + chunkSize);
   }

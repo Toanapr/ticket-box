@@ -4,7 +4,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useScannerStore } from '../lib/scanner/store';
-import { validateLocalScan, buildPendingQueueEvent } from '../lib/scanner/scan';
+import { validateLocalScan } from '../lib/scanner/scan';
+import { buildPendingQueueEvent } from '../lib/scanner/queue-event';
 
 export function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -15,7 +16,13 @@ export function ScanScreen() {
   const [manualValue, setManualValue] = useState('');
   const cooldownRef = useRef(false);
 
-  const { manifest, assignment, checkedInTicketRefs, addQueueItem, addCheckedInTicketRef, queue } = useScannerStore();
+  const {
+    manifest,
+    assignment,
+    checkedInTicketRefs,
+    recordPendingScan,
+    queue,
+  } = useScannerStore();
   
   const pendingCount = queue.filter(q => q.status === 'pending').length;
 
@@ -73,7 +80,10 @@ export function ScanScreen() {
       rawValue,
       manifest,
       assignment,
-      checkedInTicketRefs,
+      checkedInTicketRefs: [
+        ...checkedInTicketRefs,
+        ...queue.map((item) => item.ticketRef),
+      ],
     });
 
     if (!validation.ok) {
@@ -89,14 +99,20 @@ export function ScanScreen() {
         payload: validation.payload,
       });
 
-      addQueueItem({
+      const recorded = recordPendingScan({
         ...pendingEvent,
         status: 'pending',
         syncAttempts: 0,
         lastSyncedAt: null,
         lastResultReason: null,
       });
-      addCheckedInTicketRef(validation.ticket.ticketRef);
+
+      if (!recorded) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setFeedback('rejected');
+        setFeedbackMessage('This ticket has already been recorded on this device.');
+        return;
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setFeedback('accepted');
@@ -200,7 +216,7 @@ export function ScanScreen() {
           <View className="bg-zinc-900 rounded-t-[40px] p-8 border-t border-zinc-800 shadow-2xl">
             <View className="flex-row items-center mb-6">
               <View className="bg-zinc-800 p-3 rounded-full mr-4">
-                <Ionicons name="keyboard" size={24} color="#fff" />
+                <Ionicons name="keypad-outline" size={24} color="#fff" />
               </View>
               <Text className="text-white font-bold text-xl">Manual Entry</Text>
             </View>

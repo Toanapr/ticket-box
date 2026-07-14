@@ -7,10 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types src/lib/backend-proxy-request.test.ts src/lib/concert-form-orchestration.test.ts"
+    "test": "node --test --experimental-strip-types src/lib/backend-proxy-request.test.ts src/lib/concert-form-orchestration.test.ts src/lib/scanner-setup-qr.test.ts"
   },
   "dependencies": {
     "next": "16.2.9",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

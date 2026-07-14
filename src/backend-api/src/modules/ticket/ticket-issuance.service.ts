@@ -3,12 +3,14 @@ import { Injectable } from '@nestjs/common';
 import { buildQrToken, hashQrToken } from '../../common/utils/qr-token.util';
 import { TicketNotificationPublisher } from './ticket-notification.publisher';
 import { TicketRepository } from './ticket.repository';
+import { ScannerManifestProjectionService } from '../scanner/scanner-manifest-projection.service';
 
 @Injectable()
 export class TicketIssuanceService {
   constructor(
     private readonly ticketRepository: TicketRepository,
     private readonly ticketNotificationPublisher: TicketNotificationPublisher,
+    private readonly scannerManifestProjection: ScannerManifestProjectionService,
   ) {}
 
   async issueTicketsForOrder(
@@ -49,6 +51,11 @@ export class TicketIssuanceService {
       tx,
       orderId,
       OrderStatus.issued,
+    );
+
+    await this.scannerManifestProjection.refreshAssignmentsForOrder(
+      tx,
+      orderId,
     );
 
     return {

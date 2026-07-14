@@ -9,6 +9,7 @@ import { setupApp } from './../src/app.setup';
 import { createWebhookSignature } from './../src/common/utils/webhook-signature.util';
 import { InventoryService } from './../src/modules/inventory/inventory.service';
 import { PaymentReconciliationService } from './../src/modules/payment/payment-reconciliation.service';
+import { MockPaymentProvider } from './../src/modules/payment/providers/mock-payment-provider';
 import { RedisService } from './../src/common/cache/redis.service';
 import { JwtService } from './../src/modules/auth/jwt.service';
 
@@ -397,6 +398,100 @@ describe('Checkout flow and invariants (e2e)', () => {
     );
   });
 
+  it('creates one provider intent for concurrent retries with the same idempotency key', async () => {
+    const testTicketType = await createTestTicketType({
+      name: 'Concurrent Intent Replay',
+      zoneCode: 'CIRP',
+      price: '221000.00',
+      capacity: 5,
+      perUserLimit: 2,
+    });
+    const userId = await createTestUser();
+    const reservation = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', bearerToken(userId))
+      .set('x-forwarded-for', `concurrent-intent-${userId}`)
+      .send({
+        ticketTypeId: testTicketType.id,
+        quantity: 1,
+        idempotencyKey: randomUUID(),
+      });
+    const order = await request(app.getHttpServer())
+      .post('/orders')
+      .set('Authorization', bearerToken(userId))
+      .send({
+        reservationId: reservation.body.id,
+        idempotencyKey: randomUUID(),
+        buyer: testBuyer(userId),
+      });
+    const payment = await prisma.payment.findFirstOrThrow({
+      where: { orderId: order.body.id },
+    });
+    const key = randomUUID();
+    const mockProvider = app.get(MockPaymentProvider);
+    const originalCreateIntent = mockProvider.createIntent.bind(mockProvider);
+    const createIntentSpy = jest.spyOn(mockProvider, 'createIntent');
+    let releaseProvider!: () => void;
+    let markProviderEntered!: () => void;
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const providerEntered = new Promise<void>((resolve) => {
+      markProviderEntered = resolve;
+    });
+    createIntentSpy.mockImplementation(async (input) => {
+      markProviderEntered();
+      await providerGate;
+      return originalCreateIntent(input);
+    });
+
+    try {
+      const firstRequest = request(app.getHttpServer())
+        .post(`/payments/${payment.id}/intent`)
+        .set('Authorization', bearerToken(userId))
+        .set('Idempotency-Key', key)
+        .then((response) => response);
+      await providerEntered;
+
+      const concurrentRetry = await request(app.getHttpServer())
+        .post(`/payments/${payment.id}/intent`)
+        .set('Authorization', bearerToken(userId))
+        .set('Idempotency-Key', key);
+      expect(concurrentRetry.status).toBe(202);
+      expect(concurrentRetry.body.degraded).toBe(true);
+      expect(concurrentRetry.body.reason).toBe('provider_timeout_ambiguous');
+
+      releaseProvider();
+      const first = await firstRequest;
+      expect(first.status).toBe(201);
+      expect(first.body.status).toBe('pending');
+      expect(first.body.checkoutUrl).toMatch(
+        /^https:\/\/mock-payment\.local\/checkout\//,
+      );
+
+      const replay = await request(app.getHttpServer())
+        .post(`/payments/${payment.id}/intent`)
+        .set('Authorization', bearerToken(userId))
+        .set('Idempotency-Key', key);
+
+      expect(replay.status).toBe(200);
+      expect(replay.body.checkoutUrl).toBe(first.body.checkoutUrl);
+      expect(createIntentSpy).toHaveBeenCalledTimes(1);
+
+      const [persistedPayment, idempotencyRecords] = await Promise.all([
+        prisma.payment.findUniqueOrThrow({ where: { id: payment.id } }),
+        prisma.idempotencyRecord.findMany({ where: { userId, key } }),
+      ]);
+      expect(persistedPayment.providerIntentId).toBeTruthy();
+      expect(persistedPayment.checkoutUrl).toBe(first.body.checkoutUrl);
+      expect(idempotencyRecords).toHaveLength(1);
+      expect(idempotencyRecords[0]?.status).toBe('succeeded');
+    } finally {
+      releaseProvider();
+      createIntentSpy.mockRestore();
+    }
+  });
+
   it('does not create a payment intent for an expired order', async () => {
     const testTicketType = await createTestTicketType({
       name: 'Expired Intent Guard',
@@ -698,6 +793,24 @@ describe('Checkout flow and invariants (e2e)', () => {
         },
       }),
     ).toBe(1);
+
+    const [inventory, quota] = await Promise.all([
+      prisma.inventoryCounter.findUniqueOrThrow({
+        where: { ticketTypeId: testTicketType.id },
+      }),
+      prisma.userTicketQuota.findUniqueOrThrow({
+        where: {
+          userId_ticketTypeId: {
+            userId,
+            ticketTypeId: testTicketType.id,
+          },
+        },
+      }),
+    ]);
+    expect(inventory.reservedCount).toBe(0);
+    expect(inventory.soldCount).toBe(1);
+    expect(quota.reservedCount).toBe(0);
+    expect(quota.paidCount).toBe(1);
   });
 
   it('rejects non-mock webhook success when amount does not match', async () => {

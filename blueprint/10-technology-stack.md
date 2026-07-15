@@ -2,7 +2,7 @@
 
 ## Định hướng chính
 
-TicketBox dùng ba Next.js application theo actor: audience web, admin web và scanner PWA. Backend là một NestJS modular monolith; REST controllers và scheduled workers chạy trong cùng process, dùng chung domain modules và Prisma transaction. Scanner Mobile/Expo tồn tại như prototype, không phải client chính của demo.
+TicketBox dùng hai Next.js application cho audience/admin và một Scanner Mobile bằng Expo/React Native. Backend là một NestJS modular monolith; REST controllers và scheduled workers chạy trong cùng process, dùng chung domain modules và Prisma transaction. Scanner Mobile là client soát vé chính của demo.
 
 Docker Compose hiện cung cấp PostgreSQL và Redis; các application chạy bằng script riêng trong môi trường local. PostgreSQL là nguồn dữ liệu giao dịch và durable async state, Redis phục vụ cache/fixed-window rate limit, local filesystem lưu file cho demo single-writer, auth dùng JWT và RBAC. Không đưa external queue, orchestration cluster, identity provider riêng, secret manager riêng hoặc observability platform đầy đủ vào phạm vi bắt buộc.
 
@@ -11,7 +11,7 @@ Docker Compose hiện cung cấp PostgreSQL và Redis; các application chạy b
 | Khía cạnh | Bắt buộc cho đồ án/demo | Chỉ là hướng mở rộng production |
 |---|---|---|
 | Backend | Một NestJS modular monolith với các domain module gọi nhau trong process. | Tách Inventory, Payment hoặc Check-in thành microservice khi có nhu cầu vận hành thực tế. |
-| Runtime | Ba Next.js app và một NestJS Backend Runtime có scheduled workers trong process; Docker Compose chạy PostgreSQL/Redis. | Tách worker process, Kubernetes, autoscaling và nhiều deployment độc lập. |
+| Runtime | Hai Next.js app, một Expo/React Native app và một NestJS Backend Runtime có scheduled workers trong process; Docker Compose chạy PostgreSQL/Redis. | Tách worker process, Kubernetes, autoscaling và nhiều deployment độc lập. |
 | Database | Một PostgreSQL instance; outbox/job là các bảng trong cùng database. | Primary/replica, failover tự động, PITR managed, partition hoặc sharding. |
 | Cache | Một Redis instance cho cache, inventory summary và fixed-window rate limit. | Redis Sentinel/Cluster và public edge cache nhiều vùng. |
 | Async | Scheduled providers đọc durable payment/notification/AI/outbox state trong PostgreSQL. | Worker deployment riêng, RabbitMQ/Kafka/event streaming platform. |
@@ -27,7 +27,7 @@ Các mục ở cột production dùng để giải thích đường nâng cấp,
 |---|---|---|---|---|
 | Audience Web App | Next.js | Web khán giả, danh sách concert, chi tiết concert, checkout, e-ticket. | Hỗ trợ SSR/SSG, routing tốt, tối ưu cache và SEO cho trang public. | Không cache dữ liệu user/payment; public inventory có thể stale ngắn. |
 | Admin Web App | Next.js | Dashboard ban tổ chức, quản lý concert, upload PDF/CSV, báo cáo. | Dùng chung TypeScript, design system và auth flow với audience web. | Tách route và guard quyền rõ nếu cùng codebase với audience web. |
-| Scanner Web/PWA App | Next.js PWA | Quét QR, tải offline manifest, lưu check-in log cục bộ và sync. | Dễ cài qua trình duyệt/PWA, hỗ trợ camera và IndexedDB. | Không hứa chặn tuyệt đối double-scan giữa hai thiết bị cùng offline; backend reconcile khi sync. |
+| Scanner Mobile App | Expo / React Native | Quét QR, tải offline manifest, lưu check-in log cục bộ và sync. | Truy cập camera trực tiếp, dùng AsyncStorage và phù hợp thiết bị soát vé chuyên dụng. | Không hứa chặn tuyệt đối double-scan giữa hai thiết bị cùng offline; backend reconcile khi sync. |
 | Backend framework | NestJS | REST API, domain modules, scheduled workers và integration adapters trong một runtime. | Đồng nhất TypeScript với Next.js, DI/module rõ, phù hợp modular monolith. | Worker deployment riêng chỉ khi cần scale; không gọi HTTP nội bộ. |
 | Database | PostgreSQL | Concert, ticket type, reservation, order, payment, ticket, check-in, guest list, audit. | Transaction mạnh, lock/constraint rõ, query/reporting tốt. | Checkout luôn kiểm tra DB; cache không là nguồn quyết định vé. |
 | Cache/rate limit | Redis single instance | Concert cache, inventory summary TTL ngắn và fixed-window counters theo IP/user/device. | Đủ để chứng minh cache-aside và overload protection. | Redis lỗi dùng bounded DB miss budget và in-memory rate fallback. |

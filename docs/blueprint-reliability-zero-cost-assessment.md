@@ -29,7 +29,7 @@ Các thay đổi trong commit `b1006e2` sửa đúng những lỗ hổng quan tr
 - Không để CSV/AI retry tạo version hoặc draft trùng.
 - Thống nhất idempotency, DLQ và graceful degradation.
 
-Những cơ chế này không đòi hỏi mua dịch vụ trả phí. Phần lớn có thể cài bằng NestJS, PostgreSQL, Redis, RabbitMQ và IndexedDB chạy local qua Docker Compose.
+Những cơ chế này không đòi hỏi mua dịch vụ trả phí. Phần lớn có thể cài bằng NestJS, PostgreSQL, Redis, RabbitMQ và AsyncStorage; các dịch vụ backend chạy local qua Docker Compose.
 
 Điểm chưa hợp lý xuất hiện nếu Blueprint bị hiểu là phải triển khai đầy đủ:
 
@@ -57,7 +57,7 @@ Các thành phần trên đều có thể là phần mềm miễn phí, nhưng v
 | Durable idempotency | Rất hợp lý và quan trọng | Lưu PostgreSQL; Redis chỉ cache |
 | Cache-aside và TTL | Hợp lý | Dùng một Redis instance, không cần Redis Cluster |
 | Transactional outbox | Hợp lý về dữ liệu, hơi nâng cao nhưng có giá trị | Dùng bảng outbox PostgreSQL và polling worker trong cùng backend |
-| Offline check-in ACK theo event | Rất hợp lý và cần thiết | Dùng IndexedDB + explicit sync, không phụ thuộc Background Sync API |
+| Offline check-in ACK theo event | Rất hợp lý và cần thiết | Dùng AsyncStorage + explicit sync trong mobile app |
 | CSV staging/all-or-nothing | Hợp lý, dễ kiểm thử | Dùng PostgreSQL staging table và transaction publish |
 | AI async retry/DLQ | Hợp lý, nhưng AI local có rủi ro tài nguyên | Dùng model nhỏ qua Ollama; chấp nhận xử lý chậm |
 | RabbitMQ retry/DLQ | Hợp lý nếu đã dùng broker | Dùng một RabbitMQ node với DLX/DLQ |
@@ -132,18 +132,18 @@ Phần không cần cho đồ án:
 
 ### 4.4 Offline check-in
 
-Event id tạo trước khi lưu, durable queue, ACK theo từng event và chỉ xóa sau khi persist ACK là thiết kế đúng và có thể triển khai hoàn toàn trong PWA.
+Event id tạo trước khi lưu, durable queue, ACK theo từng event và chỉ xóa sau khi persist ACK là thiết kế đúng và có thể triển khai hoàn toàn trong mobile app.
 
 Đề xuất bản đồ án:
 
-- IndexedDB lưu manifest và check-in attempts.
+- AsyncStorage lưu manifest và check-in attempts.
 - Các trạng thái `pending`, `syncing`, `accepted`, `conflict`, `rejected`.
 - Nút sync thủ công và tự sync khi app phát hiện online.
 - Batch API idempotent theo event id.
 - Manifest ký bằng khóa backend và kiểm tra bằng public key.
-- Test hai browser/device cùng scan một vé khi offline.
+- Test hai thiết bị cùng scan một vé khi offline.
 
-Không nên phụ thuộc hoàn toàn vào Background Sync vì mức hỗ trợ trình duyệt không đồng đều. Mã hóa IndexedDB có thể triển khai bằng Web Crypto, nhưng nếu thiếu thời gian nên ưu tiên integrity, assignment và sync correctness trước.
+App tự kích hoạt sync khi phát hiện có mạng và vẫn cung cấp nút sync thủ công. Mã hóa dữ liệu local là hardening tiếp theo; nếu thiếu thời gian nên ưu tiên integrity, assignment và sync correctness trước.
 
 **Kết luận:** rất hợp lý và phù hợp để làm điểm nhấn kỹ thuật của đồ án.
 
@@ -221,7 +221,7 @@ Không cần bắt buộc Loki, Tempo, Jaeger hoặc distributed tracing đầy 
 
 | Thành phần | Cấu hình đồ án |
 |---|---|
-| Frontend | Next.js audience, admin và scanner PWA |
+| Client | Next.js cho audience/admin và Expo/React Native cho scanner mobile |
 | Backend | Một NestJS modular monolith |
 | Worker | Một NestJS worker process dùng chung codebase |
 | Database | Một PostgreSQL instance |

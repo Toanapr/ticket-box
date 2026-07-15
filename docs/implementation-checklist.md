@@ -27,7 +27,7 @@ Quy ước trạng thái:
 | Backend API chạy được theo modular monolith | `[x]` | NestJS, TypeScript, Prisma, PostgreSQL, Redis, `ScheduleModule`, các module `auth`, `concert`, `inventory`, `order`, `payment`, `ticket`, `scanner`, `guest-list` | Có thể thêm module audit hoặc analytics riêng nếu muốn tách rõ vận hành |
 | CSDL và migration | `[x]` | Prisma schema khá đầy đủ: user, concert, ticket type, reservation, order, payment, ticket, notification, guest list, artist bio, scanner | Chưa thấy chiến lược backup/restore hoặc script khôi phục dữ liệu |
 | Hạ tầng local bằng container | `[x]` | `docker-compose.yml` cho PostgreSQL và Redis | Chưa có MinIO/container object storage đúng như blueprint; hiện file đang lưu local disk |
-| README khởi chạy toàn repo | `[ ]` | Có README riêng cho vài app, nhưng không có `README.md` ở root | Cần một README tổng thể mô tả cách chạy backend + audience + admin + scanner-pwa + scanner-mobile |
+| README khởi chạy toàn repo | `[x]` | Có `README.md` ở root mô tả cách chạy các thành phần chính | Tiếp tục đồng bộ khi script hoặc biến môi trường thay đổi |
 
 ## 3. Audience web: xem concert, mua vé, e-ticket
 
@@ -84,8 +84,7 @@ Quy ước trạng thái:
 | Công việc | Trạng thái | Công nghệ / hiện trạng | Cần bổ sung |
 |---|---|---|---|
 | Scanner backend API | `[x]` | NestJS scanner module, manifest signing, assignment API, sync API, conflict handling | Có thể thêm metrics endpoint/export ngoài log nội bộ |
-| Scanner PWA offline | `[x]` | Next.js, local storage/IndexedDB helpers, manifest validation, queue sync tự động, Playwright verify scripts | README của `scanner-pwa` còn mặc định, cần hướng dẫn chạy và demo rõ ràng |
-| Scanner mobile app | `[~]` | Expo, React Native, Zustand persist, AsyncStorage, camera, queue/history/setup screens | Chưa thấy test, README, quy trình kết nối thực tế; mức độ hoàn thiện có vẻ thấp hơn PWA |
+| Scanner mobile app | `[x]` | Expo, React Native, Zustand persist, AsyncStorage, camera, queue/history/setup screens và test cho setup/scan | Cần bổ sung README riêng và kiểm thử trên thiết bị thật |
 | Đồng bộ lại khi có mạng | `[x]` | Queue local, batch sync, kết quả `accepted/conflict/rejected`, idempotent replay | Có thể thêm chính sách xử lý conflict trong UI rõ hơn cho nhân sự soát vé |
 | Chống check-in lặp | `[x]` | Backend lưu `CheckInEvent`, xác định `winningEventId`, manifest scope/device/assignment checks | Giới hạn offline đa thiết bị cùng lúc vẫn là accepted risk; nên nêu rõ trong demo/tài liệu |
 
@@ -139,11 +138,11 @@ Quy ước trạng thái:
 - `Blueprint` rất đầy đủ và bám sát đề.
 - `Backend` đã có nhiều phần nghiệp vụ cốt lõi chạy thật: auth, reservation, quota, order, payment, ticket issuance, notification, guest list, AI artist bio, scanner sync.
 - `Audience web` và `admin web` không còn là mock UI đơn thuần, đã nối vào backend thật cho nhiều luồng chính.
-- `Offline check-in` là điểm mạnh vì có cả backend, PWA và mobile prototype.
+- `Offline check-in` là điểm mạnh vì có backend và mobile app offline-first.
 
 ### Những phần còn thiếu hoặc chưa khép kín
 
-- Thiếu `README.md` tổng thể ở root và hướng dẫn chạy toàn hệ thống một cách thống nhất.
+- Scanner mobile chưa có README riêng; hướng dẫn demo hiện nằm trong README tổng thể ở root.
 - Chưa có `MoMo` provider thật.
 - Chưa có `dashboard doanh thu / số vé bán` đúng nghĩa cho admin.
 - Chưa có `cancel concert + refund workflow` hoàn chỉnh ở mức UI/API vận hành.
@@ -153,7 +152,7 @@ Quy ước trạng thái:
 
 ### Ưu tiên bổ sung đề xuất
 
-1. Tạo `README.md` gốc cho toàn repo và hoàn thiện README còn mặc định của `scanner-pwa`.
+1. Bổ sung README riêng cho `scanner-mobile` và quy trình demo trên thiết bị thật.
 2. Bổ sung `MoMo provider` hoặc nêu rõ phạm vi nếu chỉ demo `VNPAY + mock`.
 3. Làm `admin dashboard` cho revenue / sold / reserved / available.
 4. Hoàn thiện `cancel concert / refund workflow`.

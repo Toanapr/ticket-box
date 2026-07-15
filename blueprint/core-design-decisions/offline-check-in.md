@@ -18,7 +18,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 
 ## Lý do chọn
 
-- Manifest preloaded cho phép đối chiếu token/ref, scope và revoke list mà không gọi backend. Browser-side cryptographic verification bằng asymmetric public key là hardening còn lại.
+- Manifest preloaded cho phép đối chiếu token/ref, scope và revoke list mà không gọi backend. Client-side cryptographic verification bằng asymmetric public key là hardening còn lại.
 - Durable queue tránh mất dữ liệu khi app crash hoặc mạng mất.
 - Idempotent sync cho phép retry batch an toàn.
 - Phân vùng manifest theo cổng/khu giảm dữ liệu và giảm nguy cơ scan chéo.
@@ -28,7 +28,7 @@ Không thể tuyệt đối ngăn cùng một vé được scan trên hai thiế
 
 - Hai thiết bị offline vẫn có thể cùng chấp nhận một vé trước khi sync.
 - Manifest có thể cũ nếu vé vừa refund hoặc revoke.
-- IndexedDB chứa dữ liệu vận hành; demo giảm PII và cleanup sau event. Application-level encryption/key management là production hardening.
+- AsyncStorage chứa dữ liệu vận hành; demo giảm PII và cleanup sau event. Application-level encryption/key management là production hardening.
 - Conflict sau sync cần quy trình vận hành xử lý tại cổng.
 - Giữ event conflict/rejected làm tăng local storage và cần cleanup có kiểm soát.
 

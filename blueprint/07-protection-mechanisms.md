@@ -223,12 +223,12 @@ Không có thiết kế offline nào có thể tuyệt đối ngăn một vé đ
 | Một ticket scan hai lần trên cùng device offline | App chặn bằng local checked-in set. |
 | Một ticket scan ở hai device khác nhau đều offline | Backend phát hiện conflict khi sync. Event sync trước được accepted, event sau bị conflict. |
 | Ticket bị refund/revoked sau khi manifest đã tải | App cần sync revoke list khi online. Với offline hoàn toàn, rủi ro còn lại phải giảm bằng manifest TTL và quy trình vận hành. |
-| Device mất trước khi sync | IndexedDB queue durable nhưng dữ liệu chưa có application-level encryption. Demo giảm PII và yêu cầu xóa dữ liệu sau event; encryption/key management là production hardening. |
+| Device mất trước khi sync | AsyncStorage queue durable nhưng dữ liệu chưa có application-level encryption. Demo giảm PII và yêu cầu xóa dữ liệu sau event; encryption/key management là production hardening. |
 | Guest list cập nhật đêm trước diễn | Manifest có version. App bắt buộc sync version mới trước ca làm. |
 
 Mỗi `CheckInAttempt` có event id được tạo trước khi append local và trạng thái `pending`, `syncing`, `accepted`, `conflict` hoặc `rejected`. Backend ACK theo từng event trong batch. App chỉ xóa payload local sau khi ACK đã được persist; `conflict/rejected` được giữ cho đến khi nhân sự xác nhận đã xử lý. Batch timeout có thể gửi lại cả batch bằng cùng event id.
 
-Nếu manifest hết TTL, sai scope hoặc không đúng assignment event/gate/zone, app không tiếp tục offline scan. Backend hiện ký manifest bằng HMAC; browser kiểm tra presence/scope/TTL nhưng chưa verify mật mã độc lập. Đổi sang asymmetric signature với public key pinning là hạng mục hardening còn lại.
+Nếu manifest hết TTL, sai scope hoặc không đúng assignment event/gate/zone, app không tiếp tục offline scan. Backend hiện ký manifest bằng HMAC; mobile app kiểm tra presence/scope/TTL nhưng chưa verify mật mã độc lập. Đổi sang asymmetric signature với public key pinning là hạng mục hardening còn lại.
 
 ## Notification extensibility
 

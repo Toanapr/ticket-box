@@ -69,7 +69,7 @@ Admin web chỉ hiển thị route khi user có role `organizer` hoặc `system_
 
 ### Scanner app
 
-Scanner app dùng Bearer token kết hợp `x-device-id`; backend bind quyền qua `scanner_devices` và `scanner_assignments`. Manifest tải về có signature, version, TTL và scope concert/event/gate/zone. Khi offline, app ghi check-in vào IndexedDB queue và tự đồng bộ lại khi có mạng; backend vẫn là nguồn quyết định cuối cùng khi phát hiện conflict.
+Scanner app dùng Bearer token kết hợp `x-device-id`; backend bind quyền qua `scanner_devices` và `scanner_assignments`. Manifest tải về có signature, version, TTL và scope concert/event/gate/zone. Khi offline, app ghi check-in vào AsyncStorage queue và tự đồng bộ lại khi có mạng; backend vẫn là nguồn quyết định cuối cùng khi phát hiện conflict.
 
 ## Audit log
 

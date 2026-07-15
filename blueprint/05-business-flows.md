@@ -55,7 +55,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant App as Scanner Web/PWA App
+    participant App as Scanner Mobile App
     participant Checkin as Check-in Module
     participant DB as PostgreSQL
     participant QR as E-ticket QR
@@ -82,7 +82,7 @@ sequenceDiagram
 | Lỗi | Hành vi |
 |---|---|
 | Mất mạng hoàn toàn | App dùng signed manifest và local checked-in set. |
-| App crash trước sync | Local queue lưu bền trong IndexedDB nên khởi động lại vẫn sync được. Dữ liệu local được giảm PII; application-level encryption là hardening production. |
+| App crash trước sync | Local queue lưu bền trong AsyncStorage nên khởi động lại vẫn sync được. Dữ liệu local được giảm PII; application-level encryption là hardening production. |
 | Một vé scan hai lần cùng device | Local checked-in set chặn lần thứ hai. |
 | Một vé scan ở hai device offline | Backend nhận sync trước thì accepted; sync sau conflict. |
 | Manifest cũ | App bắt buộc refresh trước ca; manifest có version, TTL và revoked list. |

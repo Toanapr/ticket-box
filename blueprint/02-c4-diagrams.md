@@ -44,7 +44,7 @@ flowchart TD
     subgraph TicketBox["TicketBox System"]
         AudienceWeb["Audience Web App<br/>Next.js"]
         AdminWeb["Admin Web App<br/>Next.js"]
-        ScannerApp["Scanner Web/PWA App<br/>Next.js"]
+        ScannerApp["Scanner Mobile App<br/>Expo / React Native"]
         Gateway["Backend Runtime<br/>NestJS modular monolith<br/>REST API + scheduled workers"]
         Postgres["PostgreSQL<br/>transactional data + durable async records"]
         Redis["Redis<br/>cache + fixed-window rate limit"]
@@ -81,7 +81,7 @@ flowchart TD
 | Container/data store | Công nghệ | Giao tiếp chính |
 |---|---|---|
 | Audience/Admin Web | Next.js | HTTPS tới Backend API, cache public page khi phù hợp. |
-| Scanner Web/PWA App | Next.js PWA | HTTPS khi online, IndexedDB durable storage cho manifest, queue và local checked-in set. |
+| Scanner Mobile App | Expo / React Native | HTTPS khi online, AsyncStorage lưu bền manifest, queue và local checked-in set. |
 | Backend Runtime | NestJS modular monolith | REST, in-process domain calls, scheduled workers, PostgreSQL transaction và Redis. |
 | PostgreSQL | SQL database | Transaction, constraint, index, lock và durable async state. |
 | Redis | In-memory data store | Cache-aside và fixed-window counters; bounded sale admission là hạng mục hardening còn lại. |

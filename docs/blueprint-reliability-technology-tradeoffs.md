@@ -35,7 +35,7 @@ Tiêu chí lựa chọn:
 | Public read cache | Redis cache-aside + TTL/invalidation | Dễ triển khai, database vẫn là source of truth |
 | Event consistency | Transactional outbox | Không mất event sau khi database commit |
 | Async jobs | RabbitMQ + retry queue + DLQ | Phù hợp workflow, routing và retry nghiệp vụ |
-| Offline scanner | PWA + IndexedDB + signed manifest | Không cần app native, vẫn hoạt động khi mất mạng |
+| Offline scanner | Expo/React Native + AsyncStorage + signed manifest | Truy cập camera trực tiếp, vẫn hoạt động khi mất mạng |
 | Check-in sync | Event id + per-event ACK + backend conflict | Retry an toàn và không xóa dữ liệu trước ACK |
 | CSV import | Async staging + all-or-nothing version publish | File lỗi không làm hỏng guest list đang dùng |
 | File storage | MinIO hoặc filesystem adapter cho demo | Không làm PostgreSQL phình lớn, chạy local miễn phí |
@@ -239,26 +239,25 @@ Tiêu chí lựa chọn:
 
 ## 8. Offline check-in
 
-### 8.1 PWA so với native app
+### 8.1 PWA so với mobile app
 
 | Phương án | Ưu điểm | Nhược điểm |
 |---|---|---|
-| PWA + IndexedDB | Một codebase web, cài nhanh, chi phí thấp | Camera/storage/background API tùy trình duyệt |
-| React Native/Flutter | Native API và storage tốt hơn | Thêm codebase/toolchain, build mobile phức tạp |
+| PWA + IndexedDB | Cài nhanh qua trình duyệt | Camera/storage/background API tùy trình duyệt |
+| React Native/Expo | Native API và storage tốt hơn, phù hợp thiết bị soát vé | Thêm toolchain và quy trình build mobile |
 | Native Android/iOS | Kiểm soát thiết bị tốt nhất | Chi phí phát triển cao nhất |
 | Chỉ web online | Đơn giản | Không đáp ứng yêu cầu mất mạng |
 
-**Tại sao chọn PWA:** nhóm đã dùng Next.js và yêu cầu đồ án ưu tiên một stack TypeScript. IndexedDB đủ cho manifest và queue demo. Native app chỉ đáng chọn nếu thiết bị, background sync và kiosk mode là yêu cầu production.
+**Tại sao chọn React Native/Expo:** scanner cần camera và local storage ổn định trên thiết bị chuyên dụng. Expo vẫn giữ stack TypeScript, còn AsyncStorage đủ cho manifest và queue của bản demo.
 
-### 8.2 IndexedDB so với localStorage
+### 8.2 AsyncStorage so với SQLite
 
 | Storage | Ưu điểm | Nhược điểm |
 |---|---|---|
-| localStorage | API đơn giản | Đồng bộ, dung lượng nhỏ, không phù hợp dữ liệu có cấu trúc |
-| IndexedDB | Transaction, object store, dung lượng lớn | API phức tạp hơn |
-| SQLite native | Query tốt, durable | Không có trực tiếp trong PWA |
+| AsyncStorage | API đơn giản, tích hợp React Native tốt | Key-value, cần tự serialize và không có query phức tạp |
+| SQLite native | Query và transaction tốt, phù hợp dữ liệu lớn | Thêm dependency và migration schema |
 
-**Tại sao chọn IndexedDB:** lưu được manifest lớn, event có trạng thái và transaction local. `localStorage` không phù hợp durable queue.
+**Tại sao chọn AsyncStorage:** implementation hiện tại cần persistence key-value cho manifest, assignment và queue, chưa cần query phức tạp. Có thể chuyển SQLite khi dữ liệu hoặc yêu cầu transaction local tăng.
 
 ### 8.3 Xác minh offline
 
@@ -385,7 +384,7 @@ Không có công nghệ nào ngăn tuyệt đối hai thiết bị hoàn toàn o
 | Backend | NestJS modular monolith + worker | Tách hot modules khi có số liệu |
 | Cache | Redis cache-aside | Redis HA + edge CDN |
 | Outbox | PostgreSQL polling worker | CDC/Debezium nếu quy mô lớn |
-| Scanner | Next.js PWA + IndexedDB | Native app nếu cần device control sâu |
+| Scanner | Expo/React Native + AsyncStorage | Native build/SQLite nếu cần device control hoặc dữ liệu lớn hơn |
 | File | MinIO single node/filesystem adapter | Distributed object storage |
 | AI | Ollama model nhỏ, concurrency `1` | GPU inference service/vLLM |
 | Monitoring | Log + health + metrics chính | Full metrics/logs/traces |
@@ -408,7 +407,7 @@ Các quyết định quan trọng nhất nên giữ là:
 2. Redis chỉ dùng cho state ngắn hạn, cache, rate limit và waiting room.
 3. RabbitMQ dùng cho workflow async có retry/DLQ, không dùng để xác nhận đã giữ vé trước DB commit.
 4. Transactional outbox nối database transaction với event delivery.
-5. PWA offline dùng IndexedDB, signed manifest và per-event ACK.
+5. Mobile scanner offline dùng AsyncStorage, signed manifest và per-event ACK.
 6. CSV publish theo version; AI luôn async và có human review.
 7. Bản đồ án dùng single-node Docker Compose; cluster HA và full observability chỉ là target production.
 

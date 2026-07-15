@@ -10,7 +10,7 @@ flowchart TD
     Edge["Reverse Proxy / Public Cache<br/>optional"]
     AudienceWeb["Audience Web App"]
     AdminWeb["Admin Web App"]
-    ScannerApp["Scanner Web/PWA App<br/>offline manifest + local queue"]
+    ScannerApp["Scanner Mobile App<br/>offline manifest + local queue"]
 
     subgraph Backend["NestJS modular monolith - shared codebase"]
         API["Backend API<br/>REST controllers"]
@@ -88,7 +88,7 @@ flowchart TD
 | VNPAY/MoMo | Payment Module tạo payment intent/URL, gateway gửi webhook/callback tới Backend API. | Verify signature, idempotency key, payment state machine, reconciliation khi timeout. |
 | AI model | AI Artist Bio Module gửi text đã clean để sinh bio ngắn. | Async job, retry/backoff, lưu draft, admin review trước publish. |
 | CSV guest list | Organizer upload CSV qua Admin Web/API; Guest List Module lưu raw file, staging, validate và publish active version. | Full-snapshot semantics, checksum idempotency, all-or-nothing publish; scheduled drop-folder import là hướng bổ sung. |
-| Scanner offline | Scanner PWA tải manifest có scope/version/TTL, ghi IndexedDB queue và sync lại khi online. | Signed QR, durable local state, idempotent sync và backend first-wins conflict policy. |
+| Scanner offline | Scanner Mobile tải manifest có scope/version/TTL, ghi AsyncStorage queue và sync lại khi online. | Signed QR, durable local state, idempotent sync và backend first-wins conflict policy. |
 
 ## Luồng phụ thuộc khi checkout
 
@@ -106,7 +106,7 @@ flowchart TD
     subgraph Apps["Local application processes"]
         AudienceWeb["audience-web"]
         AdminWeb["admin-web"]
-        ScannerWeb["scanner-pwa"]
+        ScannerMobile["scanner-mobile<br/>Expo / React Native"]
         BackendAPI["backend-api<br/>NestJS modular monolith"]
     end
 
@@ -119,10 +119,10 @@ flowchart TD
 
     Edge --> AudienceWeb
     Edge --> AdminWeb
-    Edge --> ScannerWeb
+    Edge --> ScannerMobile
     AudienceWeb --> BackendAPI
     AdminWeb --> BackendAPI
-    ScannerWeb --> BackendAPI
+    ScannerMobile --> BackendAPI
 
     BackendAPI --> Postgres
     BackendAPI --> Redis
@@ -133,7 +133,7 @@ flowchart TD
 | Layer | Khuyến nghị |
 |---|---|
 | Public edge | Reverse proxy/public cache là tùy chọn; local apps gọi Backend API trực tiếp, còn Docker Compose hiện chỉ chạy PostgreSQL/Redis. |
-| Runtime | Audience web, admin web và scanner PWA gọi một NestJS Backend Runtime; scheduled workers chạy trong cùng process cho demo. |
+| Runtime | Audience web, admin web và scanner mobile gọi một NestJS Backend Runtime; scheduled workers chạy trong cùng process cho demo. |
 | Database | PostgreSQL single instance cho đồ án; backup script hoặc dump hướng dẫn trong README. |
 | Redis | Redis single instance cho cache, fixed-window rate limit và inventory summary gần realtime. |
 | PostgreSQL durable async state | Payment reconciliation fields/events, notification records, guest-list outbox và AI jobs nằm trong cùng database. |

@@ -170,14 +170,14 @@ Ngày đánh giá: 12/07/2026. Phạm vi: mã nguồn và tài liệu trong repo
 ### IM07 — App quét QR và xác nhận tại cổng
 
 1. **Trạng thái:** **[Đã hoàn thành]**.
-2. **Bằng chứng:** PWA `scanner-pwa/src/app/scanner/page.tsx`, `lib/scanner/barcode-detector.ts`, `scan.ts`; mobile `scanner-mobile/src/screens/ScanScreen.tsx`; backend `scanner.controller.ts`, `scanner.service.ts`, `scanner.repository.ts`; E2E `scanner-check-in-sync.e2e-spec.ts`.
-3. **Thiếu sót và hướng triển khai:** Mobile app ít test hơn PWA; nên chọn một client chính thức để demo và thêm hướng dẫn camera/device permission.
+2. **Bằng chứng:** Mobile `scanner-mobile/src/screens/ScanScreen.tsx`, `src/lib/scanner/scan.ts`, `scan.test.ts`; backend `scanner.controller.ts`, `scanner.service.ts`, `scanner.repository.ts`; E2E `scanner-check-in-sync.e2e-spec.ts`.
+3. **Thiếu sót và hướng triển khai:** Nên thêm hướng dẫn camera/device permission và kiểm thử trên thiết bị thật.
 4. **Đóng góp tổng hợp:** 7/18 mục cài đặt hoàn thành.
 
 ### IM08 — Soát vé offline và đồng bộ
 
 1. **Trạng thái:** **[Đã hoàn thành]**.
-2. **Bằng chứng:** PWA `indexed-db.ts`, `storage.ts`, `manifest.ts`, `state.tsx`, `network.ts`; scripts `verify-sync-recovery.mjs`, `verify-sync-retry.mjs`; backend manifest/sync và `scanner-check-in-sync.e2e-spec.ts` có accepted/conflict/duplicate replay.
+2. **Bằng chứng:** Mobile `store.ts`, `manifest.ts`, `queue-event.ts`, `scan.ts`; backend manifest/sync và `scanner-check-in-sync.e2e-spec.ts` có accepted/conflict/duplicate replay.
 3. **Thiếu sót và hướng triển khai:** Không thể tuyệt đối ngăn hai thiết bị hoàn toàn offline cùng nhận một vé; cần demo/UX conflict rõ và quy trình vận hành phân vùng gate như blueprint.
 4. **Đóng góp tổng hợp:** 8/18 mục cài đặt hoàn thành.
 
@@ -232,22 +232,22 @@ Ngày đánh giá: 12/07/2026. Phạm vi: mã nguồn và tài liệu trong repo
 
 ### IM16 — README clone-and-run
 
-1. **Trạng thái:** **[Chưa hoàn thành]**.
-2. **Bằng chứng:** Có README riêng ở `src/backend-api/`, `src/admin-web/`, `src/audience-web/`, `src/scanner-pwa/`, nhưng root repo không có `README.md`; scanner mobile cũng không có README riêng.
-3. **Thiếu sót và hướng triển khai:** Tạo `/README.md` chứa prerequisites, pnpm/Node/PostgreSQL/Redis, env matrix, ports, seed, tài khoản demo, thứ tự chạy 5 app, smoke test và troubleshooting; cập nhật scanner PWA/mobile README thay nội dung mặc định.
-4. **Đóng góp tổng hợp:** 1/18 mục cài đặt chưa hoàn thành.
+1. **Trạng thái:** **[Đã hoàn thành]**.
+2. **Bằng chứng:** `README.md` ở root có prerequisites, cấu hình, thứ tự chạy hệ thống, tài khoản seed, hướng dẫn Scanner Mobile, smoke test và troubleshooting.
+3. **Thiếu sót và hướng triển khai:** Có thể tách phần Scanner Mobile thành README riêng để tiện tra cứu, nhưng không chặn clone-and-run.
+4. **Đóng góp tổng hợp:** 14/18 mục cài đặt hoàn thành.
 
 ### IM17 — Seed 4 concert mẫu
 
 1. **Trạng thái:** **[Đã hoàn thành]**.
 2. **Bằng chứng:** `src/backend-api/prisma/seed.js` seed đúng 4 tên `Anh Trai Say Hi`, `Chị Đẹp Đạp Gió Rẽ Sóng`, `Anh Trai Vượt Ngàn Chông Gai`, `Em Xinh Say Hi`, kèm nghệ sĩ/địa điểm, `seatingMapObjectKey`, ticket type, giá, capacity/inventory; poster UI nằm ở `src/audience-web/public/concert-posters/`.
 3. **Thiếu sót và hướng triển khai:** Không thấy file seating-map SVG vật lý tương ứng các object key; nên thêm asset seed hoặc ghi rõ `components/seating-map.tsx` là renderer chính. Nên có smoke assertion kiểm tra đủ 4 concert sau seed.
-4. **Đóng góp tổng hợp:** 14/18 mục cài đặt hoàn thành.
+4. **Đóng góp tổng hợp:** 15/18 mục cài đặt hoàn thành.
 
 ### IM18 — Khởi chạy/demo toàn hệ thống
 
 1. **Trạng thái:** **[Hoàn thành một phần]**.
-2. **Bằng chứng:** `src/backend-api/docker-compose.yml` khởi chạy PostgreSQL/Redis; mỗi app có package scripts; backend có nhiều E2E và `test-all-backend.ps1`; scanner PWA có các verify scripts.
+2. **Bằng chứng:** `src/backend-api/docker-compose.yml` khởi chạy PostgreSQL/Redis; mỗi app có package scripts; backend có nhiều E2E và `test-all-backend.ps1`; scanner mobile có test setup/scan.
 3. **Thiếu sót và hướng triển khai:** Chưa có compose/script gốc chạy backend + audience + admin + scanner cùng lúc và chưa có smoke E2E xuyên toàn hệ thống. Thêm root `docker-compose.yml`/`start-all.ps1`, health dependency checks, `.env.example` tổng và `smoke-all.ps1` chạy login → reserve → payment mock → ticket → scanner sync.
 4. **Đóng góp tổng hợp:** 3/3 mục cài đặt còn một phần; chưa tính vào số hoàn thành đầy đủ.
 

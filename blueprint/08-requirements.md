@@ -36,7 +36,7 @@
 | Chức năng | Mô tả | Ghi chú thiết kế |
 |---|---|---|
 | Đăng nhập app soát vé | Nhân sự dùng tài khoản role scanner. | Token ngắn hạn, bind với device/event/gate nếu có thể. |
-| Tải dữ liệu phục vụ offline | Tải manifest vé, guest list, revoke list theo concert, khu vực hoặc cổng. | Có version, checksum, signature và IndexedDB durable storage; application-level encryption/public-key verification là security hardening còn lại. |
+| Tải dữ liệu phục vụ offline | Tải manifest vé, guest list, revoke list theo concert, khu vực hoặc cổng. | Có version, checksum, signature và AsyncStorage durable storage; application-level encryption/public-key verification là security hardening còn lại. |
 | Quét QR | Camera scan QR trên e-ticket. | QR kiểm tra chữ ký được cả khi offline. |
 | Xác minh vé | Kiểm tra ticket hợp lệ, đúng concert, đúng cổng/khu, chưa check-in trong local state. | Online hỏi backend; offline dùng local manifest. |
 | Ghi nhận check-in offline | Lưu check-in event vào durable local queue khi không có mạng. | Đây là scope bắt buộc, không phải tùy chọn. |

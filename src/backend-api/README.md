@@ -29,7 +29,7 @@ Concert posters are stored on backend local disk. Set `CONCERT_POSTER_STORAGE_DI
 
 Organizer uploads use `PUT /admin/concerts/:id/poster` with multipart field `poster`. JPEG, PNG, and WebP are accepted up to 5 MB. Publishing requires the referenced poster file to exist. Public bytes are served from `/media/concert-posters/:objectKey` with immutable cache headers.
 
-Local seed posters are copied from `mock-ui/images`. Those source files use `.png` names but contain JPEG bytes, so seeded object keys intentionally use `.jpg`.
+Local seed posters are copied from `data/images`. Those source files use `.png` names but contain JPEG bytes, so seeded object keys intentionally use `.jpg`.
 
 Local storage supports a single backend writer. Mount the directory on persistent storage and back it up together with PostgreSQL; restoring only the database leaves dangling poster keys. Multi-replica deployments require migration to shared object storage.
 

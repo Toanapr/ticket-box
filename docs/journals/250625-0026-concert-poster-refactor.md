@@ -23,7 +23,7 @@ Review found broken multipart forwarding, unsafe concurrent replacement, weak pu
 - Unique upload token preferred over process mutex: safe across concurrent requests without holding a database lock during filesystem I/O.
 - Legacy seed keys remain valid; new uploads use `{concertId}-{version}-{uploadToken}.{ext}`.
 - Plan stays in progress until browser smoke runs against the intended local environment.
-- Seed posters now copy from `mock-ui/images`; the source files keep `.png` names but contain JPEG bytes, so seeded runtime object keys use `.jpg`.
+- Seed posters now copy from `data/images`; the source files keep `.png` names but contain JPEG bytes, so seeded runtime object keys use `.jpg`.
 
 ## Verification
 

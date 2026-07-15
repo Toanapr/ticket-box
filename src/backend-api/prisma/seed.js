@@ -997,7 +997,7 @@ function seedPosterFixtures() {
   );
   ensureDir(storageDir);
 
-  const assetsDir = assetPath('mock-ui', 'images');
+  const assetsDir = assetPath('data', 'images');
 
   for (const concert of demoConcerts) {
     const sourcePath = join(assetsDir, concert.posterFixture);

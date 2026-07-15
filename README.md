@@ -148,65 +148,12 @@ Scan the Expo QR with Expo Go, or use:
 ```powershell
 npm run android
 ```
-
-### 3. Provision and configure by QR
-
-1. Sign in to Admin Web at `http://localhost:3002`.
-2. Open `http://localhost:3002/admin/scanners`.
-3. Select `Provision New Device`.
-4. In the one-time provision result, replace the default Scanner API URL with `http://<LAN-IP>:3000/scanner`.
-5. Keep the provision result open. The access token and setup QR disappear when it is closed.
-6. In Scanner Mobile, open `Setup` and select `Scan Setup QR`.
-7. Grant camera permission and scan the Admin QR.
-
-The app validates the versioned QR payload, fills API URL/device code/token, and requests the current assignment automatically. The database stores only the token hash; the raw token is shown only in the provision response.
-
-### 4. Assign and download the manifest
-
-1. In Admin Web, assign the device to a concert, gate, and zone.
-2. In Scanner Mobile, refresh/load the assignment.
-3. Select `Download Manifest`.
-4. Verify concert, gate, zone, manifest version, and ticket count.
-
-The signed manifest is the scanner's offline source of truth. Assignment and manifest are persisted locally.
-
-### 5. Test offline check-in and sync
-
-1. Disable Wi-Fi/mobile data on the scanner phone.
-2. Scan a valid ticket included in the manifest.
-3. Verify that one event appears in the pending queue.
-4. Scan the same QR again. Expected result: `duplicate_local_scan`, and the queue count must not increase.
-5. Fully close and reopen Scanner Mobile while offline. The pending event must still exist in AsyncStorage.
-6. Restore the network and select `Sync`.
-7. Verify an `accepted` ACK and removal of the acknowledged event from the queue.
-8. Verify the backend ticket status changes from `issued` to `checked_in`.
-
-If another scanner syncs the same ticket, only the first event is accepted. The later event receives `ticket_already_checked_in` and references the winning check-in event.
-
-## Blueprint Coverage
-
-| Blueprint flow | Verification |
-|---|---|
-| Clone, migrate, seed, and start web system | `docker compose up -d --build` |
-| Health, auth, catalog, checkout, payment, ticket | `scripts/smoke-all.ps1` |
-| Account quota under concurrent requests | Backend checkout E2E tests |
-| No oversell of the last ticket | Backend checkout E2E tests |
-| Admin scanner provision QR | Tested through Admin Web |
-| Scanner assignment and manifest | Tested through Admin + Scanner Mobile |
-| Offline queue, restart persistence, sync, and conflict | Tested through Scanner Mobile and backend sync tests |
-
-Detailed evidence and raw logs:
-
-- `docs/test-evidence-2026-07-14.md`
-- `docs/test-evidence/logs/checkout-concurrency-2026-07-14.log`
-- `docs/test-evidence/logs/checkout-smoke-2026-07-14.log`
-- `docs/test-evidence/logs/order-payment-ticket-records-2026-07-14.log`
-
-Regenerate checkout/concurrency evidence with:
+or
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\capture-core-test-evidence.ps1 -EvidenceDate 2026-07-14
+npx expo start
 ```
+
 
 ## Environment
 

@@ -35,11 +35,11 @@ export default async function GuestListPage({ params }: GuestListPageProps) {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminBackLink href="/admin/concerts">Quay lại danh sách sự kiện</AdminBackLink>
         <AdminHero
-          eyebrow="Guest list operations"
-          title="Guest list imports"
-          description={`Upload, validate, and review guest lists for ${concert.title}. Every guest is assigned to one private guest area instead of customer bookable seating zones.`}
+          eyebrow="Vận hành khách mời"
+          title="Nhập danh sách khách mời"
+          description={`Tải lên, kiểm tra và duyệt danh sách khách mời cho ${concert.title}. Tất cả khách mời sẽ tự động được xếp vào khu vực riêng.`}
         />
       </div>
 

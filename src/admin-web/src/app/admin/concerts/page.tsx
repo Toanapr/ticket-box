@@ -27,22 +27,22 @@ export default async function ConcertsPage() {
   return (
     <div className="space-y-8">
       <AdminHero
-        eyebrow="Organizer workspace"
-        title="Concert operations"
-        description="Manage the event catalog, monitor readiness, and keep ticketing setup aligned with the public TicketBox experience."
-        action={<AdminLinkButton href="/admin/concerts/new">New concert</AdminLinkButton>}
+        eyebrow="Không gian Ban tổ chức"
+        title="Quản lý sự kiện"
+        description="Quản lý danh mục sự kiện, theo dõi mức độ chuẩn bị và cấu hình hệ thống bán vé đồng nhất với trải nghiệm TicketBox công cộng."
+        action={<AdminLinkButton href="/admin/concerts/new">Thêm sự kiện</AdminLinkButton>}
       />
 
       <AdminDataTable>
         <AdminTable minWidthClassName="min-w-[980px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Title</th>
-              <th className="px-6 py-4">Venue</th>
-              <th className="px-6 py-4">Start time</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Ticket types</th>
-              <th className="px-6 py-4">Actions</th>
+              <th className="px-6 py-4">Tên sự kiện</th>
+              <th className="px-6 py-4">Địa điểm</th>
+              <th className="px-6 py-4">Thời gian bắt đầu</th>
+              <th className="px-6 py-4">Trạng thái</th>
+              <th className="px-6 py-4">Loại vé</th>
+              <th className="px-6 py-4">Thao tác</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -73,16 +73,16 @@ export default async function ConcertsPage() {
                 <td className="px-6 py-5">
                   <div className="flex flex-wrap gap-2">
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/edit`} variant="secondary">
-                      Edit
+                      Chỉnh sửa
                     </AdminLinkButton>
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/ticket-types`} variant="secondary">
-                      Ticket types
+                      Loại vé
                     </AdminLinkButton>
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/operations`} variant="secondary">
-                      Operations
+                      Vận hành
                     </AdminLinkButton>
                     <AdminLinkButton href={`/admin/concerts/${concert.id}/guest-list`} variant="secondary">
-                      Guest list
+                      Khách mời
                     </AdminLinkButton>
                     <DeleteConcertButton
                       concertId={concert.id}
@@ -97,7 +97,7 @@ export default async function ConcertsPage() {
 
         {concerts.length === 0 ? (
           <AdminEmptyState>
-            No concerts found. Start the backend API, then create a concert.
+            Không tìm thấy sự kiện nào. Hãy tạo một sự kiện mới để bắt đầu.
           </AdminEmptyState>
         ) : null}
       </AdminDataTable>

@@ -24,31 +24,31 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <AdminHero
-        eyebrow="Revenue and operations"
-        title="Admin dashboard"
-        description="Track captured sales, refund exposure, ticket movement, and the concerts that need operator attention."
+        eyebrow="Doanh thu và vận hành"
+        title="Bảng điều khiển quản trị"
+        description="Theo dõi doanh thu bán vé, số tiền hoàn tiền, lưu lượng vé và các sự kiện cần chú ý."
       />
 
       <AdminMetricsGrid>
         <AdminMetricCard
-          label="Gross revenue"
+          label="Tổng doanh thu"
           value={`${formatCurrency(dashboard?.totals.grossRevenue ?? 0)} VND`}
-          hint={`${dashboard?.totals.refundRequiredOrders ?? 0} refund-required orders`}
+          hint={`${dashboard?.totals.refundRequiredOrders ?? 0} đơn chờ hoàn tiền`}
         />
         <AdminMetricCard
-          label="Refund exposure"
+          label="Rủi ro hoàn tiền"
           value={`${formatCurrency(dashboard?.totals.refundExposure ?? 0)} VND`}
-          hint="Orders already flagged for refund handling"
+          hint="Các đơn hàng đã được gắn cờ để xử lý hoàn tiền"
         />
         <AdminMetricCard
-          label="Tickets issued"
+          label="Vé đã phát hành"
           value={dashboard?.totals.ticketsIssued ?? 0}
-          hint={`${dashboard?.totals.ticketsReserved ?? 0} still reserved, ${dashboard?.totals.ticketsAvailable ?? 0} available`}
+          hint={`${dashboard?.totals.ticketsReserved ?? 0} đang giữ chỗ, ${dashboard?.totals.ticketsAvailable ?? 0} còn trống`}
         />
         <AdminMetricCard
-          label="Active concerts"
+          label="Sự kiện hoạt động"
           value={dashboard?.totals.publishedConcerts ?? 0}
-          hint={`${dashboard?.totals.canceledConcerts ?? 0} canceled`}
+          hint={`${dashboard?.totals.canceledConcerts ?? 0} đã hủy`}
         />
       </AdminMetricsGrid>
 
@@ -56,14 +56,14 @@ export default async function DashboardPage() {
         <AdminTable minWidthClassName="min-w-[1200px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Concert</th>
-              <th className="px-6 py-4">Start</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Revenue</th>
-              <th className="px-6 py-4">Refund exposure</th>
-              <th className="px-6 py-4">Sold / Reserved / Available</th>
-              <th className="px-6 py-4">Orders</th>
-              <th className="px-6 py-4">Actions</th>
+              <th className="px-6 py-4">Sự kiện</th>
+              <th className="px-6 py-4">Bắt đầu</th>
+              <th className="px-6 py-4">Trạng thái</th>
+              <th className="px-6 py-4">Doanh thu</th>
+              <th className="px-6 py-4">Rủi ro hoàn tiền</th>
+              <th className="px-6 py-4">Đã bán / Giữ / Trống</th>
+              <th className="px-6 py-4">Đơn hàng</th>
+              <th className="px-6 py-4">Thao tác</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -95,18 +95,18 @@ export default async function DashboardPage() {
                   {formatCurrency(concert.revenue.refundExposure)} VND
                 </td>
                 <td className="px-6 py-5 text-sm leading-6 text-slate-700">
-                  {concert.inventory.sold} sold
+                  {concert.inventory.sold} đã bán
                   <br />
-                  {concert.inventory.reserved} reserved
+                  {concert.inventory.reserved} đang giữ
                   <br />
-                  {concert.inventory.available} available
+                  {concert.inventory.available} còn trống
                 </td>
                 <td className="px-6 py-5 text-sm leading-6 text-slate-700">
-                  {concert.orders.total} total
+                  {concert.orders.total} tổng cộng
                   <br />
-                  {concert.orders.pendingPayment} pending
+                  {concert.orders.pendingPayment} chờ thanh toán
                   <br />
-                  {concert.orders.refundRequired} refund queue
+                  {concert.orders.refundRequired} hàng đợi hoàn tiền
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex flex-wrap gap-2">
@@ -114,13 +114,13 @@ export default async function DashboardPage() {
                       href={`/admin/concerts/${concert.concertId}/operations`}
                       variant="secondary"
                     >
-                      Operations
+                      Vận hành
                     </AdminLinkButton>
                     <AdminLinkButton
                       href={`/admin/concerts/${concert.concertId}/edit`}
                       variant="secondary"
                     >
-                      Edit
+                      Sửa
                     </AdminLinkButton>
                   </div>
                 </td>
@@ -131,8 +131,7 @@ export default async function DashboardPage() {
 
         {!dashboard || dashboard.concerts.length === 0 ? (
           <AdminEmptyState>
-            No dashboard data yet. Start the backend and create at least one
-            concert with ticket types.
+            Chưa có dữ liệu bảng điều khiển. Vui lòng khởi chạy backend và tạo ít nhất một sự kiện có loại vé.
           </AdminEmptyState>
         ) : null}
       </AdminDataTable>

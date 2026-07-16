@@ -27,7 +27,7 @@ export function ConcertCancellationManager({
 
   async function handleCancel() {
     const confirmed = window.confirm(
-      `Cancel "${operations.concert.title}" and move impacted orders into the refund workflow?`,
+      `Hủy sự kiện "${operations.concert.title}" và đưa các đơn hàng bị ảnh hưởng vào quy trình hoàn tiền?`,
     );
 
     if (!confirmed) {
@@ -42,15 +42,15 @@ export function ConcertCancellationManager({
       const result = await cancelConcert(operations.concert.id, reason);
       setSuccess(
         result.cancellation.alreadyCanceled
-          ? "Concert was already canceled."
-          : "Concert canceled. Refund queue and ticket revocation have been updated.",
+          ? "Sự kiện đã được hủy trước đó."
+          : "Đã hủy sự kiện. Hàng đợi hoàn tiền và trạng thái thu hồi vé đã được cập nhật.",
       );
       router.refresh();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to cancel concert right now.",
+          : "Không thể thực hiện hủy sự kiện lúc này.",
       );
     } finally {
       setIsSubmitting(false);
@@ -60,43 +60,42 @@ export function ConcertCancellationManager({
   return (
     <AdminPanel className="space-y-5">
       <AdminPanelTitle
-        title="Cancel Concert And Start Refund Workflow"
-        description="This workflow cancels public sales, expires active reservations, marks affected paid orders for refund handling, and revokes issued tickets so gate operations stop using them."
+        title="Hủy sự kiện & Kích hoạt quy trình hoàn tiền"
+        description="Quy trình này sẽ dừng việc bán vé công khai, hủy các lượt giữ chỗ chưa thanh toán, chuyển các đơn hàng đã thanh toán sang hàng đợi hoàn tiền và thu hồi toàn bộ vé đã phát hành."
       />
 
       {isCanceled ? (
         <AdminNotice tone="neutral">
-          This concert is already canceled. The refund queue below reflects the
-          current operational state.
+          Sự kiện này đã bị hủy. Hàng đợi hoàn tiền bên dưới thể hiện trạng thái vận hành hiện tại.
         </AdminNotice>
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         <AdminNotice tone="neutral">
-          Active reservations to expire:{" "}
+          Giữ chỗ đang hoạt động sẽ hết hạn:{" "}
           <strong>{preview.activeReservationsToExpire}</strong>
         </AdminNotice>
         <AdminNotice tone="neutral">
-          Orders moving to refund queue:{" "}
+          Đơn hàng chuyển sang hàng đợi hoàn tiền:{" "}
           <strong>{preview.ordersToMarkRefundRequired}</strong>
         </AdminNotice>
         <AdminNotice tone="neutral">
-          Pending orders to expire:{" "}
+          Đơn hàng chờ thanh toán sẽ hết hạn:{" "}
           <strong>{preview.pendingOrdersToExpire}</strong>
         </AdminNotice>
         <AdminNotice tone="neutral">
-          Issued tickets to revoke:{" "}
+          Vé đã phát hành sẽ bị thu hồi:{" "}
           <strong>{preview.issuedTicketsToRevoke}</strong>
         </AdminNotice>
       </div>
 
       <label className="block text-sm font-black text-ticket-obsidian">
-        Internal cancellation note
+        Lý do hủy sự kiện (Nội bộ)
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           className={`${inputClassName} min-h-28 py-3`}
-          placeholder="Optional note for operators, for example sponsor withdrawal or venue issue."
+          placeholder="Lý do hủy sự kiện (không bắt buộc, ví dụ: rút nhà tài trợ hoặc sự cố địa điểm)."
           disabled={isCanceled || isSubmitting}
         />
       </label>
@@ -110,7 +109,7 @@ export function ConcertCancellationManager({
         onClick={handleCancel}
         disabled={isCanceled || isSubmitting}
       >
-        {isSubmitting ? "Processing..." : "Cancel Concert"}
+        {isSubmitting ? "Đang xử lý..." : "Hủy sự kiện"}
       </AdminButton>
     </AdminPanel>
   );

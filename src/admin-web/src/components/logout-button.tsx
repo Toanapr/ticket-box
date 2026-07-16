@@ -23,7 +23,7 @@ export function LogoutButton() {
       variant="secondary"
       className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-4 text-xs"
     >
-      {isLoggingOut ? "Signing out..." : "Sign out"}
+      {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
     </AdminButton>
   );
 }

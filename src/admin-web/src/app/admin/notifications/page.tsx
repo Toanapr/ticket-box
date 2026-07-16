@@ -25,22 +25,22 @@ export default async function NotificationsPage() {
   return (
     <div className="space-y-8">
       <AdminHero
-        eyebrow="Delivery tracking"
-        title="Notifications"
-        description="Review TicketIssued delivery records across in-app and mock email channels with the same visual language used across TicketBox."
+        eyebrow="Theo dõi gửi tin"
+        title="Thông báo hệ thống"
+        description="Xem lịch sử gửi các thông báo (như Vé đã phát hành) qua các kênh trong ứng dụng và email."
       />
 
       <AdminDataTable>
         <AdminTable minWidthClassName="min-w-[980px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Created</th>
-              <th className="px-6 py-4">Event</th>
-              <th className="px-6 py-4">Channel</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Order</th>
-              <th className="px-6 py-4">Tickets</th>
-              <th className="px-6 py-4">Message</th>
+              <th className="px-6 py-4">Thời gian tạo</th>
+              <th className="px-6 py-4">Sự kiện tin</th>
+              <th className="px-6 py-4">Kênh</th>
+              <th className="px-6 py-4">Trạng thái</th>
+              <th className="px-6 py-4">Đơn hàng</th>
+              <th className="px-6 py-4">Số vé</th>
+              <th className="px-6 py-4">Nội dung / Lỗi</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -73,7 +73,7 @@ export default async function NotificationsPage() {
         </AdminTable>
 
         {notifications.length === 0 ? (
-          <AdminEmptyState>No notification records yet.</AdminEmptyState>
+          <AdminEmptyState>Chưa có bản ghi thông báo nào.</AdminEmptyState>
         ) : null}
       </AdminDataTable>
     </div>

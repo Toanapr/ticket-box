@@ -35,34 +35,34 @@ export default async function ConcertOperationsPage({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <AdminBackLink href="/admin/dashboard">Back to dashboard</AdminBackLink>
+        <AdminBackLink href="/admin/dashboard">Quay lại bảng điều khiển</AdminBackLink>
         <AdminHero
-          eyebrow="Concert operations"
+          eyebrow="Vận hành sự kiện"
           title={operations.concert.title}
-          description="Review live sales state, refund exposure, and the full cancellation impact before you commit the workflow."
+          description="Xem xét tình trạng bán vé trực tiếp, rủi ro hoàn tiền và tác động hủy trước khi xác nhận quy trình."
         />
       </div>
 
       <AdminMetricsGrid>
         <AdminMetricCard
-          label="Concert status"
+          label="Trạng thái sự kiện"
           value={<AdminStatusBadge status={operations.concert.status} />}
           hint={formatDateTime(operations.concert.startAt)}
         />
         <AdminMetricCard
-          label="Gross revenue"
+          label="Tổng doanh thu"
           value={`${formatCurrency(operations.summary.revenue.gross)} VND`}
-          hint={`${operations.summary.orders.issued} issued orders`}
+          hint={`${operations.summary.orders.issued} đơn hàng đã xuất vé`}
         />
         <AdminMetricCard
-          label="Refund exposure"
+          label="Rủi ro hoàn tiền"
           value={`${formatCurrency(operations.summary.revenue.refundExposure)} VND`}
-          hint={`${operations.summary.orders.refundRequired} orders already in refund queue`}
+          hint={`${operations.summary.orders.refundRequired} đơn hàng trong hàng đợi hoàn tiền`}
         />
         <AdminMetricCard
-          label="Ticket movement"
+          label="Lưu lượng vé"
           value={`${operations.summary.inventory.sold} / ${operations.summary.inventory.available}`}
-          hint="Sold versus remaining available"
+          hint="Đã bán so với còn trống"
         />
       </AdminMetricsGrid>
 
@@ -72,14 +72,14 @@ export default async function ConcertOperationsPage({
         <AdminTable minWidthClassName="min-w-[1100px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Ticket type</th>
-              <th className="px-6 py-4">Zone</th>
-              <th className="px-6 py-4">Price</th>
-              <th className="px-6 py-4">Capacity</th>
-              <th className="px-6 py-4">Sold</th>
-              <th className="px-6 py-4">Reserved</th>
-              <th className="px-6 py-4">Available</th>
-              <th className="px-6 py-4">Per-user limit</th>
+              <th className="px-6 py-4">Hạng vé</th>
+              <th className="px-6 py-4">Mã khu vực</th>
+              <th className="px-6 py-4">Giá vé</th>
+              <th className="px-6 py-4">Tổng vé (Sức chứa)</th>
+              <th className="px-6 py-4">Đã bán</th>
+              <th className="px-6 py-4">Giữ chỗ</th>
+              <th className="px-6 py-4">Còn trống</th>
+              <th className="px-6 py-4">Giới hạn mỗi user</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -119,12 +119,12 @@ export default async function ConcertOperationsPage({
         <AdminTable minWidthClassName="min-w-[1200px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Order</th>
-              <th className="px-6 py-4">Buyer</th>
-              <th className="px-6 py-4">Amount</th>
-              <th className="px-6 py-4">Payment</th>
-              <th className="px-6 py-4">Tickets</th>
-              <th className="px-6 py-4">Created</th>
+              <th className="px-6 py-4">Đơn hàng</th>
+              <th className="px-6 py-4">Khách mua</th>
+              <th className="px-6 py-4">Tổng tiền</th>
+              <th className="px-6 py-4">Cổng thanh toán</th>
+              <th className="px-6 py-4">Số vé</th>
+              <th className="px-6 py-4">Ngày tạo</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -142,11 +142,11 @@ export default async function ConcertOperationsPage({
                   </div>
                 </td>
                 <td className="px-6 py-5 text-sm leading-6 text-slate-700">
-                  {order.buyerFullName ?? "Unknown buyer"}
+                  {order.buyerFullName ?? "Khách hàng không rõ"}
                   <br />
-                  {order.buyerEmail ?? "No email"}
+                  {order.buyerEmail ?? "Không có email"}
                   <br />
-                  {order.buyerPhone ?? "No phone"}
+                  {order.buyerPhone ?? "Không có SĐT"}
                 </td>
                 <td className="px-6 py-5 text-sm font-black text-ticket-obsidian">
                   {formatCurrency(order.totalAmount)} VND
@@ -155,9 +155,9 @@ export default async function ConcertOperationsPage({
                   {order.paymentProvider ?? "-"}
                 </td>
                 <td className="px-6 py-5 text-sm leading-6 text-slate-700">
-                  {order.issuedTicketCount} issued
+                  {order.issuedTicketCount} đã phát hành
                   <br />
-                  {order.revokedTicketCount} revoked
+                  {order.revokedTicketCount} đã thu hồi
                 </td>
                 <td className="px-6 py-5 text-sm font-semibold text-slate-700">
                   {formatDateTime(order.createdAt)}
@@ -169,7 +169,7 @@ export default async function ConcertOperationsPage({
 
         {operations.refundQueue.length === 0 ? (
           <AdminEmptyState>
-            No orders are currently waiting for refund handling.
+            Hiện không có đơn hàng nào chờ xử lý hoàn tiền.
           </AdminEmptyState>
         ) : null}
       </AdminDataTable>

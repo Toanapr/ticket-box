@@ -36,7 +36,7 @@ export function AdminAuthForm({
     setMessage("");
 
     if (!email.trim() || !password || (isRegister && (!fullName.trim() || !organizationName.trim()))) {
-      setError("Complete all required fields.");
+      setError("Vui lòng điền đầy đủ các trường bắt buộc.");
       return;
     }
 
@@ -61,13 +61,13 @@ export function AdminAuthForm({
       const body = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(body?.message ?? "Unable to authenticate.");
+        throw new Error(body?.message ?? "Không thể xác thực.");
       }
 
       setMessage(
         isRegister
-          ? "Organizer account created successfully."
-          : "Signed in successfully.",
+          ? "Tạo tài khoản Ban tổ chức thành công."
+          : "Đăng nhập thành công.",
       );
 
       const nextPath = searchParams.get("next") ?? "/admin/concerts";
@@ -77,7 +77,7 @@ export function AdminAuthForm({
       router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to authenticate.",
+        caught instanceof Error ? caught.message : "Không thể xác thực.",
       );
     } finally {
       setIsSubmitting(false);
@@ -88,7 +88,7 @@ export function AdminAuthForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       {isRegister ? (
         <>
-          <AdminField label="Full name">
+          <AdminField label="Họ và tên">
             <input
               type="text"
               value={fullName}
@@ -101,7 +101,7 @@ export function AdminAuthForm({
             />
           </AdminField>
 
-          <AdminField label="Organization">
+          <AdminField label="Tổ chức / Công ty">
             <input
               type="text"
               value={organizationName}
@@ -127,7 +127,7 @@ export function AdminAuthForm({
         />
       </AdminField>
 
-      <AdminField label="Password">
+      <AdminField label="Mật khẩu">
         <input
           type="password"
           value={password}
@@ -145,20 +145,20 @@ export function AdminAuthForm({
       <AdminButton type="submit" disabled={isSubmitting} className="w-full">
         {isSubmitting
           ? isRegister
-            ? "Creating account..."
-            : "Signing in..."
+            ? "Đang tạo tài khoản..."
+            : "Đang đăng nhập..."
           : isRegister
-            ? "Create admin account"
-            : "Sign in"}
+            ? "Tạo tài khoản quản trị"
+            : "Đăng nhập"}
       </AdminButton>
 
       <p className="text-sm font-bold text-slate-600">
-        {isRegister ? "Already have an organizer account?" : "Need an organizer account?"}{" "}
+        {isRegister ? "Đã có tài khoản Ban tổ chức?" : "Chưa có tài khoản Ban tổ chức?"}{" "}
         <Link
           href={isRegister ? "/login" : "/register"}
           className="text-ticket-green underline-offset-4 hover:underline"
         >
-          {isRegister ? "Sign in" : "Register"}
+          {isRegister ? "Đăng nhập" : "Đăng ký ngay"}
         </Link>
       </p>
     </form>

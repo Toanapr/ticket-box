@@ -18,7 +18,7 @@ export function DeleteConcertButton({
 
   async function handleDelete() {
     const confirmed = window.confirm(
-      `Delete concert \"${concertTitle}\"? This cannot be undone.`,
+      `Xóa sự kiện \"${concertTitle}\"? Hành động này không thể hoàn tác.`,
     );
 
     if (!confirmed) {
@@ -33,7 +33,7 @@ export function DeleteConcertButton({
       router.refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to delete concert.",
+        caught instanceof Error ? caught.message : "Không thể xóa sự kiện.",
       );
     } finally {
       setIsDeleting(false);
@@ -49,7 +49,7 @@ export function DeleteConcertButton({
         onClick={handleDelete}
         disabled={isDeleting}
       >
-        {isDeleting ? "Deleting..." : "Delete"}
+        {isDeleting ? "Đang xóa..." : "Xóa"}
       </AdminButton>
       {error ? <p className="max-w-48 text-xs font-bold text-red-700">{error}</p> : null}
     </div>

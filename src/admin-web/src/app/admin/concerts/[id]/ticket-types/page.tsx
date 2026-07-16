@@ -25,11 +25,11 @@ export default async function TicketTypesPage({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminBackLink href="/admin/concerts">Quay lại danh sách sự kiện</AdminBackLink>
         <AdminHero
-          eyebrow="Inventory design"
-          title="Ticket types"
-          description={`Configure zones, sale windows, pricing, and limits for ${concert.title}.`}
+          eyebrow="Thiết kế phân hạng vé"
+          title="Các loại vé"
+          description={`Cấu hình khu vực, thời gian mở bán, giá vé và giới hạn cho ${concert.title}.`}
         />
       </div>
 

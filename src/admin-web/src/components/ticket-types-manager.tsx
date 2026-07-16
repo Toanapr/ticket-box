@@ -24,8 +24,8 @@ export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
     <div className="space-y-6">
       <AdminPanel>
         <AdminPanelTitle
-          title={editingTicketType ? "Edit ticket type" : "Create ticket type"}
-          description="Ticket rules, limits, and sale windows continue to use the current business logic."
+          title={editingTicketType ? "Chỉnh sửa hạng vé" : "Tạo hạng vé mới"}
+          description="Các quy định về vé, giới hạn và thời gian mở bán sẽ tuân theo logic nghiệp vụ của hệ thống."
         />
         <TicketTypeForm
           key={editingTicketType?.id ?? "create"}
@@ -39,13 +39,13 @@ export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
         <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead className="bg-ticket-stone text-[11px] uppercase tracking-[0.24em] text-slate-500">
             <tr>
-              <th className="px-6 py-4">Zone</th>
-              <th className="px-6 py-4">Price</th>
-              <th className="px-6 py-4">Capacity</th>
-              <th className="px-6 py-4">Sale start</th>
-              <th className="px-6 py-4">Sale end</th>
-              <th className="px-6 py-4">Per-user limit</th>
-              <th className="px-6 py-4">Actions</th>
+              <th className="px-6 py-4">Khu vực / Phân hạng</th>
+              <th className="px-6 py-4">Giá vé</th>
+              <th className="px-6 py-4">Số lượng vé</th>
+              <th className="px-6 py-4">Mở bán từ</th>
+              <th className="px-6 py-4">Đóng bán lúc</th>
+              <th className="px-6 py-4">Giới hạn mỗi user</th>
+              <th className="px-6 py-4">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/10">
@@ -75,7 +75,7 @@ export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
                     onClick={() => setEditingTicketType(ticketType)}
                     className="inline-flex min-h-11 items-center justify-center rounded border border-black/10 bg-ticket-alabaster px-4 text-sm font-black uppercase tracking-wide text-ticket-obsidian transition hover:bg-white"
                   >
-                    Edit
+                    Sửa
                   </button>
                 </td>
               </tr>
@@ -84,7 +84,7 @@ export function TicketTypesManager({ concert }: TicketTypesManagerProps) {
         </table>
 
         {concert.ticketTypes.length === 0 ? (
-          <AdminEmptyState>No ticket types configured yet.</AdminEmptyState>
+          <AdminEmptyState>Chưa có hạng vé nào được cấu hình.</AdminEmptyState>
         ) : null}
       </AdminDataTable>
     </div>

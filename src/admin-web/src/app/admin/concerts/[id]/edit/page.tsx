@@ -42,17 +42,17 @@ export default async function EditConcertPage({
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <AdminBackLink href="/admin/concerts">Back to concerts</AdminBackLink>
+        <AdminBackLink href="/admin/concerts">Quay lại danh sách sự kiện</AdminBackLink>
         <AdminHero
-          eyebrow="Concert setup"
-          title={`Edit ${concert.title}`}
-          description="Update public-facing event details while keeping all current publishing rules and save behavior intact."
+          eyebrow="Cấu hình sự kiện"
+          title={`Chỉnh sửa ${concert.title}`}
+          description="Cập nhật thông tin chi tiết sự kiện hiển thị công khai."
           action={
             <AdminLinkButton
               href={`/admin/concerts/${concert.id}/operations`}
               variant="secondary"
             >
-              Operations
+              Vận hành
             </AdminLinkButton>
           }
         />

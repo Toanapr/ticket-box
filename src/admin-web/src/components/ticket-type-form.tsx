@@ -51,7 +51,7 @@ export function TicketTypeForm({
     const numericPerUserLimit = Number(perUserLimit);
 
     if (!zoneCode.trim() || !saleStartAt || !saleEndAt) {
-      setError("Zone code and sale window are required.");
+      setError("Mã khu vực và thời gian mở bán là bắt buộc.");
       return;
     }
 
@@ -64,13 +64,13 @@ export function TicketTypeForm({
       numericPerUserLimit <= 0
     ) {
       setError(
-        "Price, capacity, and per-user limit must be greater than zero.",
+        "Giá vé, số lượng và giới hạn mỗi tài khoản phải lớn hơn 0.",
       );
       return;
     }
 
     if (saleEndAt <= saleStartAt) {
-      setError("Sale end must be after sale start.");
+      setError("Thời gian đóng bán phải diễn ra sau thời gian mở bán.");
       return;
     }
 
@@ -113,7 +113,7 @@ export function TicketTypeForm({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to save ticket type.",
+          : "Không thể lưu hạng vé.",
       );
     } finally {
       setIsSaving(false);
@@ -122,7 +122,7 @@ export function TicketTypeForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-5 md:grid-cols-2">
-      <AdminField label="Zone code">
+      <AdminField label="Mã khu vực (Zone code)">
         <input
           value={zoneCode}
           onChange={(event) => setZoneCode(event.target.value)}
@@ -131,7 +131,7 @@ export function TicketTypeForm({
         />
       </AdminField>
 
-      <AdminField label="Price">
+      <AdminField label="Giá vé (VND)">
         <input
           type="number"
           min="1"
@@ -142,7 +142,7 @@ export function TicketTypeForm({
         />
       </AdminField>
 
-      <AdminField label="Capacity">
+      <AdminField label="Số lượng vé">
         <input
           type="number"
           min="1"
@@ -153,7 +153,7 @@ export function TicketTypeForm({
         />
       </AdminField>
 
-      <AdminField label="Per-user limit">
+      <AdminField label="Giới hạn mua mỗi tài khoản">
         <input
           type="number"
           min="1"
@@ -164,7 +164,7 @@ export function TicketTypeForm({
         />
       </AdminField>
 
-      <AdminField label="Sale start">
+      <AdminField label="Thời gian mở bán">
         <input
           type="datetime-local"
           value={saleStartAt}
@@ -174,7 +174,7 @@ export function TicketTypeForm({
         />
       </AdminField>
 
-      <AdminField label="Sale end">
+      <AdminField label="Thời gian đóng bán">
         <input
           type="datetime-local"
           value={saleEndAt}
@@ -193,14 +193,14 @@ export function TicketTypeForm({
       <div className="flex flex-wrap gap-3 md:col-span-2">
         <AdminButton type="submit" disabled={isSaving}>
           {isSaving
-            ? "Saving..."
+            ? "Đang lưu..."
             : isEditing
-              ? "Save ticket type"
-              : "Create ticket type"}
+              ? "Lưu hạng vé"
+              : "Tạo hạng vé"}
         </AdminButton>
         {isEditing ? (
           <AdminButton type="button" onClick={onCancel} variant="secondary">
-            Cancel
+            Hủy
           </AdminButton>
         ) : null}
       </div>

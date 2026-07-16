@@ -62,7 +62,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     setRecoveryConcertId(null);
 
     if (!title.trim() || !artistName.trim() || !venue.trim() || !startAt) {
-      setError("Title, artist name, venue, and start time are required.");
+      setError("Tên sự kiện, nghệ sĩ, địa điểm và thời gian bắt đầu là bắt buộc.");
       return;
     }
 
@@ -71,7 +71,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     const hasExistingPoster = Boolean(concert?.posterObjectKey);
 
     if (isPublish && !hasPosterFile && !hasExistingPoster) {
-      setError("Please select a poster image before publishing.");
+      setError("Vui lòng chọn ảnh poster trước khi xuất bản.");
       return;
     }
 
@@ -101,7 +101,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         mode === "edit" && concert ? concert.id : createdConcert?.id;
 
       if (!targetId) {
-        throw new Error("Failed to identify concert for poster upload");
+        throw new Error("Không thể xác định sự kiện để tải lên poster.");
       }
 
       if (posterFile) {
@@ -138,7 +138,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
     } catch (caught) {
       setRecoveryConcertId(createdConcert?.id ?? null);
       setError(
-        caught instanceof Error ? caught.message : "Unable to save concert.",
+        caught instanceof Error ? caught.message : "Không thể lưu thông tin sự kiện.",
       );
     } finally {
       setIsSaving(false);
@@ -147,7 +147,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <AdminField label="Title">
+      <AdminField label="Tên sự kiện">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -156,7 +156,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         />
       </AdminField>
 
-      <AdminField label="Venue">
+      <AdminField label="Địa điểm">
         <input
           value={venue}
           onChange={(event) => setVenue(event.target.value)}
@@ -165,7 +165,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         />
       </AdminField>
 
-      <AdminField label="Artist name">
+      <AdminField label="Tên nghệ sĩ">
         <input
           value={artistName}
           onChange={(event) => setArtistName(event.target.value)}
@@ -174,16 +174,16 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         />
       </AdminField>
 
-      <AdminField label="Concert description">
+      <AdminField label="Mô tả sự kiện">
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           className="mt-2 min-h-28 w-full rounded border border-black/10 bg-ticket-alabaster px-4 py-3 text-sm leading-7 text-ticket-obsidian outline-none transition placeholder:text-slate-400 focus:border-ticket-green focus:bg-white"
-          placeholder="Optional long-form concert description for the public detail page"
+          placeholder="Mô tả chi tiết sự kiện cho trang công cộng (không bắt buộc)"
         />
       </AdminField>
 
-      <AdminField label="Start time">
+      <AdminField label="Thời gian bắt đầu">
         <input
           type="datetime-local"
           value={startAt}
@@ -195,12 +195,11 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
 
       {concert?.status === "canceled" ? (
         <AdminNotice>
-          This concert is already canceled. Publishing state is now managed by
-          the dedicated operations workflow, so status changes are disabled
-          here.
+          Sự kiện này đã bị hủy. Trạng thái xuất bản hiện được quản lý bởi quy trình
+          vận hành riêng biệt, do đó bạn không thể thay đổi trạng thái tại đây.
         </AdminNotice>
       ) : (
-        <AdminField label="Status">
+        <AdminField label="Trạng thái">
           <select
             value={status}
             onChange={(event) =>
@@ -208,14 +207,14 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
             }
             className={inputClassName}
           >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
+            <option value="draft">Nháp (Draft)</option>
+            <option value="published">Xuất bản (Published)</option>
           </select>
         </AdminField>
       )}
 
       <AdminField
-        label={`Poster${mode === "create" ? " (required for publish)" : ""}`}
+        label={`Ảnh Poster${mode === "create" ? " (bắt buộc khi xuất bản)" : ""}`}
       >
         <input
           type="file"
@@ -226,11 +225,11 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         {mode === "edit" && !posterFile && existingPosterUrl ? (
           <div className="mt-4 rounded-lg border border-black/10 bg-ticket-stone p-4">
             <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
-              Current poster
+              Ảnh Poster hiện tại
             </p>
             <Image
               src={existingPosterUrl}
-              alt="Current poster"
+              alt="Ảnh Poster hiện tại"
               width={256}
               height={128}
               className="h-32 w-auto rounded border border-black/10 object-contain"
@@ -240,7 +239,7 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
         {posterPreview ? (
           <div className="mt-4 rounded-lg border border-black/10 bg-ticket-stone p-4">
             <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-slate-500">
-              New poster preview
+              Xem trước Poster mới
             </p>
             <Image
               src={posterPreview}
@@ -259,12 +258,12 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
           <AdminNotice tone="error">{error}</AdminNotice>
           {recoveryConcertId ? (
             <AdminNotice>
-              Draft created. Continue editing at{" "}
+              Bản nháp đã được tạo. Tiếp tục chỉnh sửa tại{" "}
               <Link
                 href={`/admin/concerts/${recoveryConcertId}/edit`}
                 className="text-ticket-green underline-offset-4 hover:underline"
               >
-                concert {recoveryConcertId}
+                sự kiện {recoveryConcertId}
               </Link>
               .
             </AdminNotice>
@@ -274,10 +273,10 @@ export function ConcertForm({ mode, concert }: ConcertFormProps) {
 
       <AdminButton type="submit" disabled={isSaving}>
         {isSaving
-          ? "Saving..."
+          ? "Đang lưu..."
           : mode === "create"
-            ? "Create concert"
-            : "Save concert"}
+            ? "Tạo sự kiện"
+            : "Lưu sự kiện"}
       </AdminButton>
     </form>
   );

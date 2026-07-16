@@ -23,13 +23,13 @@ export default async function ProfilePage() {
     return (
       <div className="space-y-8">
         <AdminHero
-          eyebrow="Organizer workspace"
-          title="Profile"
-          description="Manage your TicketBox administrator profile and workspace credentials."
+          eyebrow="Không gian Ban tổ chức"
+          title="Hồ sơ cá nhân"
+          description="Quản lý thông tin tài khoản ban tổ chức TicketBox của bạn."
         />
         <AdminPanel>
           <p className="text-sm font-semibold text-red-500">
-            Failed to load profile information. Please try logging in again.
+            Không thể tải thông tin hồ sơ. Vui lòng đăng nhập lại.
           </p>
         </AdminPanel>
       </div>
@@ -39,9 +39,9 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-8">
       <AdminHero
-        eyebrow="Organizer workspace"
-        title="Admin Profile"
-        description="Manage your TicketBox administrator profile and workspace credentials."
+        eyebrow="Không gian Ban tổ chức"
+        title="Hồ sơ quản trị"
+        description="Quản lý thông tin tài khoản ban tổ chức TicketBox của bạn."
       />
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -62,14 +62,14 @@ export default async function ProfilePage() {
 
         <AdminPanel className="md:col-span-2">
           <AdminPanelTitle
-            title="Account details"
-            description="Official administrator details registered for this TicketBox organization."
+            title="Thông tin tài khoản"
+            description="Thông tin chi tiết tài khoản quản trị được đăng ký cho tổ chức TicketBox."
           />
 
           <div className="mt-6 space-y-6 divide-y divide-black/10">
             <div className="pt-0">
               <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
-                User ID
+                Mã người dùng (User ID)
               </span>
               <div className="mt-1.5">
                 <code className="font-mono text-xs text-ticket-obsidian bg-ticket-stone/50 px-3 py-2 rounded border border-black/5 inline-block select-all">
@@ -80,7 +80,7 @@ export default async function ProfilePage() {
 
             <div className="pt-6">
               <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Full Name
+                Họ và tên
               </span>
               <p className="mt-1 text-base font-bold text-ticket-obsidian">
                 {profile.fullName}
@@ -89,7 +89,7 @@ export default async function ProfilePage() {
 
             <div className="pt-6">
               <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Email Address
+                Địa chỉ Email
               </span>
               <p className="mt-1 text-base font-bold text-ticket-obsidian">
                 {profile.email}
@@ -98,7 +98,7 @@ export default async function ProfilePage() {
 
             <div className="pt-6">
               <span className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">
-                Workspace Role
+                Vai trò
               </span>
               <p className="mt-1 text-base font-bold text-ticket-obsidian capitalize">
                 {profile.role}

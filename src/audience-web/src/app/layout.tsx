@@ -22,6 +22,40 @@ export default async function RootLayout({
       className="h-full scroll-smooth antialiased"
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const clean = (node) => {
+                  if (node.nodeType === 1) {
+                    if (node.hasAttribute('bis_skin_checked')) {
+                      node.removeAttribute('bis_skin_checked');
+                    }
+                    node.querySelectorAll('[bis_skin_checked]').forEach(el => el.removeAttribute('bis_skin_checked'));
+                  }
+                };
+                const observer = new MutationObserver((mutations) => {
+                  mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'bis_skin_checked') {
+                      mutation.target.removeAttribute('bis_skin_checked');
+                    }
+                    if (mutation.type === 'childList') {
+                      mutation.addedNodes.forEach(clean);
+                    }
+                  });
+                });
+                observer.observe(document.documentElement, {
+                  childList: true,
+                  subtree: true,
+                  attributes: true,
+                  attributeFilter: ['bis_skin_checked']
+                });
+              })();
+            `
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <AuthProvider initialUser={initialUser}>
           <SiteHeader />

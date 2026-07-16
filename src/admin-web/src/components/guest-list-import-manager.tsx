@@ -60,7 +60,7 @@ export function GuestListImportManager({
     event.preventDefault();
     const form = event.currentTarget;
     if (!file) {
-      setError("Choose a CSV file first.");
+      setError("Vui lòng chọn file CSV trước.");
       return;
     }
 
@@ -74,14 +74,14 @@ export function GuestListImportManager({
       setFile(null);
       setMessage(
         result.idempotent
-          ? "This CSV was already imported; existing batch returned."
+          ? "File CSV này đã được nhập trước đó; hệ thống trả về lô dữ liệu hiện tại."
           : result.status === "published"
-            ? "Guest list version published to the private guest area."
-            : "CSV staged with validation errors.",
+            ? "Danh sách khách mời đã được xuất bản vào khu vực khách mời."
+            : "File CSV đã được tải lên tạm thời nhưng có lỗi kiểm tra dữ liệu.",
       );
       form.reset();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(err instanceof Error ? err.message : "Nhập danh sách thất bại.");
     } finally {
       setIsSubmitting(false);
     }
@@ -89,7 +89,7 @@ export function GuestListImportManager({
 
   async function handleDeleteGuestList() {
     const confirmed = window.confirm(
-      `Delete the active guest list for "${concert.title}"? This will remove every published guest entry from the private guest area.`,
+      `Xóa danh sách khách mời đang hoạt động của "${concert.title}"? Thao tác này sẽ gỡ bỏ tất cả khách mời đã xuất bản khỏi hệ thống.`,
     );
 
     if (!confirmed) {
@@ -105,14 +105,14 @@ export function GuestListImportManager({
       await refreshGuestListState();
       setMessage(
         result.deleted
-          ? "Active guest list deleted."
-          : "There is no active guest list to delete.",
+          ? "Đã xóa danh sách khách mời đang hoạt động."
+          : "Không có danh sách khách mời nào để xóa.",
       );
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to delete guest list.",
+          : "Không thể xóa danh sách khách mời.",
       );
     } finally {
       setIsDeleting(false);
@@ -124,8 +124,8 @@ export function GuestListImportManager({
       <AdminPanel>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <AdminPanelTitle
-            title="CSV import"
-            description={`Active version: ${activeVersion?.version?.versionNo ?? "none"}. Guest imports no longer require seat positions or public ticket types. Every guest is assigned to one private guest area automatically.`}
+            title="Nhập danh sách CSV"
+            description={`Phiên bản hoạt động: ${activeVersion?.version?.versionNo ?? "không có"}. Quy trình nhập danh sách khách mời không yêu cầu vị trí ghế hoặc hạng vé công cộng. Tất cả khách mời sẽ tự động được xếp vào khu vực khách mời.`}
           />
           <form
             onSubmit={handleSubmit}
@@ -138,13 +138,13 @@ export function GuestListImportManager({
               className={fileInputClassName}
             />
             <AdminButton type="submit" disabled={isSubmitting} className="sm:shrink-0">
-              {isSubmitting ? "Importing" : "Import CSV"}
+              {isSubmitting ? "Đang nhập..." : "Tải CSV lên"}
             </AdminButton>
           </form>
         </div>
         <div className="mt-4">
           <AdminNotice tone="neutral">
-            Required columns: <strong>full_name</strong> and at least one of <strong>email</strong>, <strong>phone</strong>, or <strong>sponsor_id</strong>. Any legacy seating columns in older files are ignored.
+            Các cột bắt buộc: <strong>full_name</strong> và ít nhất một trong các cột: <strong>email</strong>, <strong>phone</strong>, hoặc <strong>sponsor_id</strong>. Các cột vị trí ghế trước đây sẽ bị bỏ qua.
           </AdminNotice>
         </div>
         {message ? (
@@ -162,19 +162,19 @@ export function GuestListImportManager({
       <AdminPanel>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <AdminPanelTitle
-            title="Published guest list"
+            title="Danh sách khách mời đã xuất bản"
             description={
               activeGuestList.version
-                ? `Version v${activeGuestList.version.versionNo} published ${formatDateTime(activeGuestList.version.publishedAt)}`
-                : "No guest list version has been published yet."
+                ? `Phiên bản v${activeGuestList.version.versionNo} xuất bản lúc ${formatDateTime(activeGuestList.version.publishedAt)}`
+                : "Chưa có phiên bản danh sách khách mời nào được xuất bản."
             }
           />
           <div className="flex flex-col gap-3 sm:items-end">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <GuestListStat label="Guests" value={String(activeGuestList.entries.length)} />
-              <GuestListStat label="Area" value="Private guest" />
+              <GuestListStat label="Số khách mời" value={String(activeGuestList.entries.length)} />
+              <GuestListStat label="Khu vực" value="Khách mời" />
               <GuestListStat
-                label="Version"
+                label="Phiên bản"
                 value={activeGuestList.version ? `v${activeGuestList.version.versionNo}` : "-"}
               />
             </div>
@@ -185,7 +185,7 @@ export function GuestListImportManager({
               onClick={handleDeleteGuestList}
               disabled={isDeleting || !activeGuestList.version}
             >
-              {isDeleting ? "Deleting..." : "Delete guest list"}
+              {isDeleting ? "Đang xóa..." : "Xóa danh sách khách mời"}
             </AdminButton>
           </div>
         </div>
@@ -193,7 +193,7 @@ export function GuestListImportManager({
         {activeGuestList.entries.length === 0 ? (
           <div className="mt-4">
             <AdminNotice tone="neutral">
-              Published guests will appear here after a successful import.
+              Khách mời đã xuất bản sẽ hiển thị ở đây sau khi nhập file thành công.
             </AdminNotice>
           </div>
         ) : null}
@@ -203,11 +203,11 @@ export function GuestListImportManager({
         <AdminTable minWidthClassName="min-w-[840px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Guest</th>
-              <th className="px-6 py-4">Access</th>
+              <th className="px-6 py-4">Khách mời</th>
+              <th className="px-6 py-4">Vùng truy cập</th>
               <th className="px-6 py-4">Email</th>
-              <th className="px-6 py-4">Phone</th>
-              <th className="px-6 py-4">Sponsor</th>
+              <th className="px-6 py-4">Số điện thoại</th>
+              <th className="px-6 py-4">Nhà tài trợ</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -222,7 +222,7 @@ export function GuestListImportManager({
                   </p>
                 </td>
                 <td className="px-6 py-5 text-sm font-semibold text-slate-700">
-                  Private guest area
+                  Khu vực khách mời
                 </td>
                 <td className="px-6 py-5 text-sm text-slate-600">{entry.email ?? "-"}</td>
                 <td className="px-6 py-5 text-sm text-slate-600">{entry.phone ?? "-"}</td>
@@ -233,7 +233,7 @@ export function GuestListImportManager({
         </AdminTable>
 
         {activeGuestList.entries.length === 0 ? (
-          <AdminEmptyState>No published guest entries yet.</AdminEmptyState>
+          <AdminEmptyState>Chưa có khách mời nào được xuất bản.</AdminEmptyState>
         ) : null}
       </AdminDataTable>
 
@@ -241,13 +241,13 @@ export function GuestListImportManager({
         <AdminTable minWidthClassName="min-w-[1080px]">
           <AdminTableHead>
             <tr>
-              <th className="px-6 py-4">Created</th>
-              <th className="px-6 py-4">File</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Rows</th>
-              <th className="px-6 py-4">Duplicates</th>
-              <th className="px-6 py-4">Version</th>
-              <th className="px-6 py-4">Actions</th>
+              <th className="px-6 py-4">Thời gian tạo</th>
+              <th className="px-6 py-4">Tên File</th>
+              <th className="px-6 py-4">Trạng thái</th>
+              <th className="px-6 py-4">Số dòng</th>
+              <th className="px-6 py-4">Dòng trùng</th>
+              <th className="px-6 py-4">Phiên bản</th>
+              <th className="px-6 py-4">Thao tác</th>
             </tr>
           </AdminTableHead>
           <AdminTableBody>
@@ -265,7 +265,7 @@ export function GuestListImportManager({
                   <AdminStatusBadge status={item.status} />
                 </td>
                 <td className="px-6 py-5 text-sm font-semibold text-slate-700">
-                  {item.summary.validRows}/{item.summary.totalRows} valid
+                  {item.summary.validRows}/{item.summary.totalRows} hợp lệ
                 </td>
                 <td className="px-6 py-5 text-sm font-semibold text-slate-700">
                   {item.summary.duplicateRows}
@@ -279,7 +279,7 @@ export function GuestListImportManager({
                       href={`/admin/guest-list/imports/${item.id}/errors`}
                       className="inline-flex min-h-11 items-center justify-center rounded border border-black/10 bg-ticket-alabaster px-4 text-sm font-black uppercase tracking-wide text-ticket-obsidian transition hover:bg-white"
                     >
-                      Errors
+                      Xem lỗi
                     </a>
                   ) : (
                     <span className="text-slate-400">-</span>
@@ -291,7 +291,7 @@ export function GuestListImportManager({
         </AdminTable>
 
         {imports.length === 0 ? (
-          <AdminEmptyState>No guest list imports yet.</AdminEmptyState>
+          <AdminEmptyState>Chưa có lượt nhập danh sách nào.</AdminEmptyState>
         ) : null}
       </AdminDataTable>
     </div>

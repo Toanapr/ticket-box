@@ -16,27 +16,27 @@ import { AdminPageShell } from "./admin-ui";
 const navItems = [
   {
     href: "/admin/dashboard",
-    label: "Dashboard",
+    label: "Bảng điều khiển",
     icon: BarChartIcon,
   },
   {
     href: "/admin/concerts",
-    label: "Concerts",
+    label: "Sự kiện",
     icon: LayersIcon,
   },
   {
     href: "/admin/notifications",
-    label: "Notifications",
+    label: "Thông báo",
     icon: BellIcon,
   },
   {
     href: "/admin/scanners",
-    label: "Scanners",
+    label: "Máy quét",
     icon: QrCodeIcon,
   },
   {
     href: "/admin/profile",
-    label: "Profile",
+    label: "Hồ sơ",
     icon: UserIcon,
   },
 ];
@@ -65,7 +65,7 @@ export function AdminAppShell({
               </span>
             </Link>
             <div className="hidden shrink-0 whitespace-nowrap rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-slate-500 sm:block">
-              Organizer workspace
+              Không gian Ban tổ chức
             </div>
           </div>
 
